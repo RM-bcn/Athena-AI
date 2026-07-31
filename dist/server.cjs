@@ -1,29 +1,52 @@
-import express from "express";
-import Groq from "groq-sdk";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
-const app = express();
-
-app.use(express.json({ limit: "10mb" }));
-
-// Helper to get Groq AI instance safely
-function getGroqClient() {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey || apiKey === "jouw_hier_geplakte_groq_sleutel") {
+// server.ts
+var import_express = __toESM(require("express"), 1);
+var import_path = __toESM(require("path"), 1);
+var import_url = require("url");
+var import_vite = require("vite");
+var import_genai = require("@google/genai");
+var import_meta = {};
+var __filename = (0, import_url.fileURLToPath)(import_meta.url);
+var __dirname = import_path.default.dirname(__filename);
+var app = (0, import_express.default)();
+var PORT = 3e3;
+app.use(import_express.default.json({ limit: "10mb" }));
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
     return null;
   }
-  return new Groq({ apiKey });
+  return new import_genai.GoogleGenAI({ apiKey });
 }
-
-// API: General Concierge Chat
 app.post("/api/chat", async (req, res) => {
   try {
     const { messages, context } = req.body;
-    const groq = getGroqClient();
-
-    if (!groq) {
+    const ai = getGeminiClient();
+    if (!ai) {
       const lastMsg = (messages?.[messages.length - 1]?.content || "").toLowerCase();
       let reply = "Kalimera! I'm Athena, your Greek Island Concierge. ";
-
       if (lastMsg.includes("ferry") || lastMsg.includes("schedule")) {
         reply += "High-speed ferries (Seajets & Blue Star) operate daily between Naxos, Milos, and Koufonisia. I recommend booking at least 48 hours in advance during high season as seats sell out quickly.";
       } else if (lastMsg.includes("taverna") || lastMsg.includes("eat") || lastMsg.includes("food")) {
@@ -35,78 +58,67 @@ app.post("/api/chat", async (req, res) => {
       } else {
         reply += "How can I refine your Cyclades journey today? Ask me about ferry schedules, hidden beaches, local tavernas, or customizing your 7-day odyssey!";
       }
-
       return res.json({ reply });
     }
-
     const systemPrompt = `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands (Athens, Milos, Naxos, Koufonisia, Mykonos, Santorini).
 You speak warmly, eloquently, and with expert local knowledge ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches, cheese, weather, Meltemi winds).
 Keep answers concise, helpful, and formatted with clean paragraphs or bullet points. Current traveler context: ${context || "Cyclades Hopping"}.`;
+    const userPrompt = messages.map((m) => `${m.role === "user" ? "Traveler" : "Athena"}: ${m.content}`).join("\n");
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [
+        { role: "user", parts: [{ text: `${systemPrompt}
 
-    const formattedMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages.map((m: any) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
-    ];
+Chat History:
+${userPrompt}
 
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: formattedMessages,
-      temperature: 0.7,
-      max_tokens: 500
+Athena:` }] }
+      ]
     });
-
-    res.json({ reply: response.choices[0]?.message?.content || "Yassou! How else may I assist your Aegean journey?" });
-  } catch (error: any) {
+    res.json({ reply: response.text || "Yassou! How else may I assist your Aegean journey?" });
+  } catch (error) {
     console.error("Chat error:", error);
     res.json({ reply: "Yassas! I'm here to assist. High season ferries and local island recommendations are all set for your Cyclades trip!" });
   }
 });
-
-// API: Translate Greek Menu / Photo OCR
-// Note: Groq does not support image input directly. This endpoint now uses text-only translation.
-// For image OCR, you would need a separate OCR service or keep Gemini for this feature.
 app.post("/api/translate-menu", async (req, res) => {
   try {
     const { imageBase64, textPrompt } = req.body;
-    const groq = getGroqClient();
-
-    if (!groq) {
+    const ai = getGeminiClient();
+    if (!ai) {
       return res.json({
-        translation: "🇬🇷 **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** (Άρνι Κλέφτικο) — Slow-baked lamb with herbs, garlic & Naxian potatoes.\n2. **Naxian Graviera** (Γραβιέρα Νάξου) — PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** (Χταπόδι Ψητό) — Grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** (Τοματοκεφτέδες) — Crispy Aegean tomato fritters with fresh mint.\n\n🍷 *Recommended pairing: Local Naxian white wine (Assyrtiko) or chilled Ouzo.*"
+        translation: "\u{1F1EC}\u{1F1F7} **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** (\u0386\u03C1\u03BD\u03B9 \u039A\u03BB\u03AD\u03C6\u03C4\u03B9\u03BA\u03BF) \u2014 Slow-baked lamb with herbs, garlic & Naxian potatoes.\n2. **Naxian Graviera** (\u0393\u03C1\u03B1\u03B2\u03B9\u03AD\u03C1\u03B1 \u039D\u03AC\u03BE\u03BF\u03C5) \u2014 PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** (\u03A7\u03C4\u03B1\u03C0\u03CC\u03B4\u03B9 \u03A8\u03B7\u03C4\u03CC) \u2014 Grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** (\u03A4\u03BF\u03BC\u03B1\u03C4\u03BF\u03BA\u03B5\u03C6\u03C4\u03AD\u03B4\u03B5\u03C2) \u2014 Crispy Aegean tomato fritters with fresh mint.\n\n\u{1F377} *Recommended pairing: Local Naxian white wine (Assyrtiko) or chilled Ouzo.*"
       });
     }
-
     const prompt = textPrompt || "Translate and explain this Greek restaurant menu in detail for a traveler. List dishes, ingredients, dietary notes, and local drink recommendations.";
-    
-    // Note: imageBase64 is ignored as Groq doesn't support vision yet
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: "You are an expert Greek cuisine translator and travel guide." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 800
+    let parts = [{ text: prompt }];
+    if (imageBase64) {
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+      parts.push({
+        inlineData: {
+          data: cleanBase64,
+          mimeType: "image/jpeg"
+        }
+      });
+    }
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [{ role: "user", parts }]
     });
-
-    res.json({ translation: response.choices[0]?.message?.content || "🇬🇷 **Menu Decoded**: Traditional Greek dishes available." });
+    res.json({ translation: response.text });
   } catch (err) {
     res.json({
-      translation: "🇬🇷 **Menu Decoded**:\n- **Moussaka** (Μουσακάς): Eggplant, minced beef & creamy béchamel.\n- **Kleftiko** (Κλέφτικο): Slow-baked tender lamb with local herbs.\n- **Dakos** (Ντάκος): Barley rusk with ripe tomatoes, feta & olives."
+      translation: "\u{1F1EC}\u{1F1F7} **Menu Decoded**:\n- **Moussaka** (\u039C\u03BF\u03C5\u03C3\u03B1\u03BA\u03AC\u03C2): Eggplant, minced beef & creamy b\xE9chamel.\n- **Kleftiko** (\u039A\u03BB\u03AD\u03C6\u03C4\u03B9\u03BA\u03BF): Slow-baked tender lamb with local herbs.\n- **Dakos** (\u039D\u03C4\u03AC\u03BA\u03BF\u03C2): Barley rusk with ripe tomatoes, feta & olives."
     });
   }
 });
-
-// API: Trivago-Style AI Hotel Search & Suggestions
 app.post("/api/suggest-hotels", async (req, res) => {
   try {
     const { island, style } = req.body;
-    const groq = getGroqClient();
-
+    const ai = getGeminiClient();
     const curIsland = island || "Naxos";
-
-    if (!groq) {
-      const defaultSuggestions: Record<string, any[]> = {
+    if (!ai) {
+      const defaultSuggestions = {
         "Milos": [
           {
             id: "milos-1",
@@ -117,7 +129,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Buitengewoon",
             reviewsCount: 420,
             pricePerNight: 195,
-            tag: "Trivago Best Deal • Infinity Pool",
+            tag: "Trivago Best Deal \u2022 Infinity Pool",
             amenities: ["Infinity Pool", "Panoramisch Zeezicht", "Ontbijt inbegrepen", "Cocktailbar"],
             distanceToBeach: "100m van Pollonia baai",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAOZr5gGB1weJa8rMWnTL0uY6A01WC5nthIOndYdcCtpttUQLwLh5AakhZXjrKuZAd-FlZxvC9U4iOG6J1e4uXAU0Oor1utW2UD2XdtLlyTYdPEvvsyc5BoKJauF55-AlZneX0ckYM1_LET_RPpwUyIa5WmgE0C6LF_12sbGkfLudDNSzsfAwn0fDiT4AYFxNTCRK6DUsyqEuIZGC4SIRD3jSYmMlEkbJkF-osO32NfbUjKSaFLZfFLeA"
@@ -131,8 +143,8 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Uitstekend",
             reviewsCount: 188,
             pricePerNight: 280,
-            tag: "Privé Zwembad • Adult Only",
-            amenities: ["Privé Plunge Pool", "Klimaatbeheersing", "Luxe Spa", "Sunset View"],
+            tag: "Priv\xE9 Zwembad \u2022 Adult Only",
+            amenities: ["Priv\xE9 Plunge Pool", "Klimaatbeheersing", "Luxe Spa", "Sunset View"],
             distanceToBeach: "Direct aan de Kust",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAyhUXPPtvq8bz7gDp3yHkjbE2nRwSRYNsxxAThh5mnuZMtf8gSAisxi0LSA6sMuQ3-6c0Ly0gTldOEBIuck1WYLu9XYwPYxB1ZygQnG1LF29tdlUoqWl1o74iv7PDayCoNP2Lea4Hy3lDYilB1xof9BX2FcAUN-lNLPdjJeB4Wrx6NhCyo4Q9aGkVVHcCxQWj6UR1iRjSJ51rJe2VRjjJ8jwygei0v_UOmhcPrE29vNRDy7m3MR5udzw"
           },
@@ -145,7 +157,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Geweldig",
             reviewsCount: 310,
             pricePerNight: 140,
-            tag: "Strandresort • Populair",
+            tag: "Strandresort \u2022 Populair",
             amenities: ["Strandbedden gratis", "Beach Club", "Gratis Wifi", "Parkeergelegenheid"],
             distanceToBeach: "Direct aan het zandstrand",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBO2PXtkrNV1rQmK7bALaUm6APlIKnswhv2eg7XwGwJiQOEDev_6SQoHR1-oseY1Xq_qrDFULn21JCwnC8D9KI8MYN4uqNjevH9XLAu8QSoR01f-VeSHkQlyiQKBRJ8YnC3NGXII49v6sl1bnrlM0HzxqCsUuV5S49XzvRvxHJ2YB1VU3vNJXIS6ReANKM0GAYPEHwYIlFb6OteFNGnyWVzl5oJF6-RDYQynXeWGrGlJ-luu2qxVItFPA"
@@ -161,7 +173,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Buitengewoon",
             reviewsCount: 512,
             pricePerNight: 165,
-            tag: "Trivago Top Keuze • Aan het Strand",
+            tag: "Trivago Top Keuze \u2022 Aan het Strand",
             amenities: ["Zwembad", "Gastronomisch Ontbijt", "Loopafstand van Chora Centrum", "Balkon met zeezicht"],
             distanceToBeach: "20m van het strand",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ"
@@ -175,7 +187,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Uitstekend",
             reviewsCount: 295,
             pricePerNight: 185,
-            tag: "Rooftop Pool • Luxe Spa",
+            tag: "Rooftop Pool \u2022 Luxe Spa",
             amenities: ["Rooftop Infinity Pool", "Spa & Wellness", "Restaurant", "Gratis Shuttle"],
             distanceToBeach: "100m van Agios Prokopios",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCHfBiyPTGMH6A0nprYOehSC76_PtO8RRUX4vI4Ieh_1j8l_CgiD8Zll_7okT16X08G3LcGVGV0YktEzwE0-c1yefk6fQUcyZWVoLKlNR1M1aRbg-ihQ6XBcS6rjALkkbFQLjZaxZS52V_EcHxf5Z_qxsEtDUs_Qf0uWRRh2nIEyGswCTugHHE3vUXLuk6icIsv0FXwVCq0FMz0WolXA0MmDPZESRLq4RdUQCUaXC0TH9EM-U6O83iIUQ"
@@ -205,7 +217,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Buitengewoon",
             reviewsCount: 230,
             pricePerNight: 175,
-            tag: "Trivago Top Tip • Cycladisch Design",
+            tag: "Trivago Top Tip \u2022 Cycladisch Design",
             amenities: ["Zwembad", "Biologisch Ontbijt", "Gratis Fietsverhuur", "Rustige Tuin"],
             distanceToBeach: "150m van de Hawen & Ammos Strand",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCX9IVh2F1IBAIsKj7jOD861n8sugmHDcElOR3VKlyaBLHMKRkHMtcpApETSM6CS45kARGz9dXLjdJ9suE50sTHDIcVcCsQ2OywJv15Y137fWCYEo0JeGArizL5wilGyNJwmhe_yeOqm83XRgO7IW5wVs7eZ-sVqkfzO80SLcYrpQ6s3L0oMOF9-E1zN3kSTh-PqREp5WC6d8OTrD6rtJ3XTS18aOgZzWGxiCipBwErygHLPtoKWvEl3w"
@@ -219,37 +231,26 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Uitstekend",
             reviewsCount: 145,
             pricePerNight: 210,
-            tag: "Verborgen Parel • Turquoise Baai",
+            tag: "Verborgen Parel \u2022 Turquoise Baai",
             amenities: ["Panoramisch Terras", "Directe Strandtoegang", "Keukenette", "Airco"],
             distanceToBeach: "Direct aan Pori Beach",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuA3FFMdo8xBV7-uf2HAOHtIioK0k8dyWwal_M7sOkja-Fjnc3rZKSxLJstWux3EghAakbbyrObm3LJ26sIPxtWfqCdPp26M_anuaoJaoxbE9Xa5UcbpZxZrrNX6DONr4D0DYoIL2eYsx4viIB68nhqpWrBo2IV-0Y3FledGzfxNPxJyo8frMATv4TCsVRk1ZZiGUiKXyO4DbMvCK9d12fIRwdwoaKcJqmEYX5qAs5LL0yIn5JBxNTGAEg"
           }
         ]
       };
-
       const results = defaultSuggestions[curIsland] || defaultSuggestions["Naxos"];
       return res.json({ hotels: results });
     }
-
     const prompt = `Act as a Trivago-style hotel search engine for the Greek island of ${curIsland} (style preference: ${style || "all"}). 
 Generate 3 realistic, highly-rated boutique hotels or resorts on ${curIsland}. 
-Return valid JSON array of objects with keys: id, name, location, island, rating (number like 9.4), ratingLabel (e.g. "Buitengewoon" or "Uitstekend"), reviewsCount (number), pricePerNight (number in EUR), tag (e.g. "Trivago Deal • Zeezicht"), amenities (array of string in Dutch), distanceToBeach (string in Dutch).`;
-
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: "You are a hotel search engine assistant. Return ONLY valid JSON." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 1000
+Return valid JSON array of objects with keys: id, name, location, island, rating (number like 9.4), ratingLabel (e.g. "Buitengewoon" or "Uitstekend"), reviewsCount (number), pricePerNight (number in EUR), tag (e.g. "Trivago Deal \u2022 Zeezicht"), amenities (array of string in Dutch), distanceToBeach (string in Dutch).`;
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
-
     try {
-      const rawText = response.choices[0]?.message?.content || "[]";
-      const cleanedText = rawText.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(cleanedText);
-      const enriched = parsed.map((h: any, i: number) => ({
+      const parsed = JSON.parse(response.text?.replace(/```json|```/g, "").trim() || "[]");
+      const enriched = parsed.map((h, i) => ({
         ...h,
         image: h.image || [
           "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ",
@@ -270,7 +271,7 @@ Return valid JSON array of objects with keys: id, name, location, island, rating
             ratingLabel: "Buitengewoon",
             reviewsCount: 280,
             pricePerNight: 175,
-            tag: "Trivago Best Deal • Zeezicht",
+            tag: "Trivago Best Deal \u2022 Zeezicht",
             amenities: ["Zwembad", "Ontbijt inbegrepen", "Zeezicht", "Gratis Wifi"],
             distanceToBeach: "50m van het strand",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ"
@@ -282,14 +283,11 @@ Return valid JSON array of objects with keys: id, name, location, island, rating
     res.json({ hotels: [] });
   }
 });
-
-// API: Resolve Missed Ferry Emergency Assistant
 app.post("/api/resolve-ferry", async (req, res) => {
   try {
     const { currentPort, destination, time } = req.body;
-    const groq = getGroqClient();
-
-    if (!groq) {
+    const ai = getGeminiClient();
+    if (!ai) {
       return res.json({
         resolution: {
           status: "Found Alternatives",
@@ -299,7 +297,7 @@ app.post("/api/resolve-ferry", async (req, res) => {
               operator: "Seajets WorldChampion Jet",
               departure: "14:15",
               arrival: "15:00",
-              price: "€42.50",
+              price: "\u20AC42.50",
               notes: "Fastest option. 12 seats remaining."
             },
             {
@@ -307,7 +305,7 @@ app.post("/api/resolve-ferry", async (req, res) => {
               operator: "Blue Star Delos",
               departure: "17:30",
               arrival: "18:45",
-              price: "€28.00",
+              price: "\u20AC28.00",
               notes: "Spacious deck, reliable in Meltemi winds."
             }
           ],
@@ -316,32 +314,22 @@ app.post("/api/resolve-ferry", async (req, res) => {
         }
       });
     }
-
     const prompt = `A traveler in ${currentPort || "Milos"} missed their ferry to ${destination || "Naxos"}. 
 Generate emergency assistance options including next available hydrofoils/ferries, estimated times, ticket office guidance, and temporary port hotel recommendation. Format response as JSON with fields: status, options (array of {type, operator, departure, arrival, price, notes}), recommendedHotel, advice.`;
-
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: "You are an emergency travel assistant. Return ONLY valid JSON." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 600
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
-
     try {
-      const rawText = response.choices[0]?.message?.content || "{}";
-      const cleanedText = rawText.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(cleanedText);
+      const parsed = JSON.parse(response.text?.replace(/```json|```/g, "").trim() || "{}");
       return res.json({ resolution: parsed });
     } catch {
       return res.json({
         resolution: {
           status: "Found Alternatives",
           options: [
-            { type: "Hydrofoil", operator: "Seajets Champion Jet 2", departure: "14:15", arrival: "15:05", price: "€42.50", notes: "12 seats remaining" },
-            { type: "Ferry", operator: "Blue Star Naxos", departure: "17:30", arrival: "18:45", price: "€28.00", notes: "Comfortable lounge" }
+            { type: "Hydrofoil", operator: "Seajets Champion Jet 2", departure: "14:15", arrival: "15:05", price: "\u20AC42.50", notes: "12 seats remaining" },
+            { type: "Ferry", operator: "Blue Star Naxos", departure: "17:30", arrival: "18:45", price: "\u20AC28.00", notes: "Comfortable lounge" }
           ],
           recommendedHotel: "Porto Naxos Suites",
           advice: "You can rebook instantly or Athena can hold seats for 30 minutes."
@@ -353,7 +341,7 @@ Generate emergency assistance options including next available hydrofoils/ferrie
       resolution: {
         status: "Alternatives Available",
         options: [
-          { type: "Express Catamaran", operator: "Seajets", departure: "14:15", arrival: "15:05", price: "€42.50", notes: "Direct service" }
+          { type: "Express Catamaran", operator: "Seajets", departure: "14:15", arrival: "15:05", price: "\u20AC42.50", notes: "Direct service" }
         ],
         recommendedHotel: "Naxos Beach Hotel",
         advice: "Contact Athena Concierge to confirm booking."
@@ -361,5 +349,23 @@ Generate emergency assistance options including next available hydrofoils/ferrie
     });
   }
 });
-
-export default app;
+async function startServer() {
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await (0, import_vite.createServer)({
+      server: { middlewareMode: true },
+      appType: "spa"
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = import_path.default.join(process.cwd(), "dist");
+    app.use(import_express.default.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(import_path.default.join(distPath, "index.html"));
+    });
+  }
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+startServer();
+//# sourceMappingURL=server.cjs.map
