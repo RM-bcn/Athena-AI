@@ -1,0 +1,6 @@
+{
+  "name": "Athena AI - Mediterranean Concierge",
+  "description": "Greek island hopping AI concierge app with interactive itinerary, quick help, ferry assistance, and real-time travel chat.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

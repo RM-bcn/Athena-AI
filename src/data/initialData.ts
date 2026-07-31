@@ -1,0 +1,151 @@
+import { DailyItinerary, Accommodation, LocalTip, WeatherInfo, TimelineStop, ChatMessage } from '../types';
+
+export const USER_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuD2iljiBhAsAiyvXWmhlOpuzfMWXAD_6mWv-5fDLMBf3sg2vJy9asYoS5YaZPVDoEBA7qxAHSKb0pO59uwDBRdIA_MVVffoC1E2MXONsSBGM8LCr-gO5WJJASZ-WrLNH10HW_Sx--2HrxnPQP4dD2jQTrjH4xKSGo4Ci5xKFozY74ntm8n5I9KU2ERvxpUF_IkyJfnGf4_o7bXakzsJXyoTwLBCEBjRf7_rgQZC0Zq6srzRTiUqCXVyKA";
+
+export const CHAT_USER_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuD0ruwA2ULiUXslSNEkdMRmxxDJZdyJ3o9diwVU8Zr5YC_87GWALt7tpdexyLGagepnOhOpbaMGsZPUPt0AJ9zeMzT-nUfcqne6y9eLajmKKjVY8RqY414wGfnr0N4r1JhkBh5OJhoHsDiJpTj5ONzHIb-beF-telmiq3OUvjxEOfINr1HLXb6SbJhO_TEPtKOXiIVyG9qX5N2w-nuAXjOjdVjRRd1d0K85u0tChf-zGRBpD13KWAeGwQ";
+
+export const MAP_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuAta1iXUylLTlU63J0scmScd74uZmKtuSDg0z_lyL0-AR1wKzCjSVF5vSBL33c9yS_NA19nLafkLUeLakj2BNRzCC0dfNXbgk00DBrQj8Av3w_6n-2fVPvuKIefXm88L8QDMR04sWfozhgiqb6Op7zL7RphOXQAEAl-aPKPHt4qS0oc728u6tSiDLRgJo0AqEJkM6TeptPffLiJpZr8QHrPcl9j3rFnYR-VHlXU7UERmNhOoi0fB-3rmw";
+
+export const PORTARA_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuBGnyljvgfgiAVVRcJsYIcvifjq5T0nmamAn0qRt33WTfpzv5ju6GPyGWy0ZmBTYxxpJFoU8dv-_FrnICwIfpG_kIkMzQur1PJ3ZygJG2zIUlVNPLicldpkmEvo4WRFwKlN824h5GES-iLH0AlTHAWdMR8MhufUpaTa76Lnih1OmcVhpNzHzauFFr9gbsru5EdfkK1NqfbwiOws7DKzynf8g1305DY74ER2oW2VC_QWrzQaM9SBEPeFfA";
+
+export const NISSAKI_HOTEL_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ";
+
+export const MILOS_BOUTIQUE_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuAOZr5gGB1weJa8rMWnTL0uY6A01WC5nthIOndYdcCtpttUQLwLh5AakhZXjrKuZAd-FlZxvC9U4iOG6J1e4uXAU0Oor1utW2UD2XdtLlyTYdPEvvsyc5BoKJauF55-AlZneX0ckYM1_LET_RPpwUyIa5WmgE0C6LF_12sbGkfLudDNSzsfAwn0fDiT4AYFxNTCRK6DUsyqEuIZGC4SIRD3jSYmMlEkbJkF-osO32NfbUjKSaFLZfFLeA";
+
+export const MISSED_FERRY_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuAyhUXPPtvq8bz7gDp3yHkjbE2nRwSRYNsxxAThh5mnuZMtf8gSAisxi0LSA6sMuQ3-6c0Ly0gTldOEBIuck1WYLu9XYwPYxB1ZygQnG1LF29tdlUoqWl1o74iv7PDayCoNP2Lea4Hy3lDYilB1xof9BX2FcAUN-lNLPdjJeB4Wrx6NhCyo4Q9aGkVVHcCxQWj6UR1iRjSJ51rJe2VRjjJ8jwygei0v_UOmhcPrE29vNRDy7m3MR5udzw";
+
+export const TAVERNA_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuBO2PXtkrNV1rQmK7bALaUm6APlIKnswhv2eg7XwGwJiQOEDev_6SQoHR1-oseY1Xq_qrDFULn21JCwnC8D9KI8MYN4uqNjevH9XLAu8QSoR01f-VeSHkQlyiQKBRJ8YnC3NGXII49v6sl1bnrlM0HzxqCsUuV5S49XzvRvxHJ2YB1VU3vNJXIS6ReANKM0GAYPEHwYIlFb6OteFNGnyWVzl5oJF6-RDYQynXeWGrGlJ-luu2qxVItFPA";
+
+export const QUIET_BEACH_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuA3FFMdo8xBV7-uf2HAOHtIioK0k8dyWwal_M7sOkja-Fjnc3rZKSxLJstWux3EghAakbbyrObm3LJ26sIPxtWfqCdPp26M_anuaoJaoxbE9Xa5UcbpZxZrrNX6DONr4D0DYoIL2eYsx4viIB68nhqpWrBo2IV-0Y3FledGzfxNPxJyo8frMATv4TCsVRk1ZZiGUiKXyO4DbMvCK9d12fIRwdwoaKcJqmEYX5qAs5LL0yIn5JBxNTGAEg";
+
+export const CHAT_NAXOS_CARD_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuCHfBiyPTGMH6A0nprYOehSC76_PtO8RRUX4vI4Ieh_1j8l_CgiD8Zll_7okT16X08G3LcGVGV0YktEzwE0-c1yefk6fQUcyZWVoLKlNR1M1aRbg-ihQ6XBcS6rjALkkbFQLjZaxZS52V_EcHxf5Z_qxsEtDUs_Qf0uWRRh2nIEyGswCTugHHE3vUXLuk6icIsv0FXwVCq0FMz0WolXA0MmDPZESRLq4RdUQCUaXC0TH9EM-U6O83iIUQ";
+
+export const CHAT_KOUFONISIA_CARD_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuCX9IVh2F1IBAIsKj7jOD861n8sugmHDcElOR3VKlyaBLHMKRkHMtcpApETSM6CS45kARGz9dXLjdJ9suE50sTHDIcVcCsQ2OywJv15Y137fWCYEo0JeGArizL5wilGyNJwmhe_yeOqm83XRgO7IW5wVs7eZ-sVqkfzO80SLcYrpQ6s3L0oMOF9-E1zN3kSTh-PqREp5WC6d8OTrD6rtJ3XTS18aOgZzWGxiCipBwErygHLPtoKWvEl3w";
+
+export const CHAT_BACKGROUND_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuCMGa56WVENSuvyFr4wKttGjpj-NyyEtz4FNZkQXsohrXFxuoi4FuNI8bdtimcT-zM4M5Mv5PZLUIWiDmz_50ZlZk7jIota_2WermUURZTq-NmNnbCqkDKfZn2KG2jeasE32uX71OLYLUStXMsy5uUjz085vjzbZ-xhl29umgKT5xYTLMRe5wzE0Ax-c8DYVaGUJBT5bYpTFxhiS6bzf7_k9xhW1QjGAtauG6kb0REBCRP4JBXhvs8Iaw";
+
+export const initialTimelineStops: TimelineStop[] = [
+  { id: 'milos', days: '1-2', island: 'Milos' },
+  { id: 'naxos', days: '3-5', island: 'Naxos', isActive: true },
+  { id: 'mykonos', days: '6-7', island: 'Mykonos' },
+];
+
+export const initialDailyItineraries: DailyItinerary[] = [
+  {
+    dayNumber: 3,
+    title: "Arrival in Naxos",
+    image: PORTARA_IMAGE,
+    ferryInfo: "Blue Star Ferry from Milos (09:30 AM — 11:45 AM)",
+    locationInfo: "Walk through Naxos Old Town (Chora)",
+    diningInfo: "Lunch at Meze2 for traditional Greek flavors",
+    chips: [
+      { id: '1', label: 'Portara Sunset' },
+      { id: '2', label: 'Medieval Castle' },
+      { id: '3', label: 'Local Cheese Tasting' },
+    ],
+    isActive: true,
+  },
+  {
+    dayNumber: 4,
+    title: "Mountain Villages & Ancient Ruins",
+    description: "Explore the marble-paved streets of Apeiranthos and the ancient Temple of Demeter at Sangri.",
+    isActive: false,
+  },
+  {
+    dayNumber: 5,
+    title: "Secluded Beaches & Alyko Cedar Forest",
+    description: "Swim in turquoise waters at Plaka and discover the street art hidden in the abandoned hotel of Alyko.",
+    isActive: false,
+  }
+];
+
+export const initialAccommodations: Accommodation[] = [
+  {
+    id: 'nissaki',
+    name: 'Nissaki Beach Hotel',
+    location: 'Agios Georgios, Naxos',
+    status: 'CONFIRMED',
+    image: NISSAKI_HOTEL_IMAGE,
+  },
+  {
+    id: 'milos-breeze',
+    name: 'Milos Breeze Boutique',
+    location: 'Pollonia, Milos',
+    status: 'PAST STAY',
+    image: MILOS_BOUTIQUE_IMAGE,
+  }
+];
+
+export const initialLocalTips: LocalTip[] = [
+  {
+    id: 'ferry-tip',
+    text: '"Book ferry tickets at least 48 hours in advance during high season as popular routes sell out quickly."',
+    highlight: true,
+  },
+  {
+    id: 'cheese',
+    text: 'Try the local Naxian Gruyère (Graviera) cheese.',
+  },
+  {
+    id: 'atv',
+    text: 'Rent a small ATV to explore hidden beaches.',
+  },
+  {
+    id: 'cash',
+    text: 'Carry some cash for small village tavernas.',
+  }
+];
+
+export const initialWeather: WeatherInfo = {
+  location: 'Naxos',
+  temp: 28,
+  unit: 'C',
+  condition: 'Sunny with a gentle Meltemi breeze. Perfect for sailing.',
+  sunrise: '06:42 AM',
+  sunset: '08:14 PM',
+};
+
+export const initialChatMessages: ChatMessage[] = [
+  {
+    id: 'msg-1',
+    role: 'assistant',
+    senderName: 'Athena',
+    timestamp: '10:24 AM',
+    content: "Kalimera, Alexandros! I'm Athena, your Greek island expert. I see you're planning a trip for September—the perfect time for the Cyclades. The winds are calmer and the sunset in Oia is less crowded.\n\nAre we looking for a romantic itinerary through Santorini and Milos, or perhaps something more adventurous in Naxos?"
+  },
+  {
+    id: 'msg-2',
+    role: 'user',
+    senderName: 'Alexandros P.',
+    avatar: CHAT_USER_AVATAR,
+    timestamp: '10:26 AM',
+    content: "I'm thinking of something adventurous! Naxos sounds great, but I also heard Koufonisia is a hidden gem. Can you help me plan a 5-day hop between them? Also, what's the ferry status for that week?"
+  },
+  {
+    id: 'msg-3',
+    role: 'assistant',
+    senderName: 'Athena',
+    timestamp: '10:27 AM',
+    content: "Wonderful choices! Naxos is the largest Cyclade and perfect for hiking and exploring ancient ruins, while Koufonisia offers the most crystal-clear turquoise waters you'll ever see. Here's a quick look at how we could structure this:",
+    cards: [
+      {
+        id: 'card-1',
+        days: 'Day 1-3',
+        title: 'Naxos Adventure',
+        description: 'Hiking Mt. Zeus & Portara sunset.',
+        image: CHAT_NAXOS_CARD_IMAGE
+      },
+      {
+        id: 'card-2',
+        days: 'Day 4-5',
+        title: 'Koufonisia Relaxation',
+        description: 'Biking between Pori & Italida beaches.',
+        image: CHAT_KOUFONISIA_CARD_IMAGE
+      }
+    ],
+    quickButtons: [
+      { label: 'Detailed /plan', action: '/plan' },
+      { label: 'Adjust dates', action: 'adjust_dates' }
+    ]
+  }
+];
