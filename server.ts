@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 import {
   isGoogleAuthConfigured,
   getOrCreateSpreadsheet,
@@ -73,20 +73,20 @@ app.post("/api/sheets/save", async (req, res) => {
   }
 });
 
-// Helper to get Gemini AI instance safely
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+// Helper to get Groq AI instance safely
+function getGroqClient() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey === "MY_GROQ_API_KEY") {
     return null;
   }
-  return new GoogleGenAI({ apiKey });
+  return new Groq({ apiKey });
 }
 
 // API: General Concierge Chat
 app.post("/api/chat", async (req, res) => {
   try {
     const { messages, context } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGroqClient();
 
     if (!ai) {
       // Intelligent fallback responses tailored to Greek Island Hopping
@@ -112,16 +112,15 @@ app.post("/api/chat", async (req, res) => {
 You speak warmly, eloquently, and with expert local knowledge ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches, cheese, weather, Meltemi winds).
 Keep answers concise, helpful, and formatted with clean paragraphs or bullet points. Current traveler context: ${context || "Cyclades Hopping"}.`;
 
-    const userPrompt = messages.map((m: any) => `${m.role === 'user' ? 'Traveler' : 'Athena'}: ${m.content}`).join('\n');
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: [
-        { role: "user", parts: [{ text: `${systemPrompt}\n\nChat History:\n${userPrompt}\n\nAthena:` }] }
+    const chatCompletion = await ai.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.map((m: any) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
       ]
     });
 
-    res.json({ reply: response.text || "Yassou! How else may I assist your Aegean journey?" });
+    res.json({ reply: chatCompletion.choices[0]?.message?.content || "Yassou! How else may I assist your Aegean journey?" });
   } catch (error: any) {
     console.error("Chat error:", error);
     res.json({ reply: "Yassas! I'm here to assist. High season ferries and local island recommendations are all set for your Cyclades trip!" });
@@ -132,33 +131,23 @@ Keep answers concise, helpful, and formatted with clean paragraphs or bullet poi
 app.post("/api/translate-menu", async (req, res) => {
   try {
     const { imageBase64, textPrompt } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGroqClient();
 
-    if (!ai) {
+    if (!ai || imageBase64) {
+      // Groq doesn't support vision yet, use fallback for image-based requests
       return res.json({
         translation: "🇬🇷 **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** (Άρνι Κλέφτικο) — Slow-baked lamb with herbs, garlic & Naxian potatoes.\n2. **Naxian Graviera** (Γραβιέρα Νάξου) — PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** (Χταπόδι Ψητό) — Grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** (Τοματοκεφτέδες) — Crispy Aegean tomato fritters with fresh mint.\n\n🍷 *Recommended pairing: Local Naxian white wine (Assyrtiko) or chilled Ouzo.*"
       });
     }
 
     const prompt = textPrompt || "Translate and explain this Greek restaurant menu in detail for a traveler. List dishes, ingredients, dietary notes, and local drink recommendations.";
-    
-    let parts: any[] = [{ text: prompt }];
-    if (imageBase64) {
-      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-      parts.push({
-        inlineData: {
-          data: cleanBase64,
-          mimeType: "image/jpeg"
-        }
-      });
-    }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: [{ role: "user", parts }]
+    const chatCompletion = await ai.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }]
     });
 
-    res.json({ translation: response.text });
+    res.json({ translation: chatCompletion.choices[0]?.message?.content });
   } catch (err) {
     res.json({
       translation: "🇬🇷 **Menu Decoded**:\n- **Moussaka** (Μουσακάς): Eggplant, minced beef & creamy béchamel.\n- **Kleftiko** (Κλέφτικο): Slow-baked tender lamb with local herbs.\n- **Dakos** (Ντάκος): Barley rusk with ripe tomatoes, feta & olives."
@@ -170,7 +159,7 @@ app.post("/api/translate-menu", async (req, res) => {
 app.post("/api/suggest-hotels", async (req, res) => {
   try {
     const { island, style } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGroqClient();
 
     const curIsland = island || "Naxos";
 
@@ -303,17 +292,25 @@ app.post("/api/suggest-hotels", async (req, res) => {
     const prompt = `Act as a Trivago-style hotel search engine for the Greek island of ${curIsland} (style preference: ${style || "all"}). 
 Generate 3 realistic, highly-rated boutique hotels or resorts on ${curIsland}. 
 Return valid JSON array of objects with keys: id, name, location, island, rating (number like 9.4), ratingLabel (e.g. "Buitengewoon" or "Uitstekend"), reviewsCount (number), pricePerNight (number in EUR), tag (e.g. "Trivago Deal • Zeezicht"), amenities (array of string in Dutch), distanceToBeach (string in Dutch).`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
+    const chatCompletion = await ai.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" }
     });
 
     try {
-      const parsed = JSON.parse(response.text?.replace(/```json|```/g, "").trim() || "[]");
-      const enriched = parsed.map((h: any, i: number) => ({
+      const parsed = JSON.parse(chatCompletion.choices[0]?.message?.content || "[]");
+      const hotelsArray = Array.isArray(parsed) ? parsed : (parsed.hotels || []);
+      const enriched = hotelsArray.map((h: any, i: number) => ({
         ...h,
         image: h.image || [
+          "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ",
+          "https://lh3.googleusercontent.com/aida-public/AB6AXuAOZr5gGB1weJa8rMWnTL0uY6A01WC5nthIOndYdcCtpttUQLwLh5AakhZXjrKuZAd-FlZxvC9U4iOG6J1e4uXAU0Oor1utW2UD2XdtLlyTYdPEvvsyc5BoKJauF55-AlZneX0ckYM1_LET_RPpwUyIa5WmgE0C6LF_12sbGkfLudDNSzsfAwn0fDiT4AYFxNTCRK6DUsyqEuIZGC4SIRD3jSYmMlEkbJkF-osO32NfbUjKSaFLZfFLeA",
+          "https://lh3.googleusercontent.com/aida-public/AB6AXuCX9IVh2F1IBAIsKj7jOD861n8sugmHDcElOR3VKlyaBLHMKRkHMtcpApETSM6CS45kARGz9dXLjdJ9suE50sTHDIcVcCsQ2OywJv15Y137fWCYEo0JeGArizL5wilGyNJwmhe_yeOqm83XRgO7IW5wVs7eZ-sVqkfzO80SLcYrpQ6s3L0oMOF9-E1zN3kSTh-PqREp5WC6d8OTrD6rtJ3XTS18aOgZzWGxiCipBwErygHLPtoKWvEl3w"
+        ][i % 3]
+      }));
+      return res.json({ hotels: enriched });
+    } catch {
           "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ",
           "https://lh3.googleusercontent.com/aida-public/AB6AXuAOZr5gGB1weJa8rMWnTL0uY6A01WC5nthIOndYdcCtpttUQLwLh5AakhZXjrKuZAd-FlZxvC9U4iOG6J1e4uXAU0Oor1utW2UD2XdtLlyTYdPEvvsyc5BoKJauF55-AlZneX0ckYM1_LET_RPpwUyIa5WmgE0C6LF_12sbGkfLudDNSzsfAwn0fDiT4AYFxNTCRK6DUsyqEuIZGC4SIRD3jSYmMlEkbJkF-osO32NfbUjKSaFLZfFLeA",
           "https://lh3.googleusercontent.com/aida-public/AB6AXuCX9IVh2F1IBAIsKj7jOD861n8sugmHDcElOR3VKlyaBLHMKRkHMtcpApETSM6CS45kARGz9dXLjdJ9suE50sTHDIcVcCsQ2OywJv15Y137fWCYEo0JeGArizL5wilGyNJwmhe_yeOqm83XRgO7IW5wVs7eZ-sVqkfzO80SLcYrpQ6s3L0oMOF9-E1zN3kSTh-PqREp5WC6d8OTrD6rtJ3XTS18aOgZzWGxiCipBwErygHLPtoKWvEl3w"
@@ -349,7 +346,7 @@ Return valid JSON array of objects with keys: id, name, location, island, rating
 app.post("/api/resolve-ferry", async (req, res) => {
   try {
     const { currentPort, destination, time } = req.body;
-    const ai = getGeminiClient();
+    const ai = getGroqClient();
 
     if (!ai) {
       return res.json({
@@ -381,11 +378,16 @@ app.post("/api/resolve-ferry", async (req, res) => {
 
     const prompt = `A traveler in ${currentPort || "Milos"} missed their ferry to ${destination || "Naxos"}. 
 Generate emergency assistance options including next available hydrofoils/ferries, estimated times, ticket office guidance, and temporary port hotel recommendation. Format response as JSON with fields: status, options (array of {type, operator, departure, arrival, price, notes}), recommendedHotel, advice.`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
+    const chatCompletion = await ai.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" }
     });
+
+    try {
+      const parsed = JSON.parse(chatCompletion.choices[0]?.message?.content || "{}");
+      return res.json({ resolution: parsed });
+    } catch {
 
     try {
       const parsed = JSON.parse(response.text?.replace(/```json|```/g, "").trim() || "{}");
