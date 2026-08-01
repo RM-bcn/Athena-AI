@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
-import Groq from "groq-sdk";
+import { GoogleGenAI } from "@google/genai";
 import {
   isGoogleAuthConfigured,
   getOrCreateSpreadsheet,
@@ -73,54 +73,116 @@ app.post("/api/sheets/save", async (req, res) => {
   }
 });
 
-// Helper to get Groq AI instance safely
-function getGroqClient() {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey || apiKey === "MY_GROQ_API_KEY") {
+// Helper to get Gemini AI instance safely
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
     return null;
   }
-  return new Groq({ apiKey });
+  return new GoogleGenAI({ apiKey });
 }
+
+// Helper to call Groq API safely (Primary AI Engine)
+async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<string | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey === "MY_GROQ_API_KEY" || apiKey.trim() === "") {
+    return null;
+  }
+
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey.trim()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Groq API error:", res.status, errText);
+      return null;
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || null;
+  } catch (err) {
+    console.error("Groq API exception:", err);
+    return null;
+  }
+}
+
+// API: AI Engine Status
+app.get("/api/ai/status", (req, res) => {
+  const hasGroq = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== "MY_GROQ_API_KEY");
+  const hasGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY");
+
+  res.json({
+    activeEngine: hasGroq
+      ? "Groq Llama-3.3-70B (Ultra-fast)"
+      : hasGemini
+      ? "Gemini 3.6 Flash"
+      : "Greek Concierge Offline Mode",
+    hasGroqKey: hasGroq,
+    hasGeminiKey: hasGemini,
+  });
+});
 
 // API: General Concierge Chat
 app.post("/api/chat", async (req, res) => {
   try {
     const { messages, context } = req.body;
-    const ai = getGroqClient();
-
-    if (!ai) {
-      // Intelligent fallback responses tailored to Greek Island Hopping
-      const lastMsg = (messages?.[messages.length - 1]?.content || "").toLowerCase();
-      let reply = "Kalimera! I'm Athena, your Greek Island Concierge. ";
-
-      if (lastMsg.includes("ferry") || lastMsg.includes("schedule")) {
-        reply += "High-speed ferries (Seajets & Blue Star) operate daily between Naxos, Milos, and Koufonisia. I recommend booking at least 48 hours in advance during high season as seats sell out quickly.";
-      } else if (lastMsg.includes("taverna") || lastMsg.includes("eat") || lastMsg.includes("food")) {
-        reply += "For authentic Greek cuisine in Naxos Old Town, I highly recommend Meze2 or Rotonda in Apeiranthos for sunset views over the mountain valleys. Don't forget to sample local Graviera cheese!";
-      } else if (lastMsg.includes("beach") || lastMsg.includes("swim")) {
-        reply += "In Koufonisia, Pori Beach and Italida offer some of the clearest turquoise waters in the Aegean. For a secluded spot, try Gala Beach or the natural pool at Devil's Eye!";
-      } else if (lastMsg.includes("naxos") || lastMsg.includes("koufonisia")) {
-        reply += "Naxos and Koufonisia make a perfect 5-day combination! Days 1-3 in Naxos feature hiking Mt. Zeus, exploring the Portara, and ancient ruins. Days 4-5 in Koufonisia are pure relaxation on pristine beaches.";
-      } else {
-        reply += "How can I refine your Cyclades journey today? Ask me about ferry schedules, hidden beaches, local tavernas, or customizing your 7-day odyssey!";
-      }
-
-      return res.json({ reply });
-    }
 
     const systemPrompt = `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands (Athens, Milos, Naxos, Koufonisia, Mykonos, Santorini).
 You speak warmly, eloquently, and with expert local knowledge ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches, cheese, weather, Meltemi winds).
 Keep answers concise, helpful, and formatted with clean paragraphs or bullet points. Current traveler context: ${context || "Cyclades Hopping"}.`;
 
-    const chatCompletion = await ai.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages.map((m: any) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
-      ]
-    });
+    const userPrompt = (messages || []).map((m: any) => `${m.role === 'user' ? 'Traveler' : 'Athena'}: ${m.content}`).join('\n');
 
-    res.json({ reply: chatCompletion.choices[0]?.message?.content || "Yassou! How else may I assist your Aegean journey?" });
+    // 1. Primary: Try Groq API (Llama 3.3 70B)
+    const groqReply = await callGroqAI(systemPrompt, userPrompt);
+    if (groqReply) {
+      return res.json({ reply: groqReply, engine: "Groq (llama-3.3-70b-versatile)" });
+    }
+
+    // 2. Secondary: Try Gemini AI
+    const ai = getGeminiClient();
+    if (ai) {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: [
+          { role: "user", parts: [{ text: `${systemPrompt}\n\nChat History:\n${userPrompt}\n\nAthena:` }] }
+        ]
+      });
+      return res.json({ reply: response.text || "Yassou! How else may I assist your Aegean journey?", engine: "Gemini 3.6 Flash" });
+    }
+
+    // 3. Fallback responses
+    const lastMsg = (messages?.[messages.length - 1]?.content || "").toLowerCase();
+    let reply = "Kalimera! I'm Athena, your Greek Island Concierge. ";
+
+    if (lastMsg.includes("ferry") || lastMsg.includes("schedule")) {
+      reply += "High-speed ferries (Seajets & Blue Star) operate daily between Naxos, Milos, and Koufonisia. I recommend booking at least 48 hours in advance during high season as seats sell out quickly.";
+    } else if (lastMsg.includes("taverna") || lastMsg.includes("eat") || lastMsg.includes("food")) {
+      reply += "For authentic Greek cuisine in Naxos Old Town, I highly recommend Meze2 or Rotonda in Apeiranthos for sunset views over the mountain valleys. Don't forget to sample local Graviera cheese!";
+    } else if (lastMsg.includes("beach") || lastMsg.includes("swim")) {
+      reply += "In Koufonisia, Pori Beach and Italida offer some of the clearest turquoise waters in the Aegean. For a secluded spot, try Gala Beach or the natural pool at Devil's Eye!";
+    } else if (lastMsg.includes("naxos") || lastMsg.includes("koufonisia")) {
+      reply += "Naxos and Koufonisia make a perfect 5-day combination! Days 1-3 in Naxos feature hiking Mt. Zeus, exploring the Portara, and ancient ruins. Days 4-5 in Koufonisia are pure relaxation on pristine beaches.";
+    } else {
+      reply += "How can I refine your Cyclades journey today? Ask me about ferry schedules, hidden beaches, local tavernas, or customizing your 7-day odyssey!";
+    }
+
+    res.json({ reply, engine: "Greek Concierge Local Fallback" });
   } catch (error: any) {
     console.error("Chat error:", error);
     res.json({ reply: "Yassas! I'm here to assist. High season ferries and local island recommendations are all set for your Cyclades trip!" });
@@ -131,23 +193,33 @@ Keep answers concise, helpful, and formatted with clean paragraphs or bullet poi
 app.post("/api/translate-menu", async (req, res) => {
   try {
     const { imageBase64, textPrompt } = req.body;
-    const ai = getGroqClient();
+    const ai = getGeminiClient();
 
-    if (!ai || imageBase64) {
-      // Groq doesn't support vision yet, use fallback for image-based requests
+    if (!ai) {
       return res.json({
         translation: "🇬🇷 **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** (Άρνι Κλέφτικο) — Slow-baked lamb with herbs, garlic & Naxian potatoes.\n2. **Naxian Graviera** (Γραβιέρα Νάξου) — PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** (Χταπόδι Ψητό) — Grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** (Τοματοκεφτέδες) — Crispy Aegean tomato fritters with fresh mint.\n\n🍷 *Recommended pairing: Local Naxian white wine (Assyrtiko) or chilled Ouzo.*"
       });
     }
 
     const prompt = textPrompt || "Translate and explain this Greek restaurant menu in detail for a traveler. List dishes, ingredients, dietary notes, and local drink recommendations.";
+    
+    let parts: any[] = [{ text: prompt }];
+    if (imageBase64) {
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+      parts.push({
+        inlineData: {
+          data: cleanBase64,
+          mimeType: "image/jpeg"
+        }
+      });
+    }
 
-    const chatCompletion = await ai.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }]
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [{ role: "user", parts }]
     });
 
-    res.json({ translation: chatCompletion.choices[0]?.message?.content });
+    res.json({ translation: response.text });
   } catch (err) {
     res.json({
       translation: "🇬🇷 **Menu Decoded**:\n- **Moussaka** (Μουσακάς): Eggplant, minced beef & creamy béchamel.\n- **Kleftiko** (Κλέφτικο): Slow-baked tender lamb with local herbs.\n- **Dakos** (Ντάκος): Barley rusk with ripe tomatoes, feta & olives."
@@ -159,7 +231,7 @@ app.post("/api/translate-menu", async (req, res) => {
 app.post("/api/suggest-hotels", async (req, res) => {
   try {
     const { island, style } = req.body;
-    const ai = getGroqClient();
+    const ai = getGeminiClient();
 
     const curIsland = island || "Naxos";
 
@@ -292,25 +364,17 @@ app.post("/api/suggest-hotels", async (req, res) => {
     const prompt = `Act as a Trivago-style hotel search engine for the Greek island of ${curIsland} (style preference: ${style || "all"}). 
 Generate 3 realistic, highly-rated boutique hotels or resorts on ${curIsland}. 
 Return valid JSON array of objects with keys: id, name, location, island, rating (number like 9.4), ratingLabel (e.g. "Buitengewoon" or "Uitstekend"), reviewsCount (number), pricePerNight (number in EUR), tag (e.g. "Trivago Deal • Zeezicht"), amenities (array of string in Dutch), distanceToBeach (string in Dutch).`;
-    const chatCompletion = await ai.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
     try {
-      const parsed = JSON.parse(chatCompletion.choices[0]?.message?.content || "[]");
-      const hotelsArray = Array.isArray(parsed) ? parsed : (parsed.hotels || []);
-      const enriched = hotelsArray.map((h: any, i: number) => ({
+      const parsed = JSON.parse(response.text?.replace(/```json|```/g, "").trim() || "[]");
+      const enriched = parsed.map((h: any, i: number) => ({
         ...h,
         image: h.image || [
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ",
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuAOZr5gGB1weJa8rMWnTL0uY6A01WC5nthIOndYdcCtpttUQLwLh5AakhZXjrKuZAd-FlZxvC9U4iOG6J1e4uXAU0Oor1utW2UD2XdtLlyTYdPEvvsyc5BoKJauF55-AlZneX0ckYM1_LET_RPpwUyIa5WmgE0C6LF_12sbGkfLudDNSzsfAwn0fDiT4AYFxNTCRK6DUsyqEuIZGC4SIRD3jSYmMlEkbJkF-osO32NfbUjKSaFLZfFLeA",
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuCX9IVh2F1IBAIsKj7jOD861n8sugmHDcElOR3VKlyaBLHMKRkHMtcpApETSM6CS45kARGz9dXLjdJ9suE50sTHDIcVcCsQ2OywJv15Y137fWCYEo0JeGArizL5wilGyNJwmhe_yeOqm83XRgO7IW5wVs7eZ-sVqkfzO80SLcYrpQ6s3L0oMOF9-E1zN3kSTh-PqREp5WC6d8OTrD6rtJ3XTS18aOgZzWGxiCipBwErygHLPtoKWvEl3w"
-        ][i % 3]
-      }));
-      return res.json({ hotels: enriched });
-    } catch {
           "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ",
           "https://lh3.googleusercontent.com/aida-public/AB6AXuAOZr5gGB1weJa8rMWnTL0uY6A01WC5nthIOndYdcCtpttUQLwLh5AakhZXjrKuZAd-FlZxvC9U4iOG6J1e4uXAU0Oor1utW2UD2XdtLlyTYdPEvvsyc5BoKJauF55-AlZneX0ckYM1_LET_RPpwUyIa5WmgE0C6LF_12sbGkfLudDNSzsfAwn0fDiT4AYFxNTCRK6DUsyqEuIZGC4SIRD3jSYmMlEkbJkF-osO32NfbUjKSaFLZfFLeA",
           "https://lh3.googleusercontent.com/aida-public/AB6AXuCX9IVh2F1IBAIsKj7jOD861n8sugmHDcElOR3VKlyaBLHMKRkHMtcpApETSM6CS45kARGz9dXLjdJ9suE50sTHDIcVcCsQ2OywJv15Y137fWCYEo0JeGArizL5wilGyNJwmhe_yeOqm83XRgO7IW5wVs7eZ-sVqkfzO80SLcYrpQ6s3L0oMOF9-E1zN3kSTh-PqREp5WC6d8OTrD6rtJ3XTS18aOgZzWGxiCipBwErygHLPtoKWvEl3w"
@@ -346,7 +410,7 @@ Return valid JSON array of objects with keys: id, name, location, island, rating
 app.post("/api/resolve-ferry", async (req, res) => {
   try {
     const { currentPort, destination, time } = req.body;
-    const ai = getGroqClient();
+    const ai = getGeminiClient();
 
     if (!ai) {
       return res.json({
@@ -378,16 +442,11 @@ app.post("/api/resolve-ferry", async (req, res) => {
 
     const prompt = `A traveler in ${currentPort || "Milos"} missed their ferry to ${destination || "Naxos"}. 
 Generate emergency assistance options including next available hydrofoils/ferries, estimated times, ticket office guidance, and temporary port hotel recommendation. Format response as JSON with fields: status, options (array of {type, operator, departure, arrival, price, notes}), recommendedHotel, advice.`;
-    const chatCompletion = await ai.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" }
-    });
 
-    try {
-      const parsed = JSON.parse(chatCompletion.choices[0]?.message?.content || "{}");
-      return res.json({ resolution: parsed });
-    } catch {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
+    });
 
     try {
       const parsed = JSON.parse(response.text?.replace(/```json|```/g, "").trim() || "{}");

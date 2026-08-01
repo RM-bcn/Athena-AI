@@ -3,9 +3,9 @@ import { google } from "googleapis";
 let cachedSheetId: string | null = null;
 
 function getOAuthClient() {
-  const clientId = process.env.CLIENT_ID;
-  const clientSecret = process.env.CLIENT_SECRET;
-  const refreshToken = process.env.REFRESH_TOKEN;
+  const clientId = (process.env.CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "").trim();
+  const clientSecret = (process.env.CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || "").trim();
+  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || process.env.REFRESH_TOKEN || "").trim();
 
   if (!clientId || !clientSecret || !refreshToken) {
     return null;
@@ -17,21 +17,24 @@ function getOAuthClient() {
 }
 
 export function isGoogleAuthConfigured(): boolean {
-  return !!(process.env.CLIENT_ID && process.env.CLIENT_SECRET && process.env.REFRESH_TOKEN);
+  const clientId = (process.env.CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "").trim();
+  const clientSecret = (process.env.CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || "").trim();
+  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || process.env.REFRESH_TOKEN || "").trim();
+  return !!(clientId && clientSecret && refreshToken);
 }
 
 export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
   const auth = getOAuthClient();
   if (!auth) {
-    throw new Error("Google OAuth environment variables (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) are missing.");
+    throw new Error("OAuth parameters missing (requires CLIENT_ID, CLIENT_SECRET, GOOGLE_REFRESH_TOKEN).");
   }
 
-  // 1. If explicit env variable GOOGLE_SHEET_ID is set, return it
-  if (process.env.GOOGLE_SHEET_ID) {
-    const sheetId = process.env.GOOGLE_SHEET_ID.trim();
+  // 1. If explicit env variable GOOGLE_SHEET_ID or SHEET_ID is set, return it
+  const explicitSheetId = (process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID || "").trim();
+  if (explicitSheetId) {
     return {
-      spreadsheetId: sheetId,
-      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}`,
+      spreadsheetId: explicitSheetId,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${explicitSheetId}`,
     };
   }
 
@@ -45,25 +48,31 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
   const drive = google.drive({ version: "v3", auth });
   const sheets = google.sheets({ version: "v4", auth });
 
-  // 2. Search drive for existing file named "Athena AI - Cyclades Trip (ATH-2026)"
+  // 2. Search drive for existing file named "Athena AI - Cyclades Trip (ATH-2026)" or containing "ATH-2026"
   try {
     const searchRes = await drive.files.list({
-      q: "name = 'Athena AI - Cyclades Trip (ATH-2026)' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false",
-      fields: "files(id, name, webViewLink)",
+      q: "(name = 'Athena AI - Cyclades Trip (ATH-2026)' or name contains 'ATH-2026') and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false",
+      fields: "files(id, name, webViewLink, createdTime)",
+      orderBy: "createdTime asc", // Pick the original primary sheet
     });
 
     if (searchRes.data.files && searchRes.data.files.length > 0) {
       const file = searchRes.data.files[0];
       if (file.id) {
         cachedSheetId = file.id;
+        console.log(`[Google Sheets] Reusing existing spreadsheet ID: ${file.id}`);
         return {
           spreadsheetId: file.id,
           spreadsheetUrl: file.webViewLink || `https://docs.google.com/spreadsheets/d/${file.id}`,
         };
       }
     }
-  } catch (err) {
-    console.warn("Could not list Google Drive files, creating new spreadsheet directly:", err);
+  } catch (err: any) {
+    if (err?.message?.includes("Google Drive API has not been used") || err?.code === 403) {
+      console.warn("[Google Sheets] Note: Google Drive API is not enabled on this Google Cloud Project. To enable automatic Drive file searches, visit: https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=1097495048880 . Alternatively, set GOOGLE_SHEET_ID in your environment variables.");
+    } else {
+      console.warn("[Google Sheets] Could not search Google Drive:", err?.message || err);
+    }
   }
 
   // 3. Create a brand new Google Spreadsheet

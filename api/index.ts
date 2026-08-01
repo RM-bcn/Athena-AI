@@ -1,18 +1,105 @@
 import express from "express";
 import Groq from "groq-sdk";
+import { GoogleGenAI } from "@google/genai";
+import {
+  isGoogleAuthConfigured,
+  getOrCreateSpreadsheet,
+  saveTripToSheet,
+  loadTripFromSheet,
+} from "../server/sheets-service.js";
 
 const app = express();
 
 app.use(express.json({ limit: "10mb" }));
 
+// API: Google Sheets Status
+app.get("/api/sheets/status", async (req, res) => {
+  try {
+    const configured = isGoogleAuthConfigured();
+    if (!configured) {
+      return res.json({
+        configured: false,
+        message: "OAuth parameters (CLIENT_ID, CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) not active yet.",
+      });
+    }
+
+    const { spreadsheetId, spreadsheetUrl } = await getOrCreateSpreadsheet();
+    res.json({
+      configured: true,
+      spreadsheetId,
+      spreadsheetUrl,
+    });
+  } catch (err: any) {
+    res.json({
+      configured: false,
+      error: err.message || "Failed to query Google Sheets status",
+    });
+  }
+});
+
+// API: Load Trip from Google Sheets
+app.get("/api/sheets/load", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.status(400).json({ error: "OAuth parameters not configured" });
+    }
+    const data = await loadTripFromSheet();
+    res.json(data);
+  } catch (err: any) {
+    console.error("Sheets load error:", err);
+    res.status(500).json({ error: err.message || "Failed to load trip from Google Sheets" });
+  }
+});
+
+// API: Save Trip to Google Sheets
+app.post("/api/sheets/save", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.status(400).json({ error: "OAuth parameters not configured" });
+    }
+    const { trip, customBookings } = req.body;
+    await saveTripToSheet(trip, customBookings || []);
+    const { spreadsheetUrl } = await getOrCreateSpreadsheet();
+    res.json({ success: true, spreadsheetUrl });
+  } catch (err: any) {
+    console.error("Sheets save error:", err);
+    res.status(500).json({ error: err.message || "Failed to save trip to Google Sheets" });
+  }
+});
+
 // Helper to get Groq AI instance safely
 function getGroqClient() {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey || apiKey === "jouw_hier_geplakte_groq_sleutel") {
+  if (!apiKey || apiKey === "jouw_hier_geplakte_groq_sleutel" || apiKey === "MY_GROQ_API_KEY") {
     return null;
   }
   return new Groq({ apiKey });
 }
+
+// Helper to get Gemini AI instance safely
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+}
+
+// API: AI Engine Status
+app.get("/api/ai/status", (req, res) => {
+  const hasGroq = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== "MY_GROQ_API_KEY" && process.env.GROQ_API_KEY !== "jouw_hier_geplakte_groq_sleutel");
+  const hasGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY");
+
+  res.json({
+    activeEngine: hasGroq
+      ? "Groq Llama-3.3-70B (Ultra-fast)"
+      : hasGemini
+      ? "Gemini 3.6 Flash"
+      : "Greek Concierge Offline Mode",
+    hasGroqKey: hasGroq,
+    hasGeminiKey: hasGemini,
+  });
+});
 
 // API: General Concierge Chat
 app.post("/api/chat", async (req, res) => {

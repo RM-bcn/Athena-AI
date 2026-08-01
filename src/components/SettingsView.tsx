@@ -1,7 +1,22 @@
-import React from 'react';
-import { Settings, Shield, Bell, Moon, Sun, Globe, User, Key } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Shield, Bell, Moon, Sun, Globe, User, Key, Cpu, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
+  const [aiEngine, setAiEngine] = useState<string>('Groq Llama-3.3-70B (Primary)');
+  const [hasGroq, setHasGroq] = useState<boolean>(true);
+
+  useEffect(() => {
+    fetch('/api/ai/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.activeEngine) {
+          setAiEngine(data.activeEngine);
+          setHasGroq(data.hasGroqKey);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <main className="md:ml-64 pt-24 min-h-screen px-6 md:px-12 pb-16 bg-white">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -13,7 +28,7 @@ export const SettingsView: React.FC = () => {
             Settings & Concierge Options
           </h1>
           <p className="text-[#404752] font-['Inter'] text-sm mt-1">
-            Manage your Athena AI concierge preferences, travel notifications & security settings.
+            Manage your Athena AI concierge preferences, travel notifications & AI engine settings.
           </p>
         </div>
 
@@ -45,21 +60,36 @@ export const SettingsView: React.FC = () => {
                 <Globe className="w-5 h-5 text-[#005BAE]" />
                 <div>
                   <p className="font-['Inter'] text-sm font-semibold text-[#0b1d2d]">Default Language</p>
-                  <p className="font-['Inter'] text-xs text-[#717783]">English (US) / Greek Translation Enabled</p>
+                  <p className="font-['Inter'] text-xs text-[#717783]">English (US) / Dutch & Greek Translation Enabled</p>
                 </div>
               </div>
-              <span className="font-['Inter'] text-xs font-bold text-[#005BAE] bg-[#f0f4f9] px-3 py-1.5 rounded-full">English</span>
+              <span className="font-['Inter'] text-xs font-bold text-[#005BAE] bg-[#f0f4f9] px-3 py-1.5 rounded-full">English / Dutch</span>
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-xl hover:bg-[#f0f4f9] transition-colors">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-orange-50/50 border border-orange-200/60">
               <div className="flex items-center gap-3">
-                <Key className="w-5 h-5 text-[#005BAE]" />
+                <div className="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                  ⚡
+                </div>
                 <div>
-                  <p className="font-['Inter'] text-sm font-semibold text-[#0b1d2d]">AI Concierge Engine</p>
-                  <p className="font-['Inter'] text-xs text-[#717783]">Powered by Gemini 3.6 Flash High-Speed Reasoning</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-['Inter'] text-sm font-bold text-[#0b1d2d]">AI Chat Engine (Groq Primary)</p>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white">
+                      GROQ AI
+                    </span>
+                  </div>
+                  <p className="font-['Inter'] text-xs text-[#404752] mt-0.5">
+                    Actieve motor: <strong className="text-orange-950">{aiEngine}</strong>
+                  </p>
+                  <p className="font-['Inter'] text-[11px] text-gray-500 mt-0.5">
+                    Groq Key (<code className="bg-gray-100 px-1 py-0.5 rounded text-[10px]">GROQ_API_KEY</code>) is primair ingesteld in de backend.
+                  </p>
                 </div>
               </div>
-              <span className="font-['Inter'] text-xs font-bold text-green-700 bg-green-50 px-3 py-1 rounded-full border border-green-200">ACTIVE</span>
+              <span className="font-['Inter'] text-xs font-bold text-orange-800 bg-orange-100 px-3 py-1 rounded-full border border-orange-300 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-orange-600" />
+                GROQ READY
+              </span>
             </div>
           </div>
         </div>
@@ -67,3 +97,4 @@ export const SettingsView: React.FC = () => {
     </main>
   );
 };
+
