@@ -33,7 +33,8 @@ import {
   LogIn,
   FileSpreadsheet,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Lock
 } from 'lucide-react';
 import { EditStayModal } from './Modals/EditStayModal';
 
@@ -184,7 +185,28 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             </button>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="mb-6 p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex flex-wrap items-center justify-between gap-3 text-blue-950">
+          <div className="flex items-center gap-2.5">
+            <Lock className="w-5 h-5 text-[#005BAE] flex-shrink-0" />
+            <div>
+              <p className="text-xs font-bold font-['Plus_Jakarta_Sans']">
+                Beveiligde Toegang — Niet ingelogd
+              </p>
+              <p className="text-[11px] text-blue-800 font-['Inter']">
+                Log in als beheerder (Dennis of Joyce) of voer een reiscode in om de reis te volgen.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onLoginClick}
+            className="px-3.5 py-2 rounded-xl bg-[#005BAE] text-white text-xs font-bold hover:brightness-110 shadow-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            <LogIn className="w-4 h-4" />
+            Inloggen / Reiscode Invoeren
+          </button>
+        </div>
+      )}
 
       {/* Google Sheets Live Database Banner (ENKEL VOOR INGELOGDE BEHEERDERS) */}
       {canEdit && (

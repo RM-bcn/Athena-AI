@@ -63,9 +63,9 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
       const saved = localStorage.getItem('athena_active_user');
-      return saved ? JSON.parse(saved) : DEFAULT_USERS[0]; // Default logged in as Dennis for seamless immediate access
+      return saved ? JSON.parse(saved) : null;
     } catch {
-      return DEFAULT_USERS[0];
+      return null;
     }
   });
 
@@ -89,7 +89,18 @@ export default function App() {
     }
   });
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('itinerary');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    try {
+      const savedUser = localStorage.getItem('athena_active_user');
+      const savedGuest = localStorage.getItem('athena_guest_mode');
+      if (savedUser || savedGuest === 'true') {
+        return 'itinerary';
+      }
+      return 'login';
+    } catch {
+      return 'login';
+    }
+  });
   const [chatSubTab, setChatSubTab] = useState<ChatSubTab>('current');
   const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages);
 
@@ -180,6 +191,14 @@ export default function App() {
           customBookings,
         }),
       });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await res.text();
+        alert(`⚠️ Google Sheets API is niet klaar op Vercel:\n\nZorg dat de omgevingsvariabelen (CLIENT_ID, CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) zijn toegevoegd in Vercel project settings.\n\nServer respons: ${res.status}`);
+        return;
+      }
+
       const data = await res.json();
       if (data.spreadsheetUrl) {
         setSheetUrl(data.spreadsheetUrl);
@@ -371,7 +390,16 @@ export default function App() {
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        console.warn("Server returned non-JSON for chat, falling back to local Concierge.");
+        data = {
+          reply: `Kalimera ${sender}! Athena Concierge is paraat. Hoe kan ik je verder helpen met de reis naar Milos, Naxos en Koufonisia?`
+        };
+      }
 
       // Check if data contains tripUpdate (auto itinerary adjustment)
       if (data.tripUpdate) {
