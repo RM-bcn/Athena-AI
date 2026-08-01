@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActiveTab, ChatSubTab, UserAccount } from '../types';
 import { USER_AVATAR } from '../data/initialData';
-import { Search, LogOut, LogIn, Key, UserCheck, Eye } from 'lucide-react';
+import { Search, LogOut, LogIn, Key, UserCheck, Eye, Menu } from 'lucide-react';
 
 interface TopHeaderProps {
   activeTab: ActiveTab;
@@ -14,6 +14,7 @@ interface TopHeaderProps {
   onOpenProfile?: () => void;
   onSignOut: () => void;
   onLoginClick: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -27,11 +28,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenProfile,
   onSignOut,
   onLoginClick,
+  onToggleMobileMenu,
 }) => {
   return (
-    <header className="fixed top-0 left-64 right-0 flex justify-between items-center px-8 py-4 bg-white/90 backdrop-blur-xl z-40 border-b border-[#f0f4f9]">
-      <div className="flex items-center gap-8">
-        <span className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[#005BAE]">
+    <header className="fixed top-0 left-0 md:left-64 right-0 flex justify-between items-center px-4 md:px-8 py-3 md:py-4 bg-white/90 backdrop-blur-xl z-40 border-b border-[#f0f4f9]">
+      <div className="flex items-center gap-3 md:gap-8">
+        {/* Hamburger Menu on Mobile */}
+        <button
+          onClick={onToggleMobileMenu}
+          className="md:hidden p-2 text-[#005BAE] hover:bg-[#f0f4f9] rounded-lg cursor-pointer transition-colors"
+          title="Open menu"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+
+        <span className="font-['Plus_Jakarta_Sans'] text-lg md:text-2xl font-bold text-[#005BAE] truncate">
           {activeTab === 'chat'
             ? 'Chat Interface'
             : activeTab === 'itinerary'

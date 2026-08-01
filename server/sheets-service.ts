@@ -23,15 +23,43 @@ export function isGoogleAuthConfigured(): boolean {
   return !!(clientId && clientSecret && refreshToken);
 }
 
+// Helper to ensure all required tabs exist in the spreadsheet
+async function ensureTabsExist(sheets: any, spreadsheetId: string) {
+  try {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const existingSheetTitles = (meta.data.sheets || []).map((s: any) => s.properties.title);
+    
+    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings"];
+    const missingTabs = requiredTabs.filter((title) => !existingSheetTitles.includes(title));
+
+    if (missingTabs.length > 0) {
+      console.log(`[Google Sheets] Automatically creating missing tabs: ${missingTabs.join(", ")}`);
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: missingTabs.map((title) => ({
+            addSheet: { properties: { title } },
+          })),
+        },
+      });
+    }
+  } catch (err: any) {
+    console.warn("[Google Sheets] Note when checking tabs:", err?.message || err);
+  }
+}
+
 export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
   const auth = getOAuthClient();
   if (!auth) {
     throw new Error("OAuth parameters missing (requires CLIENT_ID, CLIENT_SECRET, GOOGLE_REFRESH_TOKEN).");
   }
 
+  const sheets = google.sheets({ version: "v4", auth });
+
   // 1. If explicit env variable GOOGLE_SHEET_ID or SHEET_ID is set, return it
   const explicitSheetId = (process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID || "").trim();
   if (explicitSheetId) {
+    await ensureTabsExist(sheets, explicitSheetId);
     return {
       spreadsheetId: explicitSheetId,
       spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${explicitSheetId}`,
@@ -39,6 +67,7 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
   }
 
   if (cachedSheetId) {
+    await ensureTabsExist(sheets, cachedSheetId);
     return {
       spreadsheetId: cachedSheetId,
       spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${cachedSheetId}`,
@@ -46,7 +75,6 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
   }
 
   const drive = google.drive({ version: "v3", auth });
-  const sheets = google.sheets({ version: "v4", auth });
 
   // 2. Search drive for existing file named "Athena AI - Cyclades Trip (ATH-2026)" or containing "ATH-2026"
   try {
@@ -61,6 +89,7 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
       if (file.id) {
         cachedSheetId = file.id;
         console.log(`[Google Sheets] Reusing existing spreadsheet ID: ${file.id}`);
+        await ensureTabsExist(sheets, file.id);
         return {
           spreadsheetId: file.id,
           spreadsheetUrl: file.webViewLink || `https://docs.google.com/spreadsheets/d/${file.id}`,
@@ -111,7 +140,7 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
           ],
         },
         {
-          range: "Stays!A1:G5",
+          range: "Stays!A1:G4",
           values: [
             ["ID", "Island", "StartDate", "EndDate", "Nights", "AccommodationName", "Notes"],
             ["stay-1", "Milos", "2026-08-15", "2026-08-18", 3, "Milos Breeze Boutique", "Sarakiniko & Kleftiko boottocht"],
@@ -145,10 +174,12 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
 
 export async function saveTripToSheet(tripData: any, customBookings: any[] = []): Promise<void> {
   const auth = getOAuthClient();
-  if (!auth) throw new Error("Google auth not configured.");
+  if (!auth) throw new Error("OAuth parameters missing (requires CLIENT_ID, CLIENT_SECRET, GOOGLE_REFRESH_TOKEN).");
 
   const { spreadsheetId } = await getOrCreateSpreadsheet();
   const sheets = google.sheets({ version: "v4", auth });
+
+  await ensureTabsExist(sheets, spreadsheetId);
 
   // Format TripInfo rows
   const tripInfoValues = [
@@ -210,6 +241,8 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
   const { spreadsheetId, spreadsheetUrl } = await getOrCreateSpreadsheet();
   const sheets = google.sheets({ version: "v4", auth });
 
+  await ensureTabsExist(sheets, spreadsheetId);
+
   const res = await sheets.spreadsheets.values.batchGet({
     spreadsheetId,
     ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:F50"],
@@ -220,6 +253,18 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
   const staysRows = valueRanges[1]?.values || [];
   const bookingRows = valueRanges[2]?.values || [];
 
+  const loadedStays = staysRows
+    .filter((row: any) => row && row[1]) // Must have an island name
+    .map((row: any) => ({
+      id: row[0] || `stay-${Math.random()}`,
+      island: row[1],
+      startDate: row[2] || "2026-08-15",
+      endDate: row[3] || "2026-08-18",
+      nights: Number(row[4]) || 3,
+      accommodationName: row[5] || "",
+      notes: row[6] || "",
+    }));
+
   const trip = {
     id: tripRow?.[0] || "ATH-2026",
     title: tripRow?.[1] || "Cyclades Island Hopping Odyssey",
@@ -227,25 +272,20 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
     endDate: tripRow?.[3] || "2026-08-23",
     durationDays: Number(tripRow?.[4]) || 8,
     style: tripRow?.[5] || "Eilandhoppen met Dennis & Joyce",
-    stays: staysRows.map((row: any) => ({
-      id: row[0] || `stay-${Date.now()}`,
-      island: row[1] || "Naxos",
-      startDate: row[2] || "2026-08-15",
-      endDate: row[3] || "2026-08-18",
-      nights: Number(row[4]) || 3,
-      accommodationName: row[5] || "",
-      notes: row[6] || "",
-    })),
+    stays: loadedStays.length > 0 ? loadedStays : undefined,
   };
 
-  const customBookings = bookingRows.map((row: any) => ({
-    id: row[0] || `booking-${Date.now()}`,
-    name: row[1] || "Hotel",
-    location: row[2] || "Greek Islands",
-    status: row[3] || "CONFIRMED",
-    island: row[4] || "",
-    pricePerNight: Number(row[5]) || 150,
-  }));
+  const customBookings = bookingRows
+    .filter((row: any) => row && row[1])
+    .map((row: any) => ({
+      id: row[0] || `booking-${Math.random()}`,
+      name: row[1],
+      location: row[2] || "Greek Islands",
+      status: row[3] || "CONFIRMED",
+      island: row[4] || "",
+      pricePerNight: Number(row[5]) || 150,
+    }));
 
   return { trip, customBookings, sheetUrl: spreadsheetUrl };
 }
+

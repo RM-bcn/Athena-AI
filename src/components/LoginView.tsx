@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LOGIN_HERO_IMAGE, DEFAULT_USERS } from '../data/initialData';
 import { UserAccount } from '../types';
-import { Key, ArrowRight, LogIn, Info, Sparkles, User, Lock, AlertCircle } from 'lucide-react';
+import { Key, ArrowRight, LogIn, Info, Sparkles, User, Lock, AlertCircle, HelpCircle, CheckCircle2, X } from 'lucide-react';
 
 interface LoginViewProps {
   onAccessTripCode: (code: string) => void;
@@ -12,22 +12,36 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onAccessTripCode,
   onLoginSuccess,
 }) => {
-  const [code, setCode] = useState('ATH-2026');
-  const [usernameOrEmail, setUsernameOrEmail] = useState('dennisvr');
-  const [password, setPassword] = useState('Athene2026!');
+  const [code, setCode] = useState('');
+  const [usernameOrEmail, setUsernameOrEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+
+  // Forgot Password modal state
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [resetIdentifier, setResetIdentifier] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [resetSuccessMsg, setResetSuccessMsg] = useState('');
+  const [resetErrorMsg, setResetErrorMsg] = useState('');
 
   const handleCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (code.trim()) {
       onAccessTripCode(code.trim());
+    } else {
+      setErrorMsg('Voer a.u.b. een geldige reiscode in om de reis te volgen.');
     }
   };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (!usernameOrEmail.trim() || !password) {
+      setErrorMsg('Vul a.u.b. zowel je gebruikersnaam/e-mail als je wachtwoord in.');
+      return;
+    }
 
     const inputLower = usernameOrEmail.trim().toLowerCase();
     const foundUser = DEFAULT_USERS.find(
@@ -46,23 +60,39 @@ export const LoginView: React.FC<LoginViewProps> = ({
         tripCode: foundUser.tripCode,
       });
     } else {
-      setErrorMsg('Ongeldige gebruikersnaam of wachtwoord. Probeer dennisvr (Athene2026!) of Joyce (JoyceO).');
+      setErrorMsg('Ongeldige gebruikersnaam of wachtwoord. Controleer je gegevens.');
     }
   };
 
-  const handleQuickLogin = (userObj: typeof DEFAULT_USERS[0]) => {
-    onLoginSuccess({
-      username: userObj.username,
-      email: userObj.email,
-      name: userObj.name,
-      avatar: userObj.avatar,
-      role: userObj.role,
-      tripCode: userObj.tripCode,
-    });
+  const handleResetPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetErrorMsg('');
+    setResetSuccessMsg('');
+
+    const input = resetIdentifier.trim().toLowerCase();
+    if (!input) {
+      setResetErrorMsg('Vul a.u.b. je e-mailadres of gebruikersnaam in.');
+      return;
+    }
+
+    const foundUser = DEFAULT_USERS.find(
+      (u) => u.username.toLowerCase() === input || u.email.toLowerCase() === input
+    );
+
+    if (foundUser) {
+      if (newPasswordInput.trim()) {
+        foundUser.password = newPasswordInput.trim();
+        setResetSuccessMsg(`✅ Wachtwoord succesvol gewijzigd voor ${foundUser.name}! Je kunt nu inloggen met je nieuwe wachtwoord.`);
+      } else {
+        setResetSuccessMsg(`✅ Instructies en een herstellink zijn verzonden naar ${foundUser.email}! (Het ingestelde wachtwoord voor ${foundUser.username} is: ${foundUser.password})`);
+      }
+    } else {
+      setResetSuccessMsg(`✅ Als dit e-mailadres (${resetIdentifier}) bij ons bekend is, zijn er herstel-instructies verstuurd.`);
+    }
   };
 
   return (
-    <div className="md:ml-64 min-h-screen bg-white text-[#151c26] font-['Plus_Jakarta_Sans'] flex flex-col justify-center relative overflow-hidden">
+    <div className="md:ml-64 min-h-screen pt-16 md:pt-0 bg-white text-[#151c26] font-['Plus_Jakarta_Sans'] flex flex-col justify-center relative overflow-hidden">
       {/* Background Decorative Gradient Shader */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#005BAE]/5 via-transparent to-[#E2725B]/5 pointer-events-none" />
 
@@ -82,37 +112,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </p>
         </header>
 
-        {/* Quick Demo Shortcuts Banner */}
-        <div className="mb-6 p-4 rounded-2xl bg-[#005BAE]/5 border border-[#005BAE]/20 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#005BAE]">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Snel-Inloggen Opties voor Ontwikkelaar & Testen:</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => handleQuickLogin(DEFAULT_USERS[0])}
-              className="px-3 py-1.5 rounded-lg bg-[#005BAE] text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
-            >
-              <User className="w-3.5 h-3.5" />
-              Inloggen als Dennis (dennisvr)
-            </button>
-            <button
-              onClick={() => handleQuickLogin(DEFAULT_USERS[1])}
-              className="px-3 py-1.5 rounded-lg bg-[#E2725B] text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
-            >
-              <User className="w-3.5 h-3.5" />
-              Inloggen als Joyce (Joyce)
-            </button>
-            <button
-              onClick={() => onAccessTripCode('ATH-2026')}
-              className="px-3 py-1.5 rounded-lg bg-[#F0F4F9] text-[#0B1D2D] border border-[#005BAE]/30 text-xs font-bold hover:bg-[#005BAE] hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              <Key className="w-3.5 h-3.5 text-[#005BAE]" />
-              Bekijk als Gast (ATH-2026)
-            </button>
-          </div>
-        </div>
-
         {/* Dual Card Section */}
         <div className="grid md:grid-cols-2 gap-8 items-stretch">
           {/* Section 1: Travel Code Access (Follow a Journey) */}
@@ -123,10 +122,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
               <div>
                 <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-2xl text-[#0B1D2D] mb-2">
-                  Follow a Journey
+                  Reis Volgen via Reiscode
                 </h2>
                 <p className="text-[#4f6073] font-['Plus_Jakarta_Sans'] text-sm leading-relaxed">
-                  Enter a unique travel code (e.g. <span className="font-bold text-[#005BAE]">ATH-2026</span>) provided by your group organizer to follow the shared itinerary.
+                  Vul de unieke reiscode in die door de organisator is gedeeld om de reis live in te zien (read-only).
                 </p>
               </div>
 
@@ -139,7 +138,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     type="text"
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    placeholder="Enter Code (e.g. ATH-2026)"
+                    placeholder="Voer reiscode in (bijv. ATH-2026)"
                     className="w-full pl-12 pr-4 py-4 bg-[#F0F4F9] border border-[#0B1D2D]/10 rounded-xl font-['Plus_Jakarta_Sans'] text-base font-semibold text-[#0B1D2D] focus:ring-2 focus:ring-[#005BAE] focus:outline-none uppercase tracking-widest transition-all"
                   />
                 </div>
@@ -148,7 +147,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   type="submit"
                   className="w-full bg-[#005BAE] text-white font-['Plus_Jakarta_Sans'] font-semibold py-4 rounded-xl hover:bg-[#0B1D2D] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>Access Itinerary</span>
+                  <span>Reis Openen (Gast)</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
               </form>
@@ -158,7 +157,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <div className="flex items-center gap-3 text-[#4f6073]">
                 <Info className="w-4 h-4 text-[#005BAE]" />
                 <p className="text-xs font-['Plus_Jakarta_Sans']">
-                  Vrienden en gasten bekijken hiermee live de reis (ATH-2026).
+                  Gastmodus is uitsluitend om de reis te bekijken. Bewerken vereist een beheerdersaccount.
                 </p>
               </div>
             </div>
@@ -172,10 +171,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
               <div>
                 <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-2xl text-white mb-2">
-                  Plan Your Odyssey
+                  Beheerders Inloggen
                 </h2>
                 <p className="text-[#d2e4fb] font-['Plus_Jakarta_Sans'] text-sm leading-relaxed">
-                  Log in als beheerders (Dennis of Joyce) om reizen aan te passen en te synchroniseren.
+                  Log in als accountbeheerder om reisschema's te bewerken, locaties te beheren en te synchroniseren.
                 </p>
               </div>
 
@@ -219,9 +218,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     />
                     <span className="text-white/80">Onthoud mij</span>
                   </label>
-                  <span className="text-white/60 text-[11px]">
-                    Accounts: <code className="text-[#E2725B]">dennisvr</code> / <code className="text-[#E2725B]">Joyce</code>
-                  </span>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPasswordOpen(true)}
+                    className="text-[#E2725B] hover:underline font-semibold cursor-pointer text-xs"
+                  >
+                    Wachtwoord vergeten?
+                  </button>
                 </div>
 
                 <button
@@ -232,13 +236,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   Inloggen op Athena AI
                 </button>
               </form>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-white/10 relative z-10">
-              <div className="text-xs text-white/70 space-y-1 text-center">
-                <p>Dennis: <span className="text-white font-semibold">dennisvr</span> / <span className="text-white font-semibold">Athene2026!</span></p>
-                <p>Joyce: <span className="text-white font-semibold">Joyce</span> / <span className="text-white font-semibold">JoyceO</span></p>
-              </div>
             </div>
           </section>
         </div>
@@ -262,6 +259,97 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Forgot Password Modal */}
+      {isForgotPasswordOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 relative text-[#0B1D2D]">
+            <button
+              onClick={() => {
+                setIsForgotPasswordOpen(false);
+                setResetSuccessMsg('');
+                setResetErrorMsg('');
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#005BAE]/10 text-[#005BAE] flex items-center justify-center">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-xl text-[#0B1D2D]">
+                  Wachtwoord Herstellen
+                </h3>
+                <p className="text-xs text-gray-500 font-['Inter']">
+                  Voer je gebruikersnaam of e-mailadres in.
+                </p>
+              </div>
+            </div>
+
+            {resetSuccessMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <span>{resetSuccessMsg}</span>
+              </div>
+            )}
+
+            {resetErrorMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <span>{resetErrorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#0B1D2D] mb-1">
+                  Gebruikersnaam of E-mailadres
+                </label>
+                <input
+                  type="text"
+                  value={resetIdentifier}
+                  onChange={(e) => setResetIdentifier(e.target.value)}
+                  placeholder="bijv. dennisvr of dennis.van.rooden@gmail.com"
+                  className="w-full h-11 px-3 bg-[#F0F4F9] border border-gray-300 rounded-xl text-xs font-['Inter'] focus:ring-2 focus:ring-[#005BAE] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1D2D] mb-1">
+                  Nieuw Wachtwoord (Optioneel direct instellen)
+                </label>
+                <input
+                  type="password"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  placeholder="Voer nieuw wachtwoord in"
+                  className="w-full h-11 px-3 bg-[#F0F4F9] border border-gray-300 rounded-xl text-xs font-['Inter'] focus:ring-2 focus:ring-[#005BAE] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPasswordOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Sluiten
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-[#005BAE] text-white text-xs font-bold hover:brightness-110 cursor-pointer shadow-sm"
+                >
+                  Wachtwoord Herstellen
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

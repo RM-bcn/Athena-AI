@@ -13,13 +13,17 @@ import {
   Sun,
   Clock,
   Send,
-  Loader2
+  Loader2,
+  FileText,
+  X,
+  FileSpreadsheet,
+  CheckCircle2
 } from 'lucide-react';
 
 interface ChatInterfaceViewProps {
   chatSubTab: ChatSubTab;
   messages: ChatMessage[];
-  onSendMessage: (text: string) => Promise<void>;
+  onSendMessage: (text: string, attachment?: { name: string; type: string; base64?: string; text?: string; isImage?: boolean }) => Promise<void>;
   onTriggerQuickAction: (action: string) => void;
 }
 
@@ -31,6 +35,15 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<{
+    name: string;
+    type: string;
+    base64?: string;
+    text?: string;
+    isImage?: boolean;
+  } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -41,16 +54,49 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
     scrollToBottom();
   }, [messages, isSending]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isImg = file.type.startsWith('image/');
+    const reader = new FileReader();
+
+    if (isImg) {
+      reader.onload = () => {
+        setAttachedFile({
+          name: file.name,
+          type: file.type,
+          base64: reader.result as string,
+          isImage: true,
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      reader.onload = () => {
+        setAttachedFile({
+          name: file.name,
+          type: file.type || 'text/plain',
+          text: reader.result as string,
+          isImage: false,
+        });
+      };
+      reader.readAsText(file);
+    }
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim() || isSending) return;
+    if ((!inputText.trim() && !attachedFile) || isSending) return;
 
-    const text = inputText;
+    const text = inputText.trim() || (attachedFile ? `[Document/Bijlage Uploaded: ${attachedFile.name}] Pas mijn reisplan a.u.b. automatisch aan.` : '');
+    const currentAttachment = attachedFile;
+
     setInputText('');
+    setAttachedFile(null);
     setIsSending(true);
 
     try {
-      await onSendMessage(text);
+      await onSendMessage(text, currentAttachment || undefined);
     } catch (err) {
       console.error(err);
     } finally {
@@ -60,7 +106,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
   return (
     <div
-      className="flex-1 flex flex-col ml-64 relative min-h-screen bg-cover bg-center"
+      className="flex-1 flex flex-col md:ml-64 pt-16 md:pt-20 relative min-h-screen bg-cover bg-center"
       style={{
         backgroundImage: `linear-gradient(to bottom, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.96)), url('${CHAT_BACKGROUND_IMAGE}')`
       }}
@@ -131,6 +177,27 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                       : 'bg-white text-[#001a33] rounded-bl-sm border-[#f0f4f9]'
                   }`}
                 >
+                  {/* Message Attachment Rendering */}
+                  {msg.attachment && (
+                    <div className="mb-3">
+                      {msg.attachment.isImage && msg.attachment.url ? (
+                        <div className="max-w-xs rounded-2xl overflow-hidden border border-white/20 shadow-md mb-2">
+                          <img src={msg.attachment.url} alt={msg.attachment.name} className="w-full h-auto object-cover max-h-60" />
+                          <div className="p-2 bg-black/40 text-[10px] text-white backdrop-blur-sm truncate">
+                            📷 {msg.attachment.name}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm ${
+                          msg.role === 'user' ? 'bg-white/15 text-white border border-white/30' : 'bg-blue-50 text-[#005BAE] border border-[#005BAE]/20'
+                        }`}>
+                          <FileText className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate max-w-[200px]">{msg.attachment.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <p className="font-['Inter'] text-sm md:text-base leading-relaxed whitespace-pre-line">
                     {msg.content}
                   </p>
@@ -251,6 +318,34 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
             </button>
           </div>
 
+          {/* Staged Attached File Chip Preview */}
+          {attachedFile && (
+            <div className="mb-3 px-4 py-2 bg-[#005BAE]/10 border border-[#005BAE]/30 rounded-2xl flex items-center justify-between text-xs font-['Inter'] text-[#005BAE] shadow-sm animate-fadeIn">
+              <div className="flex items-center gap-2 truncate">
+                <FileText className="w-4 h-4 flex-shrink-0" />
+                <span className="font-bold truncate">{attachedFile.name}</span>
+                <span className="text-[10px] text-gray-500">({attachedFile.isImage ? 'Afbeelding' : 'Document'})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachedFile(null)}
+                className="p-1 hover:bg-[#005BAE]/20 rounded-full transition-colors text-[#005BAE]"
+                title="Verwijder bijlage"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.txt,.doc,.docx,.json,.csv,.md"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
           {/* Input Box Glass Panel */}
           <form
             onSubmit={handleSubmit}
@@ -258,18 +353,18 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
           >
             <button
               type="button"
-              onClick={() => onTriggerQuickAction('Translate Menu')}
+              onClick={() => fileInputRef.current?.click()}
               className="p-3 text-[#404752] hover:text-[#005BAE] transition-colors rounded-full hover:bg-[#f0f4f9] cursor-pointer"
-              title="Attach photo or menu"
+              title="Upload reisplan, document of foto"
             >
-              <Paperclip className="w-5 h-5" />
+              <Paperclip className="w-5 h-5 text-[#005BAE]" />
             </button>
 
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Tell Athena where you want to go next..."
+              placeholder={attachedFile ? `Voeg eventueel een toelichting toe voor ${attachedFile.name}...` : "Stel een vraag of upload je reisplan/ticket..."}
               className="flex-1 bg-transparent border-none focus:outline-none font-['Inter'] text-sm text-[#001a33] px-2 placeholder:text-[#717783]"
             />
 
@@ -283,7 +378,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
             <button
               type="submit"
-              disabled={!inputText.trim() || isSending}
+              disabled={(!inputText.trim() && !attachedFile) || isSending}
               className="w-11 h-11 rounded-2xl bg-[#005BAE] text-white flex items-center justify-center hover:brightness-110 active:scale-95 disabled:opacity-50 transition-all shadow-md cursor-pointer"
             >
               <ArrowUp className="w-5 h-5" />

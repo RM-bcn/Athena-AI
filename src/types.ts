@@ -96,6 +96,12 @@ export interface ChatMessage {
   content: string;
   cards?: TravelCardData[];
   quickButtons?: { label: string; action: string }[];
+  attachment?: {
+    name: string;
+    type: string;
+    url?: string;
+    isImage?: boolean;
+  };
 }
 
 export interface FerryAlternative {

@@ -51,7 +51,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
   }, []);
 
   return (
-    <main className="ml-64 min-h-screen px-8 md:px-12 py-12 relative overflow-hidden bg-white">
+    <main className="md:ml-64 min-h-screen px-4 md:px-12 pt-20 md:pt-24 pb-12 relative overflow-hidden bg-white">
       {/* Mediterranean Background Decorative Auras */}
       <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-[#005BAE]/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-[#005BAE]/5 rounded-full blur-[100px] pointer-events-none" />

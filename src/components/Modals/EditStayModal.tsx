@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IslandStay } from '../../types';
-import { X, Calendar, MapPin, Hotel, Check } from 'lucide-react';
+import { X, MapPin, Check } from 'lucide-react';
 
 interface EditStayModalProps {
   isOpen: boolean;
@@ -15,14 +15,57 @@ export const EditStayModal: React.FC<EditStayModalProps> = ({
   stayToEdit,
   onSaveStay,
 }) => {
+  const [island, setIsland] = useState('Naxos');
+  const [startDate, setStartDate] = useState('2026-08-18');
+  const [endDate, setEndDate] = useState('2026-08-21');
+  const [nights, setNights] = useState(3);
+  const [accommodationName, setAccommodationName] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const calcNights = (start: string, end: string) => {
+    const s = new Date(start);
+    const e = new Date(end);
+    if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e > s) {
+      const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 3600 * 24));
+      return diffDays > 0 ? diffDays : 1;
+    }
+    return 1;
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      const start = stayToEdit?.startDate || '2026-08-18';
+      const end = stayToEdit?.endDate || '2026-08-21';
+      setIsland(stayToEdit?.island || 'Naxos');
+      setStartDate(start);
+      setEndDate(end);
+      setNights(stayToEdit?.nights || calcNights(start, end));
+      setAccommodationName(stayToEdit?.accommodationName || '');
+      setNotes(stayToEdit?.notes || '');
+    }
+  }, [isOpen, stayToEdit]);
+
   if (!isOpen) return null;
 
-  const [island, setIsland] = useState(stayToEdit?.island || 'Naxos');
-  const [startDate, setStartDate] = useState(stayToEdit?.startDate || '2026-08-18');
-  const [endDate, setEndDate] = useState(stayToEdit?.endDate || '2026-08-21');
-  const [nights, setNights] = useState(stayToEdit?.nights || 3);
-  const [accommodationName, setAccommodationName] = useState(stayToEdit?.accommodationName || '');
-  const [notes, setNotes] = useState(stayToEdit?.notes || '');
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+    setNights(calcNights(val, endDate));
+  };
+
+  const handleEndDateChange = (val: string) => {
+    setEndDate(val);
+    setNights(calcNights(startDate, val));
+  };
+
+  const handleNightsChange = (val: number) => {
+    const n = Math.max(1, val);
+    setNights(n);
+    const s = new Date(startDate);
+    if (!isNaN(s.getTime())) {
+      s.setDate(s.getDate() + n);
+      setEndDate(s.toISOString().split('T')[0]);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +125,7 @@ export const EditStayModal: React.FC<EditStayModalProps> = ({
                 type="date"
                 required
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => handleStartDateChange(e.target.value)}
                 className="w-full h-11 px-3 bg-[#f0f4f9] border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-xs focus:outline-none focus:border-[#005BAE]"
               />
             </div>
@@ -92,7 +135,7 @@ export const EditStayModal: React.FC<EditStayModalProps> = ({
                 type="date"
                 required
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => handleEndDateChange(e.target.value)}
                 className="w-full h-11 px-3 bg-[#f0f4f9] border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-xs focus:outline-none focus:border-[#005BAE]"
               />
             </div>
@@ -105,7 +148,7 @@ export const EditStayModal: React.FC<EditStayModalProps> = ({
               min="1"
               max="30"
               value={nights}
-              onChange={(e) => setNights(Number(e.target.value))}
+              onChange={(e) => handleNightsChange(Number(e.target.value))}
               className="w-full h-11 px-3 bg-[#f0f4f9] border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-sm focus:outline-none focus:border-[#005BAE]"
             />
           </div>

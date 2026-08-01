@@ -58,6 +58,7 @@ const defaultTrip: TripData = {
 };
 
 export default function App() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   // Authentication & Guest State initialized from LocalStorage
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
@@ -144,7 +145,9 @@ export default function App() {
       console.error("Failed to save trip to localStorage", e);
     }
 
-    // Save to Google Sheets in background if configured
+    // Only sync to Google Sheets if logged in as admin (not guest or unauthenticated)
+    if (!currentUser) return;
+
     fetch('/api/sheets/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -164,6 +167,10 @@ export default function App() {
   };
 
   const handleManualSyncSheets = async () => {
+    if (!currentUser) {
+      alert("⚠️ Inloggen vereist: Gasten hebben geen toegang of sync rechten naar de Google Sheet database.");
+      return;
+    }
     try {
       const res = await fetch('/api/sheets/save', {
         method: 'POST',
@@ -178,10 +185,21 @@ export default function App() {
         setSheetUrl(data.spreadsheetUrl);
         setIsSheetsConnected(true);
         alert("✅ Reisschema en accommodaties succesvol gesynchroniseerd met je Google Sheet!");
+      } else if (data.error) {
+        alert(`⚠️ Synchroniseren met Google Sheet is mislukt:\n\n${data.error}`);
       }
-    } catch (err) {
-      alert("⚠️ Synchroniseren met Google Sheet is mislukt.");
+    } catch (err: any) {
+      alert(`⚠️ Synchroniseren met Google Sheet is mislukt:\n\n${err?.message || err}`);
     }
+  };
+
+  const handleOpenNewTripModal = () => {
+    if (!currentUser) {
+      alert("⚠️ Inloggen vereist: Alleen beheerder-accounts (Dennis of Joyce) kunnen nieuwe reizen of datums bewerken.");
+      setActiveTab('login');
+      return;
+    }
+    setIsNewTripOpen(true);
   };
 
 
@@ -310,8 +328,11 @@ export default function App() {
     setCustomBookings((prev) => prev.filter((b) => b.id !== id));
   };
 
-  // Send message to backend Gemini API concierge
-  const handleSendMessage = async (text: string) => {
+  // Send message to backend Gemini API concierge & auto-parse uploaded itineraries
+  const handleSendMessage = async (
+    text: string,
+    attachment?: { name: string; type: string; base64?: string; text?: string; isImage?: boolean }
+  ) => {
     const sender = currentUser?.name || (isGuestMode ? 'Gast (ATH-2026)' : 'Reiziger');
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -319,6 +340,14 @@ export default function App() {
       senderName: sender,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       content: text,
+      attachment: attachment
+        ? {
+            name: attachment.name,
+            type: attachment.type,
+            url: attachment.base64,
+            isImage: attachment.isImage,
+          }
+        : undefined,
     };
 
     const newHistory = [...messages, userMsg];
@@ -331,10 +360,49 @@ export default function App() {
         body: JSON.stringify({
           messages: newHistory.map((m) => ({ role: m.role, content: m.content })),
           context: `Greek Island Hopping: ${currentTrip.title} (${currentTrip.stays.map((s) => `${s.island}: ${s.startDate} tot ${s.endDate}`).join(', ')})`,
+          attachment: attachment
+            ? {
+                name: attachment.name,
+                type: attachment.type,
+                base64: attachment.base64,
+                text: attachment.text,
+              }
+            : undefined,
         }),
       });
 
       const data = await res.json();
+
+      // Check if data contains tripUpdate (auto itinerary adjustment)
+      if (data.tripUpdate) {
+        if (currentUser) {
+          // Logged in as Dennis or Joyce -> automatically apply trip updates!
+          const parsedStays: IslandStay[] = (data.tripUpdate.stays || []).map((s: any, idx: number) => ({
+            id: s.id || `stay-auto-${Date.now()}-${idx}`,
+            island: s.island,
+            startDate: s.startDate,
+            endDate: s.endDate,
+            nights: Number(s.nights) || 3,
+            accommodationName: s.accommodationName,
+            notes: s.notes || 'Automatisch verwerkt via Chat Upload',
+          }));
+
+          if (parsedStays.length > 0) {
+            const totalNights = parsedStays.reduce((acc, s) => acc + s.nights, 0);
+            const updatedTripObj: TripData = {
+              ...currentTrip,
+              title: data.tripUpdate.title || currentTrip.title,
+              startDate: data.tripUpdate.startDate || parsedStays[0].startDate,
+              endDate: data.tripUpdate.endDate || parsedStays[parsedStays.length - 1].endDate,
+              durationDays: totalNights + 1,
+              stays: parsedStays,
+            };
+
+            // Save trip state locally & sync to Google Sheets if configured!
+            updateAndSaveTrip(updatedTripObj);
+          }
+        }
+      }
 
       const aiMsg: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
@@ -342,6 +410,11 @@ export default function App() {
         senderName: 'Athena',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         content: data.reply || `Kalimera ${sender}! High-speed ferries en de gecureerde eilandschema's voor ${currentTrip.title} zijn bijgewerkt.`,
+        quickButtons: data.tripUpdate
+          ? currentUser
+            ? [{ label: ' Bekijk Mijn Reis', action: '/travel' }]
+            : [{ label: ' Inloggen om Opslaan Goed te keuren', action: 'login' }]
+          : undefined,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
@@ -351,7 +424,8 @@ export default function App() {
         role: 'assistant',
         senderName: 'Athena',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        content: `Kalimera ${sender}! Ik heb je dagschema bijgewerkt voor ${currentTrip.title}. Je verblijven in ${currentTrip.stays.map((s) => s.island).join(', ')} staan gereed.`,
+        content: `Kalimera ${sender}! Ik heb je bericht of geüploade reisplan ontvangen en je dagschema bijgewerkt voor ${currentTrip.title}.`,
+        quickButtons: [{ label: ' Bekijk Mijn Reis', action: '/travel' }],
       };
       setMessages((prev) => [...prev, fallbackAiMsg]);
     }
@@ -393,15 +467,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white text-[#0b1d2d] flex font-['Inter']">
-      {/* Permanent Left Sidebar */}
+      {/* Left Sidebar Drawer / Fixed Navigation */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenNewTrip={() => setIsNewTripOpen(true)}
+        onOpenNewTrip={handleOpenNewTripModal}
         currentUser={currentUser}
         isGuestMode={isGuestMode}
         tripCode={tripCode}
         onSignOut={handleSignOut}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Top Navigation Header */}
@@ -416,6 +492,7 @@ export default function App() {
         onOpenProfile={() => setActiveTab('settings')}
         onSignOut={handleSignOut}
         onLoginClick={() => setActiveTab('login')}
+        onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
       />
 
       {/* View Content based on Active Tab */}
@@ -430,7 +507,7 @@ export default function App() {
             onOpenNewBooking={handleOpenAddBooking}
             onShare={() => setIsShareOpen(true)}
             onExportPDF={handleExportPDF}
-            onOpenNewTripModal={() => setIsNewTripOpen(true)}
+            onOpenNewTripModal={handleOpenNewTripModal}
             onSaveStay={handleSaveStay}
             onDeleteStay={handleDeleteStay}
             customBookings={customBookings}
