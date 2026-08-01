@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
 import {
   Accommodation,
-  TimelineStop,
   TripData,
-  IslandStay
+  IslandStay,
+  UserAccount
 } from '../types';
 import {
   MAP_IMAGE,
-  PORTARA_IMAGE,
-  NISSAKI_HOTEL_IMAGE,
-  MILOS_BOUTIQUE_IMAGE
 } from '../data/initialData';
 import {
   Share2,
@@ -29,35 +26,66 @@ import {
   Clock,
   Edit3,
   Search,
-  Trash2
+  Trash2,
+  UserCheck,
+  Eye,
+  Key,
+  LogIn,
+  FileSpreadsheet,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
+import { EditStayModal } from './Modals/EditStayModal';
 
 interface MyItineraryViewProps {
   currentTrip: TripData;
+  currentUser: UserAccount | null;
+  isGuestMode: boolean;
+  tripCode: string;
   onOpenChat: () => void;
   onOpenNewBooking: (mode?: 'manual' | 'trivago', island?: string) => void;
   onShare: () => void;
   onExportPDF: () => void;
   onOpenNewTripModal: () => void;
+  onSaveStay: (stay: IslandStay) => void;
+  onDeleteStay: (stayId: string) => void;
   customBookings?: Accommodation[];
   onDeleteCustomBooking?: (id: string) => void;
+  onLoginClick: () => void;
+  sheetUrl?: string | null;
+  isSheetsConnected?: boolean;
+  onSyncSheets?: () => void;
 }
 
 export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   currentTrip,
+  currentUser,
+  isGuestMode,
+  tripCode,
   onOpenChat,
   onOpenNewBooking,
   onShare,
   onExportPDF,
   onOpenNewTripModal,
+  onSaveStay,
+  onDeleteStay,
   customBookings = [],
   onDeleteCustomBooking,
+  onLoginClick,
+  sheetUrl,
+  isSheetsConnected = false,
+  onSyncSheets,
 }) => {
+
   const [accommodationsOpen, setAccommodationsOpen] = useState(true);
   const [tipsOpen, setTipsOpen] = useState(true);
   const [activeIslandId, setActiveIslandId] = useState<string>(
     currentTrip.stays.length > 0 ? currentTrip.stays[0].id : 'stay-1'
   );
+
+  // Edit Stay Modal state
+  const [isEditStayOpen, setIsEditStayOpen] = useState(false);
+  const [editingStay, setEditingStay] = useState<IslandStay | null>(null);
 
   const [tipsChecklist, setTipsChecklist] = useState([
     { id: '1', text: 'Boek veerboottickets minimaal 48 uur van tevoren in het hoogseizoen.', checked: true },
@@ -71,7 +99,17 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
     );
   };
 
-  // Helper to format date string to friendly format e.g. "15 Aug"
+  const handleOpenEditStay = (stay?: IslandStay) => {
+    if (isGuestMode) {
+      alert("⚠️ Je volgt de reis momenteel als Gast. Log in als Dennis of Joyce om de reis aan te passen.");
+      onLoginClick();
+      return;
+    }
+    setEditingStay(stay || null);
+    setIsEditStayOpen(true);
+  };
+
+  // Helper to format date string
   const formatDateFriendly = (dateStr: string) => {
     if (!dateStr) return '';
     try {
@@ -98,29 +136,132 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   });
 
   return (
-    <main className="md:ml-64 pt-24 min-h-screen px-6 md:px-12 pb-16 bg-white">
+    <main className="md:ml-64 pt-24 min-h-screen px-6 md:px-12 pb-16 bg-white font-['Plus_Jakarta_Sans']">
+      {/* Banner for Shared Access & Guest Read-Only Mode */}
+      {isGuestMode ? (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-wrap items-center justify-between gap-3 text-amber-900">
+          <div className="flex items-center gap-2.5">
+            <Eye className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-bold font-['Plus_Jakarta_Sans']">
+                Gastmodus Actief — Je volgt Reiscode <code className="bg-amber-100 px-1.5 py-0.5 rounded font-bold">{tripCode}</code>
+              </p>
+              <p className="text-[11px] text-amber-700 font-['Inter']">
+                Je bekijkt de live gedeelde reis van Dennis & Joyce. Log in als beheerder om wijzigingen op te slaan.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onLoginClick}
+            className="px-3.5 py-2 rounded-xl bg-[#005BAE] text-white text-xs font-bold hover:brightness-110 shadow-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            <LogIn className="w-4 h-4" />
+            Inloggen als Dennis of Joyce
+          </button>
+        </div>
+      ) : currentUser ? (
+        <div className="mb-6 p-4 rounded-2xl bg-[#005BAE]/5 border border-[#005BAE]/20 flex flex-wrap items-center justify-between gap-3 text-[#0b1d2d]">
+          <div className="flex items-center gap-2.5">
+            <UserCheck className="w-5 h-5 text-[#005BAE] flex-shrink-0" />
+            <div>
+              <p className="text-xs font-bold">
+                Ingelogd als <span className="text-[#005BAE]">{currentUser.name}</span> ({currentUser.username})
+              </p>
+              <p className="text-[11px] text-[#404752]">
+                Alle wijzigingen in deze reis worden direct gesynchroniseerd met Joyce & Dennis onder Reiscode <code className="font-bold text-[#005BAE]">{tripCode}</code>.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onShare}
+              className="px-3 py-1.5 rounded-lg bg-white border border-[#005BAE]/30 text-[#005BAE] text-xs font-bold hover:bg-[#005BAE] hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <Key className="w-3.5 h-3.5" />
+              Reiscode Delen ({tripCode})
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Google Sheets Live Database Banner */}
+      <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-3 text-emerald-950">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm flex-shrink-0">
+            <FileSpreadsheet className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-bold text-emerald-900">
+                Google Sheets Database
+              </p>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                {isSheetsConnected ? 'Actief & Gekoppeld' : 'Google Workspace Sync'}
+              </span>
+            </div>
+            <p className="text-[11px] text-emerald-800 font-['Inter'] mt-0.5">
+              Alle wijzigingen in je reisschema, verblijven en boekingen worden realtime opgeslagen in je Google Sheet document.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {onSyncSheets && (
+            <button
+              onClick={onSyncSheets}
+              className="px-3 py-1.5 rounded-xl bg-white border border-emerald-600/30 text-emerald-800 text-xs font-bold hover:bg-emerald-600 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Handmatig synchroniseren met Google Sheets"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Sync nu
+            </button>
+          )}
+          {sheetUrl ? (
+            <a
+              href={sheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Open Google Sheet 📊
+            </a>
+          ) : (
+            <span className="text-xs font-medium text-emerald-700 italic">
+              Google Drive wordt gekoppeld...
+            </span>
+          )}
+        </div>
+      </div>
+
+
       {/* Header Section */}
       <section className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="font-['Inter'] text-xs font-semibold text-[#005BAE] uppercase tracking-widest bg-[#005BAE]/10 px-3 py-1 rounded-full">
               {currentTrip.durationDays} Dagen Odyssey • {currentTrip.style}
             </span>
-            <button
-              onClick={onOpenNewTripModal}
-              className="font-['Inter'] text-xs text-[#005BAE] font-bold hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Datums / Stays Wijzigen
-            </button>
+            <span className="font-['Inter'] text-xs font-bold text-[#E2725B] bg-[#E2725B]/10 px-2.5 py-1 rounded-full flex items-center gap-1">
+              <Key className="w-3 h-3" />
+              Code: {tripCode}
+            </span>
+            {!isGuestMode && (
+              <button
+                onClick={onOpenNewTripModal}
+                className="font-['Inter'] text-xs text-[#005BAE] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                Datums / Stays Bewerken
+              </button>
+            )}
           </div>
 
-          <h1 className="font-['Plus_Jakarta_Sans'] text-4xl md:text-5xl font-bold text-[#0b1d2d]">
+          <h1 className="font-['Plus_Jakarta_Sans'] text-4xl md:text-5xl font-extrabold text-[#0b1d2d]">
             {currentTrip.title}
           </h1>
 
           <p className="text-[#404752] mt-2 max-w-2xl font-['Inter'] text-base">
-            {currentTrip.stays.map(s => s.island).join(' → ')}. Een gecureerde Griekse eilandenreis met exacte verblijfsdatums & hotelboekingen.
+            {currentTrip.stays.map(s => s.island).join(' → ')}. Een gedeelde Griekse eilandenreis met live synchronisatie voor Dennis, Joyce en gasten.
           </p>
         </div>
 
@@ -130,7 +271,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             className="flex items-center gap-2 px-6 py-3 bg-[#f0f4f9] text-[#0b1d2d] rounded-xl font-['Inter'] font-medium text-sm hover:bg-[#d0e1ff] transition-colors cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
-            Share
+            Share Code
           </button>
           <button
             onClick={onExportPDF}
@@ -148,23 +289,23 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-[#005BAE]" />
             <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#001a33]">
-              Verblijfsplanning — Wanneer & Waar Blijf Je
+              Verblijfsplanning — Eiland Stopt & Hotels
             </h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => onOpenNewBooking('trivago')}
-              className="text-[#005BAE] font-['Inter'] text-xs font-semibold bg-white px-3 py-1.5 rounded-lg border border-[#005BAE]/30 hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              Trivago Hotel Finder
-            </button>
-            <button
-              onClick={onOpenNewTripModal}
-              className="text-[#005BAE] font-['Inter'] text-xs font-semibold bg-[#005BAE] text-white px-3 py-1.5 rounded-lg hover:brightness-110 transition-colors cursor-pointer flex items-center gap-1"
+              onClick={() => handleOpenEditStay()}
+              className="text-[#005BAE] font-['Inter'] text-xs font-bold bg-white px-3 py-1.5 rounded-lg border border-[#005BAE]/30 hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" />
-              Trip / Stay Wijzigen
+              Eiland Stop Toevoegen
+            </button>
+            <button
+              onClick={() => onOpenNewBooking('trivago')}
+              className="text-white font-['Inter'] text-xs font-semibold bg-[#005BAE] px-3 py-1.5 rounded-lg hover:brightness-110 transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              Trivago Hotel Finder
             </button>
           </div>
         </div>
@@ -177,7 +318,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
               <div
                 key={stay.id}
                 onClick={() => setActiveIslandId(stay.id)}
-                className={`p-4 rounded-xl bg-white border cursor-pointer transition-all ${
+                className={`p-4 rounded-xl bg-white border cursor-pointer transition-all relative group/card ${
                   isSelected
                     ? 'border-[#005BAE] ring-2 ring-[#005BAE]/20 shadow-md scale-[1.02]'
                     : 'border-[#c0c7d3]/30 hover:border-[#005BAE]/40'
@@ -187,10 +328,24 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[#005BAE] bg-[#f0f4f9] px-2 py-0.5 rounded">
                     Stop {idx + 1}
                   </span>
-                  <span className="text-xs font-semibold text-[#404752] flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-[#005BAE]" />
-                    {stay.nights} {stay.nights === 1 ? 'nacht' : 'nachten'}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-semibold text-[#404752] flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-[#005BAE]" />
+                      {stay.nights} {stay.nights === 1 ? 'nacht' : 'nachten'}
+                    </span>
+                    {!isGuestMode && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditStay(stay);
+                        }}
+                        className="p-1 text-[#005BAE] hover:bg-[#f0f4f9] rounded"
+                        title="Bewerken"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d] flex items-center gap-1.5">
@@ -307,12 +462,22 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {!isGuestMode && (
+                      <button
+                        onClick={() => handleOpenEditStay(stay)}
+                        className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-white border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        Bewerken
+                      </button>
+                    )}
+
                     <button
                       onClick={() => onOpenNewBooking('trivago', stay.island)}
                       className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      Koppel Hotel (Trivago AI)
+                      Koppel Hotel
                     </button>
 
                     <button
@@ -353,7 +518,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                           <div className="space-y-2 text-xs font-['Inter'] text-[#404752]">
                             <div className="flex items-center gap-2">
                               <Ship className="w-4 h-4 text-[#005BAE]" />
-                              <span>Ferry Check-in en overtocht naar {stay.island} hawengate</span>
+                              <span>Ferry Check-in en overtocht naar {stay.island} havens</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Hotel className="w-4 h-4 text-[#005BAE]" />
@@ -438,7 +603,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-green-50 text-green-700 border border-green-200">
                         {b.status}
                       </span>
-                      {onDeleteCustomBooking && (
+                      {onDeleteCustomBooking && !isGuestMode && (
                         <button
                           onClick={() => onDeleteCustomBooking(b.id)}
                           className="text-gray-400 hover:text-red-500 p-1"
@@ -451,23 +616,25 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                 ))}
 
                 {/* Action Buttons */}
-                <div className="pt-2 space-y-2">
-                  <button
-                    onClick={() => onOpenNewBooking('manual')}
-                    className="w-full py-2.5 border border-[#005BAE] text-[#005BAE] rounded-xl font-['Inter'] text-xs font-semibold hover:bg-[#005BAE]/5 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Handmatig Boeking Toevoegen
-                  </button>
+                {!isGuestMode && (
+                  <div className="pt-2 space-y-2">
+                    <button
+                      onClick={() => onOpenNewBooking('manual')}
+                      className="w-full py-2.5 border border-[#005BAE] text-[#005BAE] rounded-xl font-['Inter'] text-xs font-semibold hover:bg-[#005BAE]/5 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Handmatig Boeking Toevoegen
+                    </button>
 
-                  <button
-                    onClick={() => onOpenNewBooking('trivago')}
-                    className="w-full py-2.5 bg-[#005BAE] text-white rounded-xl font-['Inter'] text-xs font-semibold hover:brightness-110 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                    Zoek Hotel Suggesties (Trivago Style)
-                  </button>
-                </div>
+                    <button
+                      onClick={() => onOpenNewBooking('trivago')}
+                      className="w-full py-2.5 bg-[#005BAE] text-white rounded-xl font-['Inter'] text-xs font-semibold hover:brightness-110 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      Zoek Hotel Suggesties (Trivago Style)
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -544,6 +711,14 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       >
         <Sparkles className="w-7 h-7 group-hover:rotate-12 transition-transform" />
       </button>
+
+      {/* Edit Stay Modal */}
+      <EditStayModal
+        isOpen={isEditStayOpen}
+        onClose={() => setIsEditStayOpen(false)}
+        stayToEdit={editingStay}
+        onSaveStay={onSaveStay}
+      />
     </main>
   );
 };

@@ -1,15 +1,8 @@
-```
-# Dependencies
 node_modules/
-# Environment
-.env
-.env.local
-.env.*
-# Logs and temp files
+build/
+dist/
+coverage/
+.DS_Store
 *.log
-*.tmp
-*.swp
-# Editors
-.vscode/
-.idea/
-```
+.env*
+!.env.example

@@ -1,5 +1,14 @@
-export type ActiveTab = 'itinerary' | 'quick-help' | 'chat' | 'settings' | 'support';
+export type ActiveTab = 'itinerary' | 'quick-help' | 'chat' | 'settings' | 'support' | 'login' | 'not-found';
 export type ChatSubTab = 'current' | 'history' | 'favorites';
+
+export interface UserAccount {
+  username: string;
+  email: string;
+  name: string;
+  avatar: string;
+  role: 'owner' | 'member';
+  tripCode: string;
+}
 
 export interface IslandStay {
   id: string;

@@ -3,6 +3,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import {
+  isGoogleAuthConfigured,
+  getOrCreateSpreadsheet,
+  saveTripToSheet,
+  loadTripFromSheet,
+} from "./server/sheets-service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +17,61 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: "10mb" }));
+
+// API: Google Sheets Status
+app.get("/api/sheets/status", async (req, res) => {
+  try {
+    const configured = isGoogleAuthConfigured();
+    if (!configured) {
+      return res.json({
+        configured: false,
+        message: "Google OAuth parameters (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) not active yet.",
+      });
+    }
+
+    const { spreadsheetId, spreadsheetUrl } = await getOrCreateSpreadsheet();
+    res.json({
+      configured: true,
+      spreadsheetId,
+      spreadsheetUrl,
+    });
+  } catch (err: any) {
+    res.json({
+      configured: false,
+      error: err.message || "Failed to query Google Sheets status",
+    });
+  }
+});
+
+// API: Load Trip from Google Sheets
+app.get("/api/sheets/load", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.status(400).json({ error: "Google OAuth not configured" });
+    }
+    const data = await loadTripFromSheet();
+    res.json(data);
+  } catch (err: any) {
+    console.error("Sheets load error:", err);
+    res.status(500).json({ error: err.message || "Failed to load trip from Google Sheets" });
+  }
+});
+
+// API: Save Trip to Google Sheets
+app.post("/api/sheets/save", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.status(400).json({ error: "Google OAuth not configured" });
+    }
+    const { trip, customBookings } = req.body;
+    await saveTripToSheet(trip, customBookings || []);
+    const { spreadsheetUrl } = await getOrCreateSpreadsheet();
+    res.json({ success: true, spreadsheetUrl });
+  } catch (err: any) {
+    console.error("Sheets save error:", err);
+    res.status(500).json({ error: err.message || "Failed to save trip to Google Sheets" });
+  }
+});
 
 // Helper to get Gemini AI instance safely
 function getGeminiClient() {

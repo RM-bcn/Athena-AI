@@ -24,6 +24,29 @@ export const CHAT_KOUFONISIA_CARD_IMAGE = "https://lh3.googleusercontent.com/aid
 
 export const CHAT_BACKGROUND_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuCMGa56WVENSuvyFr4wKttGjpj-NyyEtz4FNZkQXsohrXFxuoi4FuNI8bdtimcT-zM4M5Mv5PZLUIWiDmz_50ZlZk7jIota_2WermUURZTq-NmNnbCqkDKfZn2KG2jeasE32uX71OLYLUStXMsy5uUjz085vjzbZ-xhl29umgKT5xYTLMRe5wzE0Ax-c8DYVaGUJBT5bYpTFxhiS6bzf7_k9xhW1QjGAtauG6kb0REBCRP4JBXhvs8Iaw";
 
+export const LOGIN_HERO_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuBEYNJVvb1MztBDIENtSV1IXSDiWDObpGkZo3i8y0SwcNjIzDYz56mCLdnptqPTGm-NRRNLi5oE45T9DrDoa0lFgKsFqd5y-snG6t2jyf3qN-8lHzPQItwruAYGimrkk-Ds7QV8F5j8QhrcdXiiqSmWnCnYTdVSMOGuYh1t__Yq0iLitFSuHDOWDLfCmsrHHHLpmnd-Cr3zcR9rrokMPcePKpYEqvtgoq1v8Dy0ln4A005bmHjeeZcZ5Q";
+
+export const DEFAULT_USERS = [
+  {
+    username: 'dennisvr',
+    email: 'dennis.van.rooden@gmail.com',
+    password: 'Athene2026!',
+    name: 'Dennis van Rooden',
+    avatar: USER_AVATAR,
+    role: 'owner' as const,
+    tripCode: 'ATH-2026',
+  },
+  {
+    username: 'Joyce',
+    email: 'Joyceockeloen@gmail.com',
+    password: 'JoyceO',
+    name: 'Joyce Ockeloen',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    role: 'member' as const,
+    tripCode: 'ATH-2026',
+  }
+];
+
 export const initialTimelineStops: TimelineStop[] = [
   { id: 'milos', days: '1-2', island: 'Milos' },
   { id: 'naxos', days: '3-5', island: 'Naxos', isActive: true },
