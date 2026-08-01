@@ -7,7 +7,16 @@ function getOAuthClient() {
   const clientSecret = (process.env.CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || "").trim();
   const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || process.env.REFRESH_TOKEN || "").trim();
 
+  console.log("[Google Auth] Debug - CLIENT_ID present:", !!clientId);
+  console.log("[Google Auth] Debug - CLIENT_SECRET present:", !!clientSecret);
+  console.log("[Google Auth] Debug - REFRESH_TOKEN present:", !!refreshToken);
+
   if (!clientId || !clientSecret || !refreshToken) {
+    console.error("[Google Auth] Missing credentials:", {
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+      hasRefreshToken: !!refreshToken
+    });
     return null;
   }
 
@@ -78,11 +87,14 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
 
   // 2. Search drive for existing file named "Athena AI - Cyclades Trip (ATH-2026)" or containing "ATH-2026"
   try {
+    console.log("[Google Sheets] Searching Drive for existing spreadsheet...");
     const searchRes = await drive.files.list({
       q: "(name = 'Athena AI - Cyclades Trip (ATH-2026)' or name contains 'ATH-2026') and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false",
       fields: "files(id, name, webViewLink, createdTime)",
       orderBy: "createdTime asc", // Pick the original primary sheet
     });
+
+    console.log("[Google Sheets] Drive search result:", searchRes.data.files?.length || 0, "files found");
 
     if (searchRes.data.files && searchRes.data.files.length > 0) {
       const file = searchRes.data.files[0];
@@ -97,6 +109,12 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
       }
     }
   } catch (err: any) {
+    console.error("[Google Sheets] Drive API error details:", {
+      message: err?.message,
+      code: err?.code,
+      status: err?.status,
+      errors: err?.errors
+    });
     if (err?.message?.includes("Google Drive API has not been used") || err?.code === 403) {
       console.warn("[Google Sheets] Note: Google Drive API is not enabled on this Google Cloud Project. To enable automatic Drive file searches, visit: https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=1097495048880 . Alternatively, set GOOGLE_SHEET_ID in your environment variables.");
     } else {
