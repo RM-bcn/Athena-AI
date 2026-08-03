@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import greeceSunsetBg from '../assets/images/greece_sunset_bg_1785583337875.jpg';
 import { LOGIN_HERO_IMAGE, DEFAULT_USERS } from '../data/initialData';
 import { UserAccount } from '../types';
 import { Key, ArrowRight, LogIn, Info, Sparkles, User, Lock, AlertCircle, HelpCircle, CheckCircle2, X } from 'lucide-react';
@@ -97,19 +98,29 @@ export const LoginView: React.FC<LoginViewProps> = ({
       <div className="absolute inset-0 bg-gradient-to-br from-[#005BAE]/5 via-transparent to-[#E2725B]/5 pointer-events-none" />
 
       <main className="relative z-10 w-full max-w-6xl mx-auto px-6 md:px-12 py-12 flex flex-col justify-center">
-        {/* Branding Header */}
-        <header className="mb-8 md:mb-12 text-center md:text-left">
-          <div className="flex items-center justify-center md:justify-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#005BAE] text-white flex items-center justify-center shadow-md">
-              <span className="material-symbols-outlined text-2xl">account_balance</span>
+        {/* Branding & Hero Sunset Banner Header */}
+        <header className="mb-8 md:mb-10 relative rounded-3xl overflow-hidden shadow-lg border border-amber-900/20">
+          <img
+            src={greeceSunsetBg}
+            alt="Griekenland Sunset"
+            referrerPolicy="no-referrer"
+            className="w-full h-48 md:h-56 object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/85 via-slate-900/70 to-amber-950/50 backdrop-blur-[1px]" />
+          
+          <div className="absolute inset-0 p-6 md:p-8 flex flex-col justify-end text-white z-10">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 rounded-full bg-amber-500/30 backdrop-blur-md border border-amber-400/30 text-amber-300 flex items-center justify-center shadow-md">
+                <span className="material-symbols-outlined text-xl">account_balance</span>
+              </div>
+              <h1 className="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-md">
+                Athena AI Concierge
+              </h1>
             </div>
-            <h1 className="font-['Plus_Jakarta_Sans'] text-3xl md:text-4xl font-extrabold text-[#005BAE] tracking-tight">
-              Athena AI
-            </h1>
+            <p className="max-w-xl text-amber-100/90 font-['Plus_Jakarta_Sans'] text-sm md:text-base leading-relaxed drop-shadow">
+              Welkom bij Dennis & Joyce's Eilandhoppen Odyssey (Milos, Naxos & Koufonisia). Log in als beheerder of bekijk de reis direct via reiscode.
+            </p>
           </div>
-          <p className="mt-3 max-w-md text-[#4f6073] font-['Plus_Jakarta_Sans'] text-base md:text-lg">
-            Wisdom-led travel planning. Discover the Mediterranean through the eyes of a modern sage.
-          </p>
         </header>
 
         {/* Dual Card Section */}
