@@ -17,6 +17,22 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "10mb" }));
 
+// Flexible case-insensitive env variable reader
+function getEnvVal(...names: string[]): string {
+  for (const name of names) {
+    if (process.env[name] && process.env[name]!.trim()) {
+      return process.env[name]!.trim();
+    }
+  }
+  const lowerNames = names.map((n) => n.toLowerCase());
+  for (const key of Object.keys(process.env)) {
+    if (lowerNames.includes(key.toLowerCase()) && process.env[key] && process.env[key]!.trim()) {
+      return process.env[key]!.trim();
+    }
+  }
+  return "";
+}
+
 // API: Google Sheets Status
 app.get("/api/sheets/status", async (req, res) => {
   try {
@@ -81,56 +97,66 @@ function getGeminiClient() {
   return new GoogleGenAI({ apiKey });
 }
 
-// Helper to call Groq API safely (Primary AI Engine)
-async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<string | null> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey || apiKey === "MY_GROQ_API_KEY" || apiKey.trim() === "") {
+// Helper to call Groq API safely (Primary AI Engine with multi-model fallback)
+async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ content: string; model: string } | null> {
+  const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
+  if (!apiKey) {
     return null;
   }
 
-  try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey.trim()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
-    });
+  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"];
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("Groq API error:", res.status, errText);
-      return null;
+  for (const model of models) {
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 1024,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          return { content, model };
+        }
+      } else {
+        const errText = await res.text();
+        console.warn(`Groq API model ${model} error (${res.status}):`, errText);
+      }
+    } catch (err) {
+      console.warn(`Groq API exception for model ${model}:`, err);
     }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || null;
-  } catch (err) {
-    console.error("Groq API exception:", err);
-    return null;
   }
+
+  return null;
 }
 
 // API: AI Engine Status
 app.get("/api/ai/status", (req, res) => {
-  const hasGroq = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== "MY_GROQ_API_KEY");
-  const hasGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY");
+  const groqKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  const hasGroq = !!(groqKey && groqKey !== "MY_GROQ_API_KEY");
+  const hasGemini = !!(geminiKey && geminiKey !== "MY_GEMINI_API_KEY");
 
   res.json({
     activeEngine: hasGroq
-      ? "Groq Llama-3.3-70B (Ultra-fast)"
+      ? "Groq Llama-3.3-70B (Primary Ultra-Fast)"
       : hasGemini
       ? "Gemini 3.6 Flash"
-      : "Greek Concierge Offline Mode",
+      : "Athena Greek Concierge Engine",
     hasGroqKey: hasGroq,
     hasGeminiKey: hasGemini,
   });
@@ -273,66 +299,70 @@ If no travel schedule update is present, reply in standard conversational Dutch 
     const lastUserMsg = userMsgList[userMsgList.length - 1]?.content || "";
     const userPromptText = userMsgList.map((m: any) => `${m.role === 'user' ? 'Traveler' : 'Athena'}: ${m.content}`).join('\n');
 
-    // 1. Primary Engine: Try Groq AI (Llama-3.3-70b-versatile)
+    // 1. Primary Engine: Try Groq AI (Llama 3.3 70B & Fallbacks)
     const groqUserPrompt = `${userPromptText}${
       attachment?.text ? `\n\n[Bijgevoegd Document Content (${attachment.name})]:\n${attachment.text}` : ''
     }${
       attachment?.name && !attachment?.text ? `\n\n[Bijgevoegd Bestand: ${attachment.name}]` : ''
     }`;
 
-    const groqReply = await callGroqAI(systemPrompt, groqUserPrompt);
-    if (groqReply) {
-      const parsedJson = parseAIJsonBlock(groqReply);
+    const groqRes = await callGroqAI(systemPrompt, groqUserPrompt);
+    if (groqRes && groqRes.content) {
+      const parsedJson = parseAIJsonBlock(groqRes.content);
       if (parsedJson && parsedJson.tripUpdate) {
         return res.json({
           reply: parsedJson.reply || "Kalimera! Je geüploade reisplan is verwerkt door Groq AI en je reisschema is automatisch bijgewerkt.",
           tripUpdate: parsedJson.tripUpdate,
-          engine: "Groq (llama-3.3-70b-versatile)"
+          engine: `Groq (${groqRes.model})`
         });
       }
-      return res.json({ reply: groqReply, engine: "Groq (llama-3.3-70b-versatile)" });
+      return res.json({ reply: groqRes.content, engine: `Groq (${groqRes.model})` });
     }
 
-    // 2. Secondary Engine: Try Gemini AI (Multimodal fallback if image attached or Groq unavailable)
-    const ai = getGeminiClient();
-    if (ai) {
-      const parts: any[] = [{ text: `${systemPrompt}\n\nChat History:\n${userPromptText}\n\nAthena:` }];
-      
-      if (attachment) {
-        if (attachment.base64 && attachment.type?.startsWith("image/")) {
-          const cleanBase64 = attachment.base64.replace(/^data:image\/\w+;base64,/, "");
-          parts.push({
-            inlineData: {
-              data: cleanBase64,
-              mimeType: attachment.type
-            }
-          });
-          parts.push({ text: `Attached Image File (${attachment.name}): Please read the text/itinerary inside this image.` });
-        } else if (attachment.text) {
-          parts.push({ text: `Attached Document Content (${attachment.name}):\n${attachment.text}` });
+    // 2. Secondary Engine: Try Gemini AI safely (Multimodal fallback if image attached or Groq unavailable)
+    try {
+      const ai = getGeminiClient();
+      if (ai) {
+        const parts: any[] = [{ text: `${systemPrompt}\n\nChat History:\n${userPromptText}\n\nAthena:` }];
+        
+        if (attachment) {
+          if (attachment.base64 && attachment.type?.startsWith("image/")) {
+            const cleanBase64 = attachment.base64.replace(/^data:image\/\w+;base64,/, "");
+            parts.push({
+              inlineData: {
+                data: cleanBase64,
+                mimeType: attachment.type
+              }
+            });
+            parts.push({ text: `Attached Image File (${attachment.name}): Please read the text/itinerary inside this image.` });
+          } else if (attachment.text) {
+            parts.push({ text: `Attached Document Content (${attachment.name}):\n${attachment.text}` });
+          }
         }
-      }
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: [{ role: "user", parts }]
-      });
+        const response = await ai.models.generateContent({
+          model: "gemini-3.6-flash",
+          contents: [{ role: "user", parts }]
+        });
 
-      const rawText = response.text || "";
-      const parsedJson = parseAIJsonBlock(rawText);
+        const rawText = response.text || "";
+        const parsedJson = parseAIJsonBlock(rawText);
 
-      if (parsedJson && parsedJson.tripUpdate) {
+        if (parsedJson && parsedJson.tripUpdate) {
+          return res.json({
+            reply: parsedJson.reply || "Kalimera! Ik heb je geüploade reisplan verwerkt en je reisschema automatisch aangepast.",
+            tripUpdate: parsedJson.tripUpdate,
+            engine: "Gemini 3.6 Flash (Itinerary Parser)"
+          });
+        }
+
         return res.json({
-          reply: parsedJson.reply || "Kalimera! Ik heb je geüploade reisplan verwerkt en je reisschema automatisch aangepast.",
-          tripUpdate: parsedJson.tripUpdate,
-          engine: "Gemini 3.6 Flash (Itinerary Parser)"
+          reply: rawText || "Yassou! Hoe kan ik je verder helpen met je reis?",
+          engine: "Gemini 3.6 Flash"
         });
       }
-
-      return res.json({
-        reply: rawText || "Yassou! Hoe kan ik je verder helpen met je reis?",
-        engine: "Gemini 3.6 Flash"
-      });
+    } catch (geminiErr: any) {
+      console.warn("Gemini AI error (falling back to local Athena Concierge):", geminiErr?.message || geminiErr);
     }
 
     // 3. Fallback Engine with Local Itinerary Parser

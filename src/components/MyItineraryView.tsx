@@ -252,9 +252,13 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                 Open Google Sheet 📊
               </a>
             ) : (
-              <span className="text-xs font-medium text-emerald-700 italic">
-                Google Drive wordt gekoppeld...
-              </span>
+              <button
+                onClick={onSyncSheets}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Koppelen & Synchroniseren 📊
+              </button>
             )}
           </div>
         </div>
