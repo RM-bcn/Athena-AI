@@ -269,12 +269,57 @@ export default function App() {
 
   // Save / Edit Stay Handler (Dennis or Joyce editing trip)
   const handleSaveStay = (updatedStay: IslandStay) => {
+    // Frontend validation before saving
+    if (!updatedStay.id || !updatedStay.island || !updatedStay.startDate || !updatedStay.endDate) {
+      alert("⚠️ Verplichte velden ontbreken: ID, eiland, aankomstdatum en vertrekdatum zijn verplicht.");
+      return;
+    }
+
+    const sStart = new Date(updatedStay.startDate);
+    const sEnd = new Date(updatedStay.endDate);
+    const tripStart = new Date(currentTrip.startDate);
+    const tripEnd = new Date(currentTrip.endDate);
+
+    if (isNaN(sStart.getTime()) || isNaN(sEnd.getTime())) {
+      alert("⚠️ Ongeldig datumformaat. Gebruik YYYY-MM-DD.");
+      return;
+    }
+
+    if (sStart > sEnd) {
+      alert("⚠️ Aankomstdatum moet voor vertrekdatum liggen.");
+      return;
+    }
+
+    if (sStart < tripStart || sEnd > tripEnd) {
+      alert(`⚠️ Verblijfdatums moeten binnen de reisperiode liggen (${currentTrip.startDate} tot ${currentTrip.endDate}).`);
+      return;
+    }
+
+    // Check for overlap with other stays in the trip
+    const hasOverlap = currentTrip.stays.some((s) => {
+      if (s.id === updatedStay.id) return false;
+      const oStart = new Date(s.startDate);
+      const oEnd = new Date(s.endDate);
+      if (isNaN(oStart.getTime()) || isNaN(oEnd.getTime())) return false;
+      return !(sEnd < oStart || sStart > oEnd);
+    });
+
+    if (hasOverlap) {
+      alert("⚠️ Dit verblijf overlapt met een ander verblijf in de reis. Corrigeer de datums.");
+      return;
+    }
+
     const existingIndex = currentTrip.stays.findIndex((s) => s.id === updatedStay.id);
     let newStays: IslandStay[];
 
     if (existingIndex >= 0) {
       newStays = currentTrip.stays.map((s) => (s.id === updatedStay.id ? updatedStay : s));
     } else {
+      // Check for duplicate ID in new stays
+      if (currentTrip.stays.some((s) => s.id === updatedStay.id)) {
+        alert("⚠️ Een verblijf met dit ID bestaat al.");
+        return;
+      }
       newStays = [...currentTrip.stays, updatedStay];
     }
 

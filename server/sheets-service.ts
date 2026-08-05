@@ -1,26 +1,3 @@
-import { google } from "googleapis";
-
-let cachedSheetId: string | null = null;
-
-function getEnvVal(...names: string[]): string {
-  for (const name of names) {
-    const val = process.env[name];
-    if (val && typeof val === "string" && val.trim()) {
-      return val.trim().replace(/^["']|["']$/g, "");
-    }
-  }
-  const lowerNames = names.map((n) => n.toLowerCase());
-  for (const key of Object.keys(process.env)) {
-    if (lowerNames.includes(key.toLowerCase())) {
-      const val = process.env[key];
-      if (val && typeof val === "string" && val.trim()) {
-        return val.trim().replace(/^["']|["']$/g, "");
-      }
-    }
-  }
-  return "";
-}
-
 function cleanSpreadsheetId(id: string): string {
   if (!id) return "";
   const match = id.match(/\/d\/([a-zA-Z0-9-_]+)/);
@@ -90,6 +67,28 @@ async function ensureTabsExist(sheets: any, spreadsheetId: string) {
     }
   } catch (err: any) {
     console.warn("[Google Sheets] Note when checking tabs:", err?.message || err);
+  }
+}
+
+// Helper to look up existing row by ID in a sheet
+async function findRowById(sheets: any, spreadsheetId: string, sheetTitle: string, idColumnIndex: number): Promise<number | null> {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetTitle}!A:Z`, // Get all columns
+    });
+
+    const rows = response.data.values || [];
+    for (let i = 1; i < rows.length; i++) { // Skip header row
+      const row = rows[i];
+      if (row.length > idColumnIndex && row[idColumnIndex] === id) {
+        return i; // Return row number (1-based)
+      }
+    }
+    return null; // No matching row found
+  } catch (err) {
+    console.warn("[Google Sheets] Could not lookup row by ID:", err?.message || err);
+    return null;
   }
 }
 
@@ -237,14 +236,20 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
 
     await ensureTabsExist(sheets, spreadsheetId);
 
-    // Validate tripData
+    // Validate tripData - strict DTO validation
     if (!tripData.startDate || !tripData.endDate) {
       throw new Error("Ongeldige reisdata: startDate en endDate zijn verplicht.");
     }
     const start = new Date(tripData.startDate);
     const end = new Date(tripData.endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new Error("Ongeldige reisdata: startDate en endDate moeten in YYYY-MM-DD formaat zijn.");
+    }
     if (start > end) {
       throw new Error("Ongeldige reisdata: startDate moet voor endDate liggen.");
+    }
+    if (!tripData.id) {
+      throw new Error("Ongeldige reisdata: id is verplicht.");
     }
 
     // Format TripInfo rows
@@ -261,15 +266,56 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
       ]
     ];
 
-    // Validate and filter stays
+    // Validate and filter stays - strict validation with date overlap check
     const seenStayIds = new Set<string>();
-    const validStays = (tripData.stays || []).filter((s: any) => {
-      if (!s.island || !s.startDate || !s.endDate) return false;
-      if (seenStayIds.has(s.id)) return false; // prevent duplicates
+    const tripStart = start;
+    const tripEnd = end;
+
+    const validStays = (tripData.stays || []).filter((s: any, index: number, self: any[]) => {
+      // Basic required field validation
+      if (!s.id) return false;
+      if (!s.island) return false;
+      if (!s.startDate || !s.endDate) return false;
+
+      // Check for duplicate IDs within the trip
+      if (seenStayIds.has(s.id)) return false;
       seenStayIds.add(s.id);
+
+      // Parse dates
       const sStart = new Date(s.startDate);
       const sEnd = new Date(s.endDate);
-      return sStart <= sEnd;
+
+      // Validate date format
+      if (isNaN(sStart.getTime()) || isNaN(sEnd.getTime())) {
+        return false;
+      }
+
+      // Validate date range
+      if (sStart > sEnd) {
+        return false;
+      }
+
+      // Check if stay overlaps with trip dates
+      if (sStart < tripStart || sEnd > tripEnd) {
+        return false;
+      }
+
+      // Check for overlap with other stays in the same trip
+      for (let i = 0; i < self.length; i++) {
+        if (i === index) continue;
+        const otherStay = self[i];
+
+        const oStart = new Date(otherStay.startDate);
+        const oEnd = new Date(otherStay.endDate);
+
+        if (!isNaN(oStart.getTime()) && !isNaN(oEnd.getTime())) {
+          if (!(sEnd < oStart || sStart > oEnd)) {
+            return false;
+          }
+        }
+      }
+
+      return true;
     });
 
     // Format Stays rows
@@ -285,12 +331,15 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
     ]);
     const staysValues = [staysHeaders, ...staysRows];
 
-    // Validate and filter custom bookings
+    // Validate and filter custom bookings - strict validation
     const seenBookingIds = new Set<string>();
     const validBookings = (customBookings || []).filter((b: any) => {
+      if (!b.id) return false;
       if (!b.name || !b.location) return false;
+
       if (seenBookingIds.has(b.id)) return false;
       seenBookingIds.add(b.id);
+
       return true;
     });
 
