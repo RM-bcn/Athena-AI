@@ -142,7 +142,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
       </aside>
 
       {/* Main Chat Conversation Space */}
-        <div className="flex-1 flex flex-col pt-24 px-4 md:px-8 md:px-12 pb-24 md:pb-44 overflow-y-auto">
+      <div className="flex-1 flex flex-col pt-24 px-4 md:px-12 pb-24 md:pb-44 overflow-y-auto">
         <div className="max-w-3xl mx-auto w-full space-y-8 py-6">
           {messages.map(msg => (
             <div
