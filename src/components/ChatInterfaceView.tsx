@@ -142,7 +142,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
       </aside>
 
       {/* Main Chat Conversation Space */}
-      <div className="flex-1 flex flex-col pt-24 px-8 md:px-12 pb-44 overflow-y-auto">
+        <div className="flex-1 flex flex-col pt-24 px-4 md:px-8 md:px-12 pb-24 md:pb-44 overflow-y-auto">
         <div className="max-w-3xl mx-auto w-full space-y-8 py-6">
           {messages.map(msg => (
             <div
@@ -281,7 +281,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
       </div>
 
       {/* Bottom Floating Interaction Bar */}
-      <div className="fixed bottom-0 left-64 right-0 p-8 bg-gradient-to-t from-white via-white/90 to-transparent z-40">
+      <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 md:p-8 bg-gradient-to-t from-white via-white/90 to-transparent z-40">
         <div className="max-w-3xl mx-auto">
           {/* Quick Action Chips */}
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1 no-scrollbar">

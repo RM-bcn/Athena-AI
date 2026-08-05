@@ -506,7 +506,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#0b1d2d] flex font-['Inter']">
+    <div className="min-h-screen bg-white text-[#0b1d2d] flex font-['Inter'] overflow-x-hidden w-full">
       {/* Left Sidebar Drawer / Fixed Navigation */}
       <Sidebar
         activeTab={activeTab}
