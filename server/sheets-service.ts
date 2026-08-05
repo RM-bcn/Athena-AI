@@ -237,40 +237,70 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
 
     await ensureTabsExist(sheets, spreadsheetId);
 
+    // Validate tripData
+    if (!tripData.startDate || !tripData.endDate) {
+      throw new Error("Ongeldige reisdata: startDate en endDate zijn verplicht.");
+    }
+    const start = new Date(tripData.startDate);
+    const end = new Date(tripData.endDate);
+    if (start > end) {
+      throw new Error("Ongeldige reisdata: startDate moet voor endDate liggen.");
+    }
+
     // Format TripInfo rows
     const tripInfoValues = [
       ["TripID", "Title", "StartDate", "EndDate", "DurationDays", "Style", "TripCode"],
       [
         tripData.id || "ATH-2026",
         tripData.title || "Cyclades Odyssey",
-        tripData.startDate || "2026-08-15",
-        tripData.endDate || "2026-08-23",
-        String(tripData.durationDays || 8),
+        tripData.startDate,
+        tripData.endDate,
+        String(tripData.durationDays || Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))),
         tripData.style || "Eilandhoppen",
         "ATH-2026"
       ]
     ];
 
+    // Validate and filter stays
+    const seenStayIds = new Set<string>();
+    const validStays = (tripData.stays || []).filter((s: any) => {
+      if (!s.island || !s.startDate || !s.endDate) return false;
+      if (seenStayIds.has(s.id)) return false; // prevent duplicates
+      seenStayIds.add(s.id);
+      const sStart = new Date(s.startDate);
+      const sEnd = new Date(s.endDate);
+      return sStart <= sEnd;
+    });
+
     // Format Stays rows
     const staysHeaders = ["ID", "Island", "StartDate", "EndDate", "Nights", "AccommodationName", "Notes"];
-    const staysRows = (tripData.stays || []).map((s: any) => [
+    const staysRows = validStays.map((s: any) => [
       s.id,
       s.island,
       s.startDate,
       s.endDate,
-      s.nights,
+      s.nights || Math.ceil((new Date(s.endDate).getTime() - new Date(s.startDate).getTime()) / (1000 * 60 * 60 * 24)),
       s.accommodationName || "",
       s.notes || ""
     ]);
     const staysValues = [staysHeaders, ...staysRows];
 
+    // Validate and filter custom bookings
+    const seenBookingIds = new Set<string>();
+    const validBookings = (customBookings || []).filter((b: any) => {
+      if (!b.name || !b.location) return false;
+      if (seenBookingIds.has(b.id)) return false;
+      seenBookingIds.add(b.id);
+      return true;
+    });
+
     // Format Custom Bookings rows
     const bookingHeaders = ["ID", "Name", "Location", "Status", "Island", "PricePerNight"];
-    const bookingRows = (customBookings || []).map((b: any) => [
+    const bookingRows = validBookings.map((b: any) => [
       b.id,
       b.name,
       b.location,
-      b.status,
+      b.status || "PENDING",
       b.island || "",
       b.pricePerNight || ""
     ]);
@@ -283,7 +313,7 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
         valueInputOption: "USER_ENTERED",
         data: [
           { range: "TripInfo!A1:G2", values: tripInfoValues },
-          { range: `Stays!A1:G${staysValues.length}`, values: staysValues },
+          { range: `Stays!A1:G${Math.max(staysValues.length, 2)}`, values: staysValues },
           { range: `CustomBookings!A1:F${Math.max(bookingValues.length, 2)}`, values: bookingValues }
         ]
       }

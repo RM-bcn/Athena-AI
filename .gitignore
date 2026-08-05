@@ -1,12 +1,1 @@
-#Images
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.bmp
-*.webm
-
-# Dependencies & Build
-node_modules/
-dist/
-package-lock.json
+Nothing should be ignored based on the provided file changes. The only modified file is 'server/sheets-service.ts', which appears to be a source code file and should not be added to .gitignore.
