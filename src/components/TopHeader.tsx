@@ -91,14 +91,14 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             </>
           ) : (
             <>
-              <button
-                onClick={() => setActiveTab('chat')}
-                className={`font-['Inter'] text-sm transition-colors py-1 cursor-pointer ${
-                  activeTab === 'chat' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
-                }`}
-              >
-                Chat Interface
-              </button>
+              {!isGuestMode && (
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className="font-['Inter'] text-sm transition-colors py-1 cursor-pointer text-[#404752] hover:text-[#005BAE]"
+                >
+                  Chat Interface
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('itinerary')}
                 className={`font-['Inter'] text-sm transition-colors py-1 cursor-pointer ${

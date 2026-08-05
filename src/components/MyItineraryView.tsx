@@ -527,13 +527,15 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       </>
                     )}
 
-                    <button
-                      onClick={onOpenChat}
-                      className="text-xs font-['Inter'] font-semibold text-white bg-[#005BAE] px-3 py-1.5 rounded-lg hover:brightness-110 transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Vraag Concierge
-                    </button>
+                    {!isGuestMode && (
+                      <button
+                        onClick={onOpenChat}
+                        className="text-xs font-['Inter'] font-semibold text-white bg-[#005BAE] px-3 py-1.5 rounded-lg hover:brightness-110 transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Vraag Concierge
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -753,13 +755,15 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       </div>
 
       {/* Interactive Floating Chat Action */}
-      <button
-        onClick={onOpenChat}
-        className="fixed bottom-8 right-8 w-16 h-16 bg-[#005BAE] text-white rounded-full shadow-[0_12px_32px_rgba(0,91,174,0.3)] flex items-center justify-center group active:scale-95 transition-transform z-50 cursor-pointer"
-        title="Open Athena AI Assistant"
-      >
-        <Sparkles className="w-7 h-7 group-hover:rotate-12 transition-transform" />
-      </button>
+      {!isGuestMode && (
+        <button
+          onClick={onOpenChat}
+          className="fixed bottom-8 right-8 w-16 h-16 bg-[#005BAE] text-white rounded-full shadow-[0_12px_32px_rgba(0,91,174,0.3)] flex items-center justify-center group active:scale-95 transition-transform z-50 cursor-pointer"
+          title="Open Athena AI Assistant"
+        >
+          <Sparkles className="w-7 h-7 group-hover:rotate-12 transition-transform" />
+        </button>
+      )}
 
       {/* Edit Stay Modal */}
       <EditStayModal

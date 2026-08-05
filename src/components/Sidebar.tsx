@@ -117,17 +117,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Mijn Itinerary
         </button>
 
-        <button
-          onClick={() => handleNavClick('chat')}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
-            activeTab === 'chat'
-              ? 'bg-[#005BAE] text-white shadow-sm'
-              : 'text-[#404752] hover:bg-[#f0f4f9]'
-          }`}
-        >
-          <MessageSquare className="w-4 h-4" />
-          Chat Interface
-        </button>
+        {!isGuestMode && (
+          <button
+            onClick={() => handleNavClick('chat')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
+              activeTab === 'chat'
+                ? 'bg-[#005BAE] text-white shadow-sm'
+                : 'text-[#404752] hover:bg-[#f0f4f9]'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            Chat Interface
+          </button>
+        )}
 
         <button
           onClick={() => handleNavClick('quick-help')}

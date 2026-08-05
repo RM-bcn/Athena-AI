@@ -24,6 +24,7 @@ interface QuickHelpViewProps {
   onTriggerEmergency: () => void;
   onCallTaxi: () => void;
   onFindPharmacy: () => void;
+  isGuestMode?: boolean;
 }
 
 export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
@@ -35,6 +36,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
   onTriggerEmergency,
   onCallTaxi,
   onFindPharmacy,
+  isGuestMode = false,
 }) => {
   const [localTime, setLocalTime] = useState<string>('08:01');
 
@@ -243,17 +245,19 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
       </div>
 
       {/* Floating Action Chat Button */}
-      <div className="fixed bottom-10 right-10 z-50">
-        <button
-          onClick={onOpenChat}
-          className="w-14 h-14 bg-[#005BAE] text-white rounded-full shadow-2xl flex items-center justify-center group active:scale-90 transition-all hover:w-48 hover:rounded-2xl cursor-pointer"
-        >
-          <MessageSquare className="w-6 h-6" />
-          <span className="hidden group-hover:inline ml-3 font-['Inter'] text-xs font-semibold whitespace-nowrap overflow-hidden">
-            Type a custom request
-          </span>
-        </button>
-      </div>
+      {!isGuestMode && (
+        <div className="fixed bottom-10 right-10 z-50">
+          <button
+            onClick={onOpenChat}
+            className="w-14 h-14 bg-[#005BAE] text-white rounded-full shadow-2xl flex items-center justify-center group active:scale-90 transition-all hover:w-48 hover:rounded-2xl cursor-pointer"
+          >
+            <MessageSquare className="w-6 h-6" />
+            <span className="hidden group-hover:inline ml-3 font-['Inter'] text-xs font-semibold whitespace-nowrap overflow-hidden">
+              Type a custom request
+            </span>
+          </button>
+        </div>
+      )}
     </main>
   );
 };
