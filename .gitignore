@@ -1,1 +1,7 @@
-(empty)
+#Images
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webm
