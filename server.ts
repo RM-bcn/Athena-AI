@@ -694,6 +694,17 @@ Generate emergency assistance options including next available hydrofoils/ferrie
   }
 });
 
+// Global Error Handler for Vercel / Express to prevent unhandled 500 crashes
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Unhandled Error on Vercel:", err);
+  if (!res.headersSent) {
+    res.status(200).json({
+      success: false,
+      error: err?.message || "Er is een onverwachte serverfout opgetreden op Vercel."
+    });
+  }
+});
+
 // Vite / Static production serving
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
