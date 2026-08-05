@@ -7,7 +7,7 @@ import {
   getOrCreateSpreadsheet,
   saveTripToSheet,
   loadTripFromSheet,
-} from "./server/sheets-service";
+} from "./server/sheets-service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
