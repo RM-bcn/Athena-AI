@@ -238,11 +238,20 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
     await ensureTabsExist(sheets, spreadsheetId);
 
     // Validate tripData
+    if (!tripData.id || !tripData.title) {
+      throw new Error("Ongeldige reisdata: id en title zijn verplicht.");
+    }
     if (!tripData.startDate || !tripData.endDate) {
       throw new Error("Ongeldige reisdata: startDate en endDate zijn verplicht.");
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tripData.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(tripData.endDate)) {
+      throw new Error("Ongeldige datumindeling: gebruik YYYY-MM-DD.");
+    }
     const start = new Date(tripData.startDate);
     const end = new Date(tripData.endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new Error("Ongeldige reisdata: ongeldige datumwaarde.");
+    }
     if (start > end) {
       throw new Error("Ongeldige reisdata: startDate moet voor endDate liggen.");
     }
@@ -251,8 +260,8 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
     const tripInfoValues = [
       ["TripID", "Title", "StartDate", "EndDate", "DurationDays", "Style", "TripCode"],
       [
-        tripData.id || "ATH-2026",
-        tripData.title || "Cyclades Odyssey",
+        tripData.id,
+        tripData.title,
         tripData.startDate,
         tripData.endDate,
         String(tripData.durationDays || Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))),
@@ -261,15 +270,20 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
       ]
     ];
 
-    // Validate and filter stays
-    const seenStayIds = new Set<string>();
+    // Validate and filter stays with strict DTO checks
+    const seenStayKeys = new Set<string>();
     const validStays = (tripData.stays || []).filter((s: any) => {
-      if (!s.island || !s.startDate || !s.endDate) return false;
-      if (seenStayIds.has(s.id)) return false; // prevent duplicates
-      seenStayIds.add(s.id);
+      if (!s.id || !s.island || !s.startDate || !s.endDate || !s.nights) return false;
+      if (typeof s.nights !== "number" || s.nights < 1) return false;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(s.endDate)) return false;
       const sStart = new Date(s.startDate);
       const sEnd = new Date(s.endDate);
-      return sStart <= sEnd;
+      if (isNaN(sStart.getTime()) || isNaN(sEnd.getTime())) return false;
+      if (sStart > sEnd) return false;
+      const dupKey = `${s.island.toLowerCase()}|${s.startDate}|${s.endDate}`;
+      if (seenStayKeys.has(dupKey)) return false;
+      seenStayKeys.add(dupKey);
+      return true;
     });
 
     // Format Stays rows
@@ -285,12 +299,16 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
     ]);
     const staysValues = [staysHeaders, ...staysRows];
 
-    // Validate and filter custom bookings
-    const seenBookingIds = new Set<string>();
+    // Validate and filter custom bookings with strict DTO checks
+    const seenBookingKeys = new Set<string>();
     const validBookings = (customBookings || []).filter((b: any) => {
-      if (!b.name || !b.location) return false;
-      if (seenBookingIds.has(b.id)) return false;
-      seenBookingIds.add(b.id);
+      if (!b.id || !b.name || !b.location) return false;
+      if (typeof b.name !== "string" || b.name.trim().length === 0) return false;
+      if (typeof b.location !== "string" || b.location.trim().length === 0) return false;
+      const dupKey = `${b.name.toLowerCase()}|${b.location.toLowerCase()}`;
+      if (seenBookingKeys.has(dupKey)) return false;
+      seenBookingKeys.add(dupKey);
+      if (b.status && !["CONFIRMED", "PAID", "PENDING", "CANCELLED"].includes(b.status)) return false;
       return true;
     });
 

@@ -182,91 +182,6 @@ function parseAIJsonBlock(text: string): any | null {
   return null;
 }
 
-// Fallback helper to extract itinerary from text/file if AI is offline
-function extractFallbackItinerary(userText: string, fileName?: string): any | null {
-  const combined = (userText + " " + (fileName || "")).toLowerCase();
-  const isItineraryRequest =
-    combined.includes("reisplan") ||
-    combined.includes("itinerary") ||
-    combined.includes("upload") ||
-    combined.includes("schema") ||
-    combined.includes("vliegticket") ||
-    combined.includes("boeking") ||
-    combined.includes("/tripupdate") ||
-    combined.includes("milos") ||
-    combined.includes("naxos") ||
-    combined.includes("koufonisia") ||
-    combined.includes("santorini") ||
-    combined.includes("mykonos");
-
-  if (!isItineraryRequest) return null;
-
-  const stays = [];
-  if (combined.includes("milos")) {
-    stays.push({
-      id: `stay-milos-${Date.now()}`,
-      island: "Milos",
-      startDate: "2026-08-10",
-      endDate: "2026-08-13",
-      nights: 3,
-      accommodationName: "Milos Breeze Boutique Hotel",
-      notes: "Automatisch geïmporteerd uit geüpload document"
-    });
-  }
-  if (combined.includes("naxos")) {
-    stays.push({
-      id: `stay-naxos-${Date.now()}`,
-      island: "Naxos",
-      startDate: "2026-08-13",
-      endDate: "2026-08-17",
-      nights: 4,
-      accommodationName: "Nissaki Beach Hotel",
-      notes: "Automatisch geïmporteerd uit geüpload document"
-    });
-  }
-  if (combined.includes("koufonisia")) {
-    stays.push({
-      id: `stay-kouf-${Date.now()}`,
-      island: "Koufonisia",
-      startDate: "2026-08-17",
-      endDate: "2026-08-20",
-      nights: 3,
-      accommodationName: "Koufonisia Beach Suites",
-      notes: "Automatisch geïmporteerd uit geüpload document"
-    });
-  }
-
-  if (stays.length === 0) {
-    stays.push(
-      {
-        id: `stay-milos-${Date.now()}`,
-        island: "Milos",
-        startDate: "2026-08-10",
-        endDate: "2026-08-13",
-        nights: 3,
-        accommodationName: "Milos Breeze Boutique Hotel",
-        notes: "Geëxtraheerd uit reisdocument"
-      },
-      {
-        id: `stay-naxos-${Date.now()}`,
-        island: "Naxos",
-        startDate: "2026-08-13",
-        endDate: "2026-08-17",
-        nights: 4,
-        accommodationName: "Nissaki Beach Hotel",
-        notes: "Geëxtraheerd uit reisdocument"
-      }
-    );
-  }
-
-  return {
-    title: "Geïmporteerd Cycladen Reisplan 2026",
-    startDate: stays[0].startDate,
-    endDate: stays[stays.length - 1].endDate,
-    stays
-  };
-}
-
 // API: General Concierge Chat & Itinerary Auto-Parser
 app.post("/api/chat", async (req, res) => {
   try {
@@ -414,24 +329,7 @@ If no travel schedule update is present, reply in standard conversational Dutch 
       console.warn("Gemini AI error (falling back to local Athena Concierge):", geminiErr?.message || geminiErr);
     }
 
-    // 3. Fallback Engine with Local Itinerary Parser
-    const fallbackUpdate = extractFallbackItinerary(lastUserMsg, attachment?.name);
     let reply = "Kalimera! I'm Athena, your Greek Island Concierge. ";
-
-    if (fallbackUpdate) {
-      reply = `Kalimera! Ik heb het geüploade reisbestand **"${attachment?.name || 'Reisplan'}"** geanalyseerd! 
-
-📍 **Aangepast Schema**:
-${fallbackUpdate.stays.map((s: any) => `• **${s.island}**: ${s.nights} nachten (${s.startDate} - ${s.endDate}) — *Hotel: ${s.accommodationName}*`).join('\n')}
-
-✨ Je reisschema is automatisch gesynchroniseerd met je reisoverzicht!`;
-
-      return res.json({
-        reply,
-        tripUpdate: fallbackUpdate,
-        engine: "Greek Concierge Local Itinerary Auto-Parser"
-      });
-    }
 
     if (isTripUpdateCommand) {
       reply = `Kalimera! Ik heb je /tripupdate commando ontvangen maar kon de details niet volledig verwerken. Probeer het zo: /tripupdate Santorini, 17 sept - 21 sept, 4 nachten, Hotel Anastasis Apartments`;
@@ -441,7 +339,7 @@ ${fallbackUpdate.stays.map((s: any) => `• **${s.island}**: ${s.nights} nachten
       reply += "Typ /tripupdate gevolgd door je boekingsgegevens om je reisschema direct aan te passen! Bijv: /tripupdate Santorini, 17 sept - 21 sept, Hotel Caldera View";
     }
 
-    res.json({ reply, engine: "Greek Concierge Local Fallback" });
+    res.json({ reply, engine: "Greek Concierge" });
   } catch (error: any) {
     console.error("Chat error:", error);
     res.json({

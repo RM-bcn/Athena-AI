@@ -269,13 +269,46 @@ export default function App() {
 
   // Save / Edit Stay Handler (Dennis or Joyce editing trip)
   const handleSaveStay = (updatedStay: IslandStay) => {
-    const existingIndex = currentTrip.stays.findIndex((s) => s.id === updatedStay.id);
+    const sanitized: IslandStay = {
+      ...updatedStay,
+      id: updatedStay.id || `stay-${Date.now()}`,
+      island: (updatedStay.island || "").trim(),
+      startDate: (updatedStay.startDate || "").trim(),
+      endDate: (updatedStay.endDate || "").trim(),
+      accommodationName: (updatedStay.accommodationName || "").trim(),
+      notes: (updatedStay.notes || "").trim(),
+    };
+
+    if (!sanitized.island) {
+      alert("⚠️ Het eiland is verplicht.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(sanitized.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(sanitized.endDate)) {
+      alert("⚠️ Datumindeling ongeldig. Gebruik YYYY-MM-DD.");
+      return;
+    }
+    const sStart = new Date(sanitized.startDate);
+    const sEnd = new Date(sanitized.endDate);
+    if (isNaN(sStart.getTime()) || isNaN(sEnd.getTime())) {
+      alert("⚠️ Ongeldige datumwaarde.");
+      return;
+    }
+    if (sStart > sEnd) {
+      alert("⚠️ De startdatum moet voor de einddatum liggen.");
+      return;
+    }
+    if (typeof sanitized.nights !== "number" || sanitized.nights < 1) {
+      alert("⚠️ Het aantal nachten moet minimaal 1 zijn.");
+      return;
+    }
+
+    const existingIndex = currentTrip.stays.findIndex((s) => s.id === sanitized.id);
     let newStays: IslandStay[];
 
     if (existingIndex >= 0) {
-      newStays = currentTrip.stays.map((s) => (s.id === updatedStay.id ? updatedStay : s));
+      newStays = currentTrip.stays.map((s) => (s.id === sanitized.id ? sanitized : s));
     } else {
-      newStays = [...currentTrip.stays, updatedStay];
+      newStays = [...currentTrip.stays, sanitized];
     }
 
     const totalNights = newStays.reduce((acc, s) => acc + s.nights, 0);
@@ -288,7 +321,7 @@ export default function App() {
     updateAndSaveTrip(newTripObj);
 
     handleSendMessage(
-      `Verblijf aangepast door ${currentUser?.name || 'Beheerder'}: ${updatedStay.island} (${updatedStay.startDate} tot ${updatedStay.endDate}, ${updatedStay.nights} nachten, Hotel: ${updatedStay.accommodationName || 'Nog niet geselecteerd'}). Herbereken dagschema!`
+      `Verblijf aangepast door ${currentUser?.name || 'Beheerder'}: ${sanitized.island} (${sanitized.startDate} tot ${sanitized.endDate}, ${sanitized.nights} nachten, Hotel: ${sanitized.accommodationName || 'Nog niet geselecteerd'}). Herbereken dagschema!`
     );
   };
 
