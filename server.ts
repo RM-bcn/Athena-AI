@@ -40,7 +40,7 @@ app.get("/api/sheets/status", async (req, res) => {
     if (!configured) {
       return res.json({
         configured: false,
-        message: "Google OAuth parameters (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) not active yet.",
+        message: "Google OAuth parameters (CLIENT_ID, CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) missing or inactive.",
       });
     }
 
@@ -62,13 +62,13 @@ app.get("/api/sheets/status", async (req, res) => {
 app.get("/api/sheets/load", async (req, res) => {
   try {
     if (!isGoogleAuthConfigured()) {
-      return res.status(400).json({ error: "Google OAuth not configured" });
+      return res.json({ error: "Google OAuth is niet volledig geconfigureerd op Vercel. Controleer of GOOGLE_REFRESH_TOKEN ook is aangevinkt voor 'Preview' en 'Production' in Vercel settings." });
     }
     const data = await loadTripFromSheet();
     res.json(data);
   } catch (err: any) {
     console.error("Sheets load error:", err);
-    res.status(500).json({ error: err.message || "Failed to load trip from Google Sheets" });
+    res.json({ error: err.message || "Fout bij laden van reis uit Google Sheets" });
   }
 });
 
@@ -76,7 +76,10 @@ app.get("/api/sheets/load", async (req, res) => {
 app.post("/api/sheets/save", async (req, res) => {
   try {
     if (!isGoogleAuthConfigured()) {
-      return res.status(400).json({ error: "Google OAuth not configured" });
+      return res.json({
+        success: false,
+        error: "Google OAuth parameter GOOGLE_REFRESH_TOKEN ontbreekt. In Vercel staat deze op 'Production' maar niet op 'Preview'. Pas de Vercel Environment Variable instelling aan naar 'Production and Preview'."
+      });
     }
     const { trip, customBookings } = req.body;
     await saveTripToSheet(trip, customBookings || []);
@@ -84,7 +87,10 @@ app.post("/api/sheets/save", async (req, res) => {
     res.json({ success: true, spreadsheetUrl });
   } catch (err: any) {
     console.error("Sheets save error:", err);
-    res.status(500).json({ error: err.message || "Failed to save trip to Google Sheets" });
+    res.json({
+      success: false,
+      error: err.message || "Fout bij opslaan naar Google Sheets."
+    });
   }
 });
 

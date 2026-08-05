@@ -192,20 +192,21 @@ export default function App() {
         }),
       });
 
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        const text = await res.text();
-        alert(`⚠️ Google Sheets API is niet klaar op Vercel:\n\nZorg dat de omgevingsvariabelen (CLIENT_ID, CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) zijn toegevoegd in Vercel project settings.\n\nServer respons: ${res.status}`);
+      const data = await res.json().catch(() => null);
+
+      if (!data) {
+        alert(`⚠️ Vercel respons fout (HTTP ${res.status}).\n\nZorg dat GOOGLE_REFRESH_TOKEN in Vercel is ingeschakeld voor 'Production and Preview'.`);
         return;
       }
 
-      const data = await res.json();
       if (data.spreadsheetUrl) {
         setSheetUrl(data.spreadsheetUrl);
         setIsSheetsConnected(true);
         alert("✅ Reisschema en accommodaties succesvol gesynchroniseerd met je Google Sheet!");
       } else if (data.error) {
-        alert(`⚠️ Synchroniseren met Google Sheet is mislukt:\n\n${data.error}`);
+        alert(`⚠️ Google Sheets status op Vercel:\n\n${data.error}`);
+      } else {
+        alert("⚠️ Onbekend antwoord ontvangen van Google Sheets service.");
       }
     } catch (err: any) {
       alert(`⚠️ Synchroniseren met Google Sheet is mislukt:\n\n${err?.message || err}`);
