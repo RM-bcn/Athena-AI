@@ -192,6 +192,7 @@ function extractFallbackItinerary(userText: string, fileName?: string): any | nu
     combined.includes("schema") ||
     combined.includes("vliegticket") ||
     combined.includes("boeking") ||
+    combined.includes("/tripupdate") ||
     combined.includes("milos") ||
     combined.includes("naxos") ||
     combined.includes("koufonisia") ||
@@ -271,7 +272,49 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { messages, context, attachment } = req.body;
 
-    const systemPrompt = `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
+    const userMsgList = messages || [];
+    const lastUserMsg = userMsgList[userMsgList.length - 1]?.content || "";
+
+    // Detect /tripupdate command: force the AI to return a structured tripUpdate
+    const isTripUpdateCommand = lastUserMsg.trim().toLowerCase().startsWith("/tripupdate");
+    const tripUpdateDetails = isTripUpdateCommand
+      ? lastUserMsg.trim().substring("/tripupdate".length).trim()
+      : "";
+
+    const systemPrompt = isTripUpdateCommand
+      ? `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
+You speak warmly, eloquently, and in fluent Dutch.
+Current traveler context: ${context || "Cyclades Hopping"}.
+
+The traveler has used the /tripupdate command. They are providing you with new travel information to update their itinerary.
+You MUST parse the following details and ALWAYS return a JSON tripUpdate, even if the details are partial.
+Extract as much information as possible: island name, hotel name, check-in date, check-out date, number of nights.
+If a date is missing, make a reasonable estimate based on context.
+
+Return ONLY this JSON format:
+\`\`\`json
+{
+  "reply": "Bevestiging in warm Nederlands: wat je hebt toegevoegd of aangepast in het reisschema.",
+  "tripUpdate": {
+    "title": "Griekenland Cycladen Reis 2026",
+    "startDate": "2026-08-10",
+    "endDate": "2026-08-20",
+    "stays": [
+      {
+        "island": "Naxos",
+        "startDate": "2026-08-15",
+        "endDate": "2026-08-18",
+        "nights": 3,
+        "accommodationName": "Nissaki Beach Hotel",
+        "notes": "Toegevoegd via /tripupdate commando"
+      }
+    ]
+  }
+}
+\`\`\`
+IMPORTANT: The stays array must include ALL current stays from the context PLUS the new/updated stay.
+Do NOT return plain text. Only return the JSON block above.`
+      : `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
 You speak warmly, eloquently, and in fluent Dutch ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches).
 Current traveler context: ${context || "Cyclades Hopping"}.
 
@@ -301,23 +344,23 @@ Return JSON in this format:
 \`\`\`
 If no travel schedule update is present, reply in standard conversational Dutch without JSON.`;
 
-    const userMsgList = messages || [];
-    const lastUserMsg = userMsgList[userMsgList.length - 1]?.content || "";
     const userPromptText = userMsgList.map((m: any) => `${m.role === 'user' ? 'Traveler' : 'Athena'}: ${m.content}`).join('\n');
 
     // 1. Primary Engine: Try Groq AI (Llama 3.3 70B & Fallbacks)
-    const groqUserPrompt = `${userPromptText}${
-      attachment?.text ? `\n\n[Bijgevoegd Document Content (${attachment.name})]:\n${attachment.text}` : ''
-    }${
-      attachment?.name && !attachment?.text ? `\n\n[Bijgevoegd Bestand: ${attachment.name}]` : ''
-    }`;
+    const groqUserPrompt = isTripUpdateCommand
+      ? `The traveler used /tripupdate with the following new booking details:\n${tripUpdateDetails}\n\nCurrent trip context: ${context}\n\nExtract and return the full updated stays array as JSON.`
+      : `${userPromptText}${
+          attachment?.text ? `\n\n[Bijgevoegd Document Content (${attachment.name})]:\n${attachment.text}` : ''
+        }${
+          attachment?.name && !attachment?.text ? `\n\n[Bijgevoegd Bestand: ${attachment.name}]` : ''
+        }`;
 
     const groqRes = await callGroqAI(systemPrompt, groqUserPrompt);
     if (groqRes && groqRes.content) {
       const parsedJson = parseAIJsonBlock(groqRes.content);
       if (parsedJson && parsedJson.tripUpdate) {
         return res.json({
-          reply: parsedJson.reply || "Kalimera! Je geüploade reisplan is verwerkt door Groq AI en je reisschema is automatisch bijgewerkt.",
+          reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI.",
           tripUpdate: parsedJson.tripUpdate,
           engine: `Groq (${groqRes.model})`
         });
@@ -356,7 +399,7 @@ If no travel schedule update is present, reply in standard conversational Dutch 
 
         if (parsedJson && parsedJson.tripUpdate) {
           return res.json({
-            reply: parsedJson.reply || "Kalimera! Ik heb je geüploade reisplan verwerkt en je reisschema automatisch aangepast.",
+            reply: parsedJson.reply || "Kalimera! Ik heb je reisplan verwerkt en je reisschema automatisch aangepast.",
             tripUpdate: parsedJson.tripUpdate,
             engine: "Gemini 3.6 Flash (Itinerary Parser)"
           });
@@ -390,10 +433,12 @@ ${fallbackUpdate.stays.map((s: any) => `• **${s.island}**: ${s.nights} nachten
       });
     }
 
-    if (lastUserMsg.toLowerCase().includes("ferry")) {
+    if (isTripUpdateCommand) {
+      reply = `Kalimera! Ik heb je /tripupdate commando ontvangen maar kon de details niet volledig verwerken. Probeer het zo: /tripupdate Santorini, 17 sept - 21 sept, 4 nachten, Hotel Anastasis Apartments`;
+    } else if (lastUserMsg.toLowerCase().includes("ferry")) {
       reply += "High-speed ferries (Seajets & Blue Star) memeren dagelijks aan tussen Naxos, Milos, en Koufonisia. Ik raad aan 48 uur van tevoren te boeken.";
     } else {
-      reply += "Upload gerust een reisdocument, vliegticket of foto van je boeking via het paperclip-icoon 📄 om je reis automatisch aan te laten passen!";
+      reply += "Typ /tripupdate gevolgd door je boekingsgegevens om je reisschema direct aan te passen! Bijv: /tripupdate Santorini, 17 sept - 21 sept, Hotel Caldera View";
     }
 
     res.json({ reply, engine: "Greek Concierge Local Fallback" });
