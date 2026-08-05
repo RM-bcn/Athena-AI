@@ -758,10 +758,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       {!isGuestMode && (
         <button
           onClick={onOpenChat}
-          className="fixed bottom-8 right-8 w-16 h-16 bg-[#005BAE] text-white rounded-full shadow-[0_12px_32px_rgba(0,91,174,0.3)] flex items-center justify-center group active:scale-95 transition-transform z-50 cursor-pointer"
+          className="fixed bottom-20 md:bottom-8 right-4 md:right-8 w-14 h-14 md:w-16 md:h-16 bg-[#005BAE] text-white rounded-full shadow-[0_12px_32px_rgba(0,91,174,0.3)] flex items-center justify-center group active:scale-95 transition-transform z-50 cursor-pointer"
           title="Open Athena AI Assistant"
         >
-          <Sparkles className="w-7 h-7 group-hover:rotate-12 transition-transform" />
+          <Sparkles className="w-6 h-6 md:w-7 md:h-7 group-hover:rotate-12 transition-transform" />
         </button>
       )}
 

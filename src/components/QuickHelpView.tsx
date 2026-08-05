@@ -246,13 +246,13 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
 
       {/* Floating Action Chat Button */}
       {!isGuestMode && (
-        <div className="fixed bottom-10 right-10 z-50">
+        <div className="fixed bottom-16 md:bottom-10 right-4 md:right-10 z-50">
           <button
             onClick={onOpenChat}
-            className="w-14 h-14 bg-[#005BAE] text-white rounded-full shadow-2xl flex items-center justify-center group active:scale-90 transition-all hover:w-48 hover:rounded-2xl cursor-pointer"
+            className="w-12 h-12 md:w-14 md:h-14 bg-[#005BAE] text-white rounded-full shadow-2xl flex items-center justify-center group active:scale-90 transition-all hover:w-40 hover:rounded-2xl cursor-pointer"
           >
-            <MessageSquare className="w-6 h-6" />
-            <span className="hidden group-hover:inline ml-3 font-['Inter'] text-xs font-semibold whitespace-nowrap overflow-hidden">
+            <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />
+            <span className="hidden group-hover:inline ml-2 font-['Inter'] text-xs font-semibold whitespace-nowrap overflow-hidden">
               Type a custom request
             </span>
           </button>
