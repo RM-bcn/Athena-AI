@@ -5,3 +5,8 @@
 *.gif
 *.bmp
 *.webm
+
+# Dependencies & Build
+node_modules/
+dist/
+package-lock.json

@@ -223,6 +223,12 @@ export default function App() {
   };
 
 
+  // Navigation Guard: guests cannot access the chat
+  const handleSetActiveTab = (tab: ActiveTab) => {
+    if (tab === 'chat' && isGuestMode) return;
+    setActiveTab(tab);
+  };
+
   // Auth Handlers
   const handleLoginSuccess = (user: UserAccount) => {
     setCurrentUser(user);
@@ -353,7 +359,8 @@ export default function App() {
     text: string,
     attachment?: { name: string; type: string; base64?: string; text?: string; isImage?: boolean }
   ) => {
-    const sender = currentUser?.name || (isGuestMode ? 'Gast (ATH-2026)' : 'Reiziger');
+    if (isGuestMode) return;
+    const sender = currentUser?.name || 'Reiziger';
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
@@ -461,19 +468,23 @@ export default function App() {
   };
 
   // Quick Action Chips Trigger
+  const openChat = (message?: string) => {
+    if (isGuestMode) return;
+    setActiveTab('chat');
+    if (message) handleSendMessage(message);
+  };
+
   const handleTriggerQuickAction = (action: string) => {
     if (action === 'Ferry Status' || action.includes('ferry')) {
       setIsMissedFerryOpen(true);
     } else if (action === 'Translate Menu' || action.includes('menu')) {
       setIsTranslateMenuOpen(true);
     } else if (action === '/plan' || action.includes('/plan')) {
-      setActiveTab('chat');
-      handleSendMessage("Athena, genereer een gedetailleerd /plan voor onze Griekse eilandenreis!");
+      openChat("Athena, genereer een gedetailleerd /plan voor onze Griekse eilandenreis!");
     } else if (action === '/travel' || action.includes('/travel')) {
       setActiveTab('itinerary');
     } else {
-      setActiveTab('chat');
-      handleSendMessage(action);
+      openChat(action);
     }
   };
 
@@ -499,7 +510,7 @@ export default function App() {
       {/* Left Sidebar Drawer / Fixed Navigation */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleSetActiveTab}
         onOpenNewTrip={handleOpenNewTripModal}
         currentUser={currentUser}
         isGuestMode={isGuestMode}
@@ -512,7 +523,7 @@ export default function App() {
       {/* Top Navigation Header */}
       <TopHeader
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleSetActiveTab}
         chatSubTab={chatSubTab}
         setChatSubTab={setChatSubTab}
         currentUser={currentUser}
@@ -532,7 +543,7 @@ export default function App() {
             currentUser={currentUser}
             isGuestMode={isGuestMode}
             tripCode={tripCode}
-            onOpenChat={() => setActiveTab('chat')}
+            onOpenChat={openChat}
             onOpenNewBooking={handleOpenAddBooking}
             onShare={() => setIsShareOpen(true)}
             onExportPDF={handleExportPDF}
@@ -553,20 +564,18 @@ export default function App() {
             onOpenMissedFerry={() => setIsMissedFerryOpen(true)}
             onOpenTranslateMenu={() => setIsTranslateMenuOpen(true)}
             onOpenTavernas={() => {
-              setActiveTab('chat');
-              handleSendMessage("Athena, can you recommend authentic local tavernas in Naxos and Milos within walking distance?");
+              openChat("Athena, can you recommend authentic local tavernas in Naxos and Milos within walking distance?");
             }}
             onOpenBeaches={() => {
-              setActiveTab('chat');
-              handleSendMessage("Athena, where are the quietest secluded beaches in Koufonisia and Naxos?");
+              openChat("Athena, where are the quietest secluded beaches in Koufonisia and Naxos?");
             }}
-            onOpenChat={() => setActiveTab('chat')}
+            onOpenChat={openChat}
             onTriggerEmergency={() => alert("🚨 Emergency Service: Calling 112 (European Emergency Services in Greece)...")}
             onCallTaxi={() => alert("🚕 Taxi Desk: Contacting Naxos & Milos Port Radio Taxi Service (+30 22850 22444)...")}
             onFindPharmacy={() => {
-              setActiveTab('chat');
-              handleSendMessage("Athena, where is the nearest open pharmacy in Naxos Chora?");
+              openChat("Athena, where is the nearest open pharmacy in Naxos Chora?");
             }}
+            isGuestMode={isGuestMode}
           />
         )}
 
@@ -594,7 +603,7 @@ export default function App() {
           <NotFoundView
             onReturnHome={() => setActiveTab('itinerary')}
             onGoBack={() => setActiveTab('itinerary')}
-            onNavigateTab={(tab) => setActiveTab(tab)}
+            onNavigateTab={handleSetActiveTab}
           />
         )}
       </div>
