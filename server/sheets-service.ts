@@ -1,3 +1,26 @@
+import { google } from "googleapis";
+
+let cachedSheetId: string | null = null;
+
+function getEnvVal(...names: string[]): string {
+  for (const name of names) {
+    const val = process.env[name];
+    if (val && typeof val === "string" && val.trim()) {
+      return val.trim().replace(/^["']|["']$/g, "");
+    }
+  }
+  const lowerNames = names.map((n) => n.toLowerCase());
+  for (const key of Object.keys(process.env)) {
+    if (lowerNames.includes(key.toLowerCase())) {
+      const val = process.env[key];
+      if (val && typeof val === "string" && val.trim()) {
+        return val.trim().replace(/^["']|["']$/g, "");
+      }
+    }
+  }
+  return "";
+}
+
 function cleanSpreadsheetId(id: string): string {
   if (!id) return "";
   const match = id.match(/\/d\/([a-zA-Z0-9-_]+)/);
