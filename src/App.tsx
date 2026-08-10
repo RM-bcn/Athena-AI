@@ -7,6 +7,7 @@ import { MyItineraryView } from './components/MyItineraryView';
 import { QuickHelpView } from './components/QuickHelpView';
 import { ChatInterfaceView } from './components/ChatInterfaceView';
 import { SettingsView } from './components/SettingsView';
+import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
 import { LoginView } from './components/LoginView';
 import { NotFoundView } from './components/NotFoundView';
@@ -267,6 +268,54 @@ export default function App() {
     setActiveTab('login');
   };
 
+  // Update user profile via backend API, then sync React state + localStorage
+  const handleUpdateProfile = async (payload: {
+    nickname?: string;
+    avatarData?: string;
+    newPassword?: string;
+    currentPassword?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Je bent niet ingelogd.' };
+    }
+
+    try {
+      const res = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          username: currentUser.username,
+          nickname: payload.nickname,
+          avatarData: payload.avatarData,
+          currentPassword: payload.currentPassword,
+          newPassword: payload.newPassword,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || `Profiel bijwerken mislukt (HTTP ${res.status}).` };
+      }
+
+      if (data.user) {
+        const updatedUser: UserAccount = { ...currentUser, ...data.user };
+        setCurrentUser(updatedUser);
+        try {
+          localStorage.setItem('athena_active_user', JSON.stringify(updatedUser));
+        } catch (e) {
+          console.error("Failed to save user to localStorage", e);
+        }
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error("Profile update error:", err);
+      return { success: false, error: err?.message || 'Netwerkfout bij het bijwerken van je profiel.' };
+    }
+  };
+
   // Save / Edit Stay Handler (Dennis or Joyce editing trip)
   const handleSaveStay = (updatedStay: IslandStay) => {
     // Frontend validation before saving
@@ -405,11 +454,12 @@ export default function App() {
     attachment?: { name: string; type: string; base64?: string; text?: string; isImage?: boolean }
   ) => {
     if (isGuestMode) return;
-    const sender = currentUser?.name || 'Reiziger';
+    const sender = currentUser?.nickname || currentUser?.name || 'Reiziger';
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
       senderName: sender,
+      avatar: currentUser?.avatarUrl || currentUser?.avatar,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       content: text,
       attachment: attachment
@@ -574,7 +624,7 @@ export default function App() {
         currentUser={currentUser}
         isGuestMode={isGuestMode}
         tripCode={tripCode}
-        onOpenProfile={() => setActiveTab('settings')}
+        onOpenProfile={() => setActiveTab('profile')}
         onSignOut={handleSignOut}
         onLoginClick={() => setActiveTab('login')}
         onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
@@ -633,7 +683,20 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'settings' && <SettingsView />}
+        {activeTab === 'settings' && (
+          <SettingsView
+            currentUser={currentUser}
+            onOpenProfile={() => setActiveTab('profile')}
+          />
+        )}
+
+        {activeTab === 'profile' && currentUser && (
+          <ProfileView
+            currentUser={currentUser}
+            onUpdateUser={handleUpdateProfile}
+            onBack={() => setActiveTab('settings')}
+          />
+        )}
 
         {activeTab === 'support' && <SupportView />}
 

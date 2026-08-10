@@ -56,7 +56,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
         username: foundUser.username,
         email: foundUser.email,
         name: foundUser.name,
+        nickname: foundUser.nickname,
         avatar: foundUser.avatar,
+        avatarUrl: foundUser.avatarUrl,
         role: foundUser.role,
         tripCode: foundUser.tripCode,
       });
