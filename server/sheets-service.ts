@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { v2 as cloudinary } from "cloudinary";
 
 let cachedSheetId: string | null = null;
 
@@ -19,6 +20,71 @@ function getEnvVal(...names: string[]): string {
     }
   }
   return "";
+}
+
+function configureCloudinary(): boolean {
+  const cloudName = getEnvVal("CLOUDINARY_CLOUD_NAME", "CLOUD_NAME");
+  const apiKey = getEnvVal("CLOUDINARY_API_KEY", "API_KEY");
+  const apiSecret = getEnvVal("CLOUDINARY_API_SECRET", "API_SECRET");
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    return false;
+  }
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+    secure: true,
+  });
+  return true;
+}
+
+export async function uploadToCloudinary(fileInput: string, folder = "athena_avatars"): Promise<string> {
+  const isConfigured = configureCloudinary();
+  if (!isConfigured) {
+    throw new Error("Cloudinary environment variabelen ontbreken (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET).");
+  }
+
+  const result = await cloudinary.uploader.upload(fileInput, {
+    folder,
+    resource_type: "image",
+    transformation: [
+      { width: 500, height: 500, crop: "fill", gravity: "face" },
+      { quality: "auto", fetch_format: "auto" }
+    ]
+  });
+
+  return result.secure_url;
+}
+
+function getGoogleAuth() {
+  const serviceAccountEmail = getEnvVal("GOOGLE_SERVICE_ACCOUNT_EMAIL", "SERVICE_ACCOUNT_EMAIL");
+  let privateKey = getEnvVal("GOOGLE_PRIVATE_KEY", "PRIVATE_KEY");
+
+  if (serviceAccountEmail && privateKey) {
+    privateKey = privateKey.replace(/\\n/g, "\n");
+    return new google.auth.JWT({
+      email: serviceAccountEmail,
+      key: privateKey,
+      scopes: [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+      ],
+    });
+  }
+
+  const clientId = getEnvVal("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_Id", "CLIENT_ID");
+  const clientSecret = getEnvVal("GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_Secret", "CLIENT_SECRET");
+  const refreshToken = getEnvVal("GOOGLE_REFRESH_TOKEN", "REFRESH_TOKEN");
+
+  if (clientId && clientSecret && refreshToken) {
+    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    return oauth2Client;
+  }
+
+  return null;
 }
 
 function cleanSpreadsheetId(id: string): string {
@@ -48,24 +114,11 @@ function formatGoogleError(err: any): string {
 }
 
 function getOAuthClient() {
-  const clientId = getEnvVal("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_Id", "CLIENT_ID");
-  const clientSecret = getEnvVal("GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_Secret", "CLIENT_SECRET");
-  const refreshToken = getEnvVal("GOOGLE_REFRESH_TOKEN", "REFRESH_TOKEN");
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    return null;
-  }
-
-  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
-  oauth2Client.setCredentials({ refresh_token: refreshToken });
-  return oauth2Client;
+  return getGoogleAuth();
 }
 
 export function isGoogleAuthConfigured(): boolean {
-  const clientId = getEnvVal("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_Id", "CLIENT_ID");
-  const clientSecret = getEnvVal("GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_Secret", "CLIENT_SECRET");
-  const refreshToken = getEnvVal("GOOGLE_REFRESH_TOKEN", "REFRESH_TOKEN");
-  return !!(clientId && clientSecret && refreshToken);
+  return !!getGoogleAuth();
 }
 
 // Helper to ensure all required tabs exist in the spreadsheet
@@ -94,7 +147,7 @@ async function ensureTabsExist(sheets: any, spreadsheetId: string) {
 }
 
 // Helper to look up existing row by ID in a sheet
-async function findRowById(sheets: any, spreadsheetId: string, sheetTitle: string, idColumnIndex: number): Promise<number | null> {
+async function findRowById(sheets: any, spreadsheetId: string, sheetTitle: string, idColumnIndex: number, id: string): Promise<number | null> {
   try {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -109,7 +162,7 @@ async function findRowById(sheets: any, spreadsheetId: string, sheetTitle: strin
       }
     }
     return null; // No matching row found
-  } catch (err) {
+  } catch (err: any) {
     console.warn("[Google Sheets] Could not lookup row by ID:", err?.message || err);
     return null;
   }
@@ -223,11 +276,11 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
             ],
           },
           {
-            range: "Users!A1:E3",
+            range: "Users!A1:I3",
             values: [
-              ["Username", "Email", "Name", "Role", "TripCode"],
-              ["dennisvr", "dennis.van.rooden@gmail.com", "Dennis van Rooden", "owner", "ATH-2026"],
-              ["Joyce", "Joyceockeloen@gmail.com", "Joyce Ockeloen", "member", "ATH-2026"]
+              ["Username", "Email", "Name", "Role", "TripCode", "Nickname", "AvatarUrl", "PasswordHash", "UpdatedAt"],
+              ["dennisvr", "dennis.van.rooden@gmail.com", "Dennis van Rooden", "owner", "ATH-2026", "Dennis", "", "", ""],
+              ["Joyce", "Joyceockeloen@gmail.com", "Joyce Ockeloen", "member", "ATH-2026", "Joyce", "", "", ""]
             ],
           },
           {
@@ -451,6 +504,167 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
     return { trip, customBookings, sheetUrl: spreadsheetUrl };
   } catch (err: any) {
     throw new Error(formatGoogleError(err));
+  }
+}
+
+const USER_HEADERS = ["Username", "Email", "Name", "Role", "TripCode", "Nickname", "AvatarUrl", "PasswordHash", "UpdatedAt"];
+
+// Ensure the Users sheet has the required profile columns (Nickname, AvatarUrl, PasswordHash, UpdatedAt)
+async function ensureUserSheetHeaders(sheets: any, spreadsheetId: string) {
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "Users!A1:I1",
+    });
+
+    const existingHeaders = (res.data.values && res.data.values[0]) || [];
+    const missingColumns: { column: string; index: number }[] = [];
+
+    USER_HEADERS.forEach((header, index) => {
+      const existing = (existingHeaders[index] || "").trim().toLowerCase();
+      if (existing !== header.toLowerCase()) {
+        missingColumns.push({ column: header, index });
+      }
+    });
+
+    if (missingColumns.length > 0) {
+      const values = [...USER_HEADERS];
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: "Users!A1",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [values] },
+      });
+      console.log("[Google Sheets] Users sheet headers updated to include profile columns.");
+    }
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not ensure Users headers:", err?.message || err);
+  }
+}
+
+// Find the row number (1-based, including header) for a user by email or username
+async function findUserRowByEmailOrUsername(sheets: any, spreadsheetId: string, email: string, username: string): Promise<number | null> {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "Users!A:I",
+  });
+
+  const rows = res.data.values || [];
+  const emailLower = (email || "").trim().toLowerCase();
+  const usernameLower = (username || "").trim().toLowerCase();
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row.length) continue;
+    const rowUsername = (row[0] || "").trim().toLowerCase();
+    const rowEmail = (row[1] || "").trim().toLowerCase();
+    if ((emailLower && rowEmail === emailLower) || (usernameLower && rowUsername === usernameLower)) {
+      return i + 1; // Convert 0-based array index to 1-based sheet row number
+    }
+  }
+  return null;
+}
+
+export interface UserProfileUpdate {
+  nickname?: string;
+  avatarUrl?: string;
+  passwordHash?: string;
+}
+
+export async function updateUserProfileInSheet(
+  identifier: { email?: string; username?: string },
+  updates: UserProfileUpdate
+): Promise<any | null> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google credentials ontbreken (OAuth of Service Account).");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+
+  await ensureTabsExist(sheets, spreadsheetId);
+  await ensureUserSheetHeaders(sheets, spreadsheetId);
+
+  const rowNumber = await findUserRowByEmailOrUsername(sheets, spreadsheetId, identifier.email || "", identifier.username || "");
+  const updatedAt = new Date().toISOString();
+
+  if (rowNumber) {
+    // Update existing row: merge with current values so untouched columns are preserved
+    const existing = await getUserFromSheet(identifier.email || "", identifier.username || "");
+    const values = [
+      existing?.nickname || "",
+      updates.nickname !== undefined ? updates.nickname : (existing?.nickname || ""),
+      updates.avatarUrl !== undefined ? updates.avatarUrl : (existing?.avatarUrl || ""),
+      updates.passwordHash !== undefined ? updates.passwordHash : (existing?.passwordHash || ""),
+      updatedAt,
+    ];
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Users!F${rowNumber}:I${rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [values] },
+    });
+  } else {
+    // User not found: append a new row with the identifier + updates
+    const existing = await getUserFromSheet(identifier.email || "", identifier.username || "");
+    const baseRow = existing
+      ? [existing.username, existing.email, existing.name, existing.role, existing.tripCode]
+      : [identifier.username || "", identifier.email || "", "", "member", "ATH-2026"];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: "Users!A:I",
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [[
+          baseRow[0], baseRow[1], baseRow[2], baseRow[3], baseRow[4],
+          updates.nickname || baseRow[0] || "",
+          updates.avatarUrl || "",
+          updates.passwordHash || "",
+          updatedAt,
+        ]],
+      },
+    });
+  }
+
+  return getUserFromSheet(identifier.email || "", identifier.username || "");
+}
+
+// Retrieve a user from the Users sheet by email or username
+export async function getUserFromSheet(email: string, username: string): Promise<any | null> {
+  const auth = getOAuthClient();
+  if (!auth) return null;
+
+  try {
+    const { spreadsheetId } = await getOrCreateSpreadsheet();
+    const sheets = google.sheets({ version: "v4", auth });
+
+    await ensureTabsExist(sheets, spreadsheetId);
+    await ensureUserSheetHeaders(sheets, spreadsheetId);
+
+    const rowNumber = await findUserRowByEmailOrUsername(sheets, spreadsheetId, email, username);
+    if (!rowNumber) return null;
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `Users!A${rowNumber}:I${rowNumber}`,
+    });
+
+    const row = (res.data.values && res.data.values[0]) || [];
+    return {
+      username: row[0] || "",
+      email: row[1] || "",
+      name: row[2] || "",
+      role: row[3] || "member",
+      tripCode: row[4] || "ATH-2026",
+      nickname: row[5] || row[2] || row[0] || "",
+      avatarUrl: row[6] || "",
+      passwordHash: row[7] || "",
+      updatedAt: row[8] || "",
+    };
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not fetch user:", err?.message || err);
+    return null;
   }
 }
 

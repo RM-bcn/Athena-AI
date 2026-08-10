@@ -8,6 +8,7 @@ import {
   saveTripToSheet,
   loadTripFromSheet,
 } from "./server/sheets-service.js";
+import { handleProfileUpdate } from "./server/profile-service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,6 +94,9 @@ app.post("/api/sheets/save", async (req, res) => {
     });
   }
 });
+
+// API: Update User Profile (nickname, avatar, password)
+app.post("/api/profile/update", handleProfileUpdate);
 
 // Helper to get Gemini AI instance safely
 function getGeminiClient() {
