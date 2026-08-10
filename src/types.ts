@@ -8,6 +8,9 @@ export interface UserAccount {
   avatar: string;
   role: 'owner' | 'member';
   tripCode: string;
+  nickname?: string;
+  avatarUrl?: string;
+  updatedAt?: string;
 }
 
 export interface IslandStay {

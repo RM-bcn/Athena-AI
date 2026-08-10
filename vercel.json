@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/profile/update",
+      "destination": "/api/profile/update"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api"
     }
