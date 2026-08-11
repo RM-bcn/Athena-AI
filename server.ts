@@ -818,48 +818,84 @@ RULES WHEN LIVE DATA IS PRESENT:
       }
     }
 
-    // 2. Secondary Engine: Try Gemini AI safely (Multimodal fallback if image attached or Groq unavailable)
+    // 2. Secondary Engine: Try Gemini AI safely (fallback when Groq is unavailable)
     try {
       const ai = getGeminiClient();
       if (ai) {
-        const parts: any[] = [{ text: `${systemPrompt}\n\nChat History:\n${userPromptText}${liveDataBlock ? `\n\n${liveDataBlock}` : ''}\n\nAthena:` }];
-        
+        // Beknopte, schone prompt voor Gemini: géén tool-instructies (die zijn
+        // alleen bedoeld voor de Groq-agent), wel live-data erinline zodat het
+        // een informatief antwoord kan geven.
+        const geminiSystem =
+          `Je bent Athena, een vriendkijke AI-reisgids voor Griekenland (met name de Cycladen). ` +
+          `Beantwoord in vloeiend Nederlands, in een warme concierge-toon. ` +
+          `Als er live-gegevens hieronder staan, gebruik die dan en citeer de bronnen. ` +
+          `Verzin geen restaurants, prijzen of openingstijden die niet in de gegevens staan. ` +
+          `Blijf beknopt en behulpzaam.`;
+
+        const liveDataText = liveDataBlock ? `\n\nLIVE GEGEVENS (gebruik deze bij je antwoord):\n${liveDataBlock}` : "";
+        const parts: any[] = [
+          {
+            text:
+              `${geminiSystem}\n\n` +
+              `Gespreksgeschiedenis:\n${userPromptText}` +
+              `${liveDataText}\n\n` +
+              `Antwoord:`,
+          },
+        ];
+
         if (attachment) {
           if (attachment.base64 && attachment.type?.startsWith("image/")) {
             const cleanBase64 = attachment.base64.replace(/^data:image\/\w+;base64,/, "");
             parts.push({
               inlineData: {
                 data: cleanBase64,
-                mimeType: attachment.type
-              }
+                mimeType: attachment.type,
+              },
             });
-            parts.push({ text: `Attached Image File (${attachment.name}): Please read the text/itinerary inside this image.` });
+            parts.push({ text: `Bijgevoegd afbeeldingsbestand (${attachment.name}): lees de tekst/het reisplan op de afbeelding.` });
           } else if (attachment.text) {
-            parts.push({ text: `Attached Document Content (${attachment.name}):\n${attachment.text}` });
+            parts.push({ text: `Bijgevoegd document (${attachment.name}):\n${attachment.text}` });
           }
         }
 
         const response = await ai.models.generateContent({
           model: "gemini-3.6-flash",
-          contents: [{ role: "user", parts }]
+          contents: [{ role: "user", parts }],
         });
 
-        const rawText = response.text || "";
-        const parsedJson = parseAIJsonBlock(rawText);
+        // Robuuste tekst-extractie: response.text kan leeg zijn als Gemini
+        // bijnaam/thought-parts levert; val dan terug op candidates.
+        let rawText = response.text || "";
+        if (!rawText && response.candidates?.[0]?.content?.parts) {
+          rawText = response.candidates[0].content.parts
+            .filter((p: any) => p.text)
+            .map((p: any) => p.text)
+            .join("\n")
+            .trim();
+        }
+        if (!rawText && (response as any).functionCalls?.length) {
+          rawText = `(Gemini wilde een tool aanroepen maar die is hier niet beschikbaar.)`;
+        }
+        console.info(
+          `Gemini fallback: textLen=${rawText.length} ` +
+            `finishReason=${response.candidates?.[0]?.finishReason || "?"} ` +
+            `thoughtsTokens=${response.usageMetadata?.thoughtsTokenCount || 0}`
+        );
 
+        const parsedJson = parseAIJsonBlock(rawText);
         if (parsedJson && parsedJson.tripUpdate) {
           return res.json({
             reply: parsedJson.reply || "Kalimera! Ik heb je reisplan verwerkt en je reisschema automatisch aangepast.",
             tripUpdate: parsedJson.tripUpdate,
             engine: "Gemini 3.6 Flash (Itinerary Parser)",
-            sources: fallbackSources.length ? fallbackSources : undefined
+            sources: fallbackSources.length ? fallbackSources : undefined,
           });
         }
 
         return res.json({
           reply: rawText || "Yassou! Hoe kan ik je verder helpen met je reis?",
           engine: "Gemini 3.6 Flash",
-          sources: fallbackSources.length ? fallbackSources : undefined
+          sources: fallbackSources.length ? fallbackSources : undefined,
         });
       }
     } catch (geminiErr: any) {
