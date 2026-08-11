@@ -171,8 +171,9 @@ async function callGroqAI(systemPrompt: string, userPrompt: string, retriesLeft 
         console.warn(`Groq API model ${model} error (${res.status}):`, errText);
         if (res.status === 429) {
           if (retriesLeft <= 0) break;
-          const backoff = Math.min(parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000, 6000);
-          await sleep(backoff);
+          const waitMs = parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000;
+          if (waitMs > 5000) break; // sustained limit (e.g. daily budget) — hand over to Gemini quickly
+          await sleep(waitMs);
           return callGroqAI(systemPrompt, userPrompt, retriesLeft - 1);
         }
       }
@@ -377,11 +378,12 @@ async function executeTool(name: string, args: any): Promise<ToolResult> {
 async function callGroqAgent(
   systemPrompt: string,
   userPrompt: string
-): Promise<{ content: string; model: string; sources: Source[] } | null> {
+): Promise<{ content: string; model: string; sources: Source[]; rateLimited: boolean } | null> {
   const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
   if (!apiKey) return null;
 
   const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+  let hardRateLimited = false;
 
   for (const model of models) {
     const messages: any[] = [
@@ -415,11 +417,14 @@ async function callGroqAgent(
           const errText = await res.text();
           console.warn(`Groq agent model ${model} error (${res.status}):`, errText);
           if (res.status === 429) {
+            const waitMs = parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000;
+            if (consecutive429 >= 1 || waitMs > 5000) {
+              hardRateLimited = true;
+              break; // sustained rate limit (e.g. daily budget) — hand over to Gemini quickly
+            }
             consecutive429++;
-            if (consecutive429 >= 2) break; // hard rate limit (e.g. daily budget) — try next model
-            const backoff = Math.min(parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000, 4000);
-            await sleep(backoff);
-            rounds--; // retry this round after backoff
+            await sleep(Math.min(waitMs, 4000));
+            rounds--; // retry this round after a short backoff
             continue;
           }
           if (res.status === 400 && errText.includes("tool_use_failed")) {
@@ -477,9 +482,9 @@ async function callGroqAgent(
         }
 
         if (content) {
-          return { content, model, sources: collectedSources.slice(0, 8) };
+          return { content, model, sources: collectedSources.slice(0, 8), rateLimited: hardRateLimited };
         }
-        return null;
+        return { content: "", model: "", sources: [], rateLimited: hardRateLimited };
       }
 
       // Tool rounds exhausted without a final answer: synthesize from the tool results.
@@ -501,7 +506,7 @@ async function callGroqAgent(
           const finalData = await finalRes.json();
           const finalContent = finalData.choices?.[0]?.message?.content;
           if (finalContent) {
-            return { content: finalContent, model, sources: collectedSources.slice(0, 8) };
+            return { content: finalContent, model, sources: collectedSources.slice(0, 8), rateLimited: hardRateLimited };
           }
         }
       }
@@ -509,7 +514,7 @@ async function callGroqAgent(
       console.warn(`Groq agent exception for model ${model}:`, err);
     }
   }
-  return null;
+  return { content: "", model: "", sources: [], rateLimited: hardRateLimited };
 }
 
 const WEATHER_KEYWORDS = [
@@ -714,7 +719,7 @@ RULES WHEN LIVE DATA IS PRESENT:
     const userPromptText = userMsgList.map((m: any) => `${m.role === 'user' ? 'Traveler' : 'Athena'}: ${m.content}`).join('\n');
 
     // 1. Primary Engine: Groq tool-calling agent (live info tools)
-    let agentRes: { content: string; model: string; sources: Source[] } | null = null;
+    let agentRes: { content: string; model: string; sources: Source[]; rateLimited: boolean } | null = null;
     if (needsLive) {
       try {
         agentRes = await callGroqAgent(systemPrompt, userPromptText);
@@ -753,7 +758,8 @@ RULES WHEN LIVE DATA IS PRESENT:
       }
     }
 
-    // 2. Classic Groq call
+    // 2. Classic Groq call (skipped when the agent already hit a hard rate limit,
+    //    so we hand over to Gemini earlier instead of burning more retries/time)
     const groqUserPrompt = isTripUpdateCommand
       ? `The traveler used /tripupdate with the following new booking details:\n${tripUpdateDetails}\n\nCurrent trip context: ${context}\n\nExtract and return the full updated stays array as JSON.`
       : `${userPromptText}${liveDataBlock ? `\n\n${liveDataBlock}` : ''}${
@@ -762,22 +768,24 @@ RULES WHEN LIVE DATA IS PRESENT:
           attachment?.name && !attachment?.text ? `\n\n[Bijgevoegd Bestand: ${attachment.name}]` : ''
         }`;
 
-    const groqRes = await callGroqAI(systemPrompt, groqUserPrompt);
-    if (groqRes && groqRes.content) {
-      const parsedJson = parseAIJsonBlock(groqRes.content);
-      if (parsedJson && parsedJson.tripUpdate) {
+    if (!(agentRes && agentRes.rateLimited)) {
+      const groqRes = await callGroqAI(systemPrompt, groqUserPrompt);
+      if (groqRes && groqRes.content) {
+        const parsedJson = parseAIJsonBlock(groqRes.content);
+        if (parsedJson && parsedJson.tripUpdate) {
+          return res.json({
+            reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI.",
+            tripUpdate: parsedJson.tripUpdate,
+            engine: `Groq (${groqRes.model})`,
+            sources: fallbackSources.length ? fallbackSources : undefined
+          });
+        }
         return res.json({
-          reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI.",
-          tripUpdate: parsedJson.tripUpdate,
+          reply: groqRes.content,
           engine: `Groq (${groqRes.model})`,
           sources: fallbackSources.length ? fallbackSources : undefined
         });
       }
-      return res.json({
-        reply: groqRes.content,
-        engine: `Groq (${groqRes.model})`,
-        sources: fallbackSources.length ? fallbackSources : undefined
-      });
     }
 
     // 2. Secondary Engine: Try Gemini AI safely (Multimodal fallback if image attached or Groq unavailable)
