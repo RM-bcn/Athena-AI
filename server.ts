@@ -205,7 +205,7 @@ function parseFailedGeneration(errText: string): { name: string; arguments: any 
   } catch {
     // raw text fallback below
   }
-  const m = gen.match(/<\s*function=(\w+)[\s=]*(\{[\s\S]*?\})\s*<\s*\/\s*function\s*>/i);
+  const m = gen.match(/<\s*function=(\w+)[\s=]*(\{[\s\S]*?\})\s*(?:>\s*)?<\s*\/\s*function\s*>/i);
   if (!m) return null;
   try {
     return { name: m[1], arguments: JSON.parse(m[2]) };
@@ -649,6 +649,7 @@ CRITICAL RESEARCH RULES (use your live tools FIRST — never guess when you can 
 - When the traveler asks about restaurants, taverna's or food: ALWAYS call find_restaurants first. It works via OpenStreetMap and also covers cities like Athene/Glyfada. Recommend the real places it returns, including their cuisine and address.
 - When the traveler asks about weather, events, ferries, sights or practical info: call the matching live tool (get_weather, search_web, get_city_tips) BEFORE answering.
 - Never invent restaurant names, prices, opening hours, ratings or locations. Only list what the tool results actually contain.
+- If find_restaurants (or any tool) returned concrete results, you MUST copy the found names (with cuisine and address) into your answer verbatim as a numbered list. NEVER say "geen restaurants gevonden" or "ik kon niets vinden" when the tool result contains places.
 - Never claim you used Google Maps, TripAdvisor, Booking.com or any other source that is not actually present in the tool results.
 - Do NOT narrate what you are about to do (e.g. "Ik zal een live zoekactie uitvoeren..."). Call the tool directly and immediately give the concrete answer.
 - If a tool returns no useful results, say that honestly, then give general (non-fabricated) guidance and suggest online search.
