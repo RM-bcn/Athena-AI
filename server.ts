@@ -197,8 +197,15 @@ function parseRetryAfterMs(errText: string, retryAfter: string | null): number |
   return null;
 }
 
-function parseFailedGeneration(generation: string): { name: string; arguments: any } | null {
-  const m = (generation || "").match(/<\s*function=(\w+)[=\s]*(\{[\s\S]*?\})<\s*\/\s*function\s*>/i);
+function parseFailedGeneration(errText: string): { name: string; arguments: any } | null {
+  let gen = errText || "";
+  try {
+    const parsed = JSON.parse(errText);
+    gen = parsed?.error?.failed_generation || gen;
+  } catch {
+    // raw text fallback below
+  }
+  const m = gen.match(/<\s*function=(\w+)[\s=]*(\{[\s\S]*?\})\s*<\s*\/\s*function\s*>/i);
   if (!m) return null;
   try {
     return { name: m[1], arguments: JSON.parse(m[2]) };
