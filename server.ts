@@ -133,7 +133,7 @@ function getGeminiClient() {
 }
 
 // Helper to call Groq API safely (Primary AI Engine with multi-model fallback)
-async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ content: string; model: string } | null> {
+async function callGroqAI(systemPrompt: string, userPrompt: string, retriesLeft = 2): Promise<{ content: string; model: string } | null> {
   const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
   if (!apiKey) {
     return null;
@@ -170,9 +170,10 @@ async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ c
         const errText = await res.text();
         console.warn(`Groq API model ${model} error (${res.status}):`, errText);
         if (res.status === 429) {
+          if (retriesLeft <= 0) break;
           const backoff = Math.min(parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000, 6000);
           await sleep(backoff);
-          return callGroqAI(systemPrompt, userPrompt);
+          return callGroqAI(systemPrompt, userPrompt, retriesLeft - 1);
         }
       }
     } catch (err) {
@@ -390,6 +391,7 @@ async function callGroqAgent(
     const collectedSources: Source[] = [];
     let rounds = 0;
     let toolRoundsUsed = false;
+    let consecutive429 = 0;
     try {
       while (rounds < 4) {
         rounds++;
@@ -413,7 +415,9 @@ async function callGroqAgent(
           const errText = await res.text();
           console.warn(`Groq agent model ${model} error (${res.status}):`, errText);
           if (res.status === 429) {
-            const backoff = Math.min(parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000, 6000);
+            consecutive429++;
+            if (consecutive429 >= 2) break; // hard rate limit (e.g. daily budget) — try next model
+            const backoff = Math.min(parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000, 4000);
             await sleep(backoff);
             rounds--; // retry this round after backoff
             continue;
