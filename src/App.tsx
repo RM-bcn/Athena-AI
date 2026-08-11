@@ -574,6 +574,7 @@ export default function App() {
             ? [{ label: ' Bekijk Mijn Reis', action: '/travel' }]
             : [{ label: ' Inloggen om Opslaan Goed te keuren', action: 'login' }]
           : undefined,
+        sources: data.sources,
       };
 
       setMessages((prev) => [...prev, aiMsg]);

@@ -99,6 +99,7 @@ export interface ChatMessage {
   content: string;
   cards?: TravelCardData[];
   quickButtons?: { label: string; action: string }[];
+  sources?: { title: string; url: string }[];
   attachment?: {
     name: string;
     type: string;

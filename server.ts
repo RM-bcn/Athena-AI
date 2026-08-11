@@ -10,6 +10,8 @@ import {
   getUserFromSheet,
 } from "./server/sheets-service.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
+import { searchDuckDuckGo } from "./server/duckduckgo-search.js";
+import type { SearchResponse } from "./server/duckduckgo-search.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -183,6 +185,7 @@ app.get("/api/ai/status", (req, res) => {
 
   const hasGroq = !!(groqKey && groqKey !== "MY_GROQ_API_KEY");
   const hasGemini = !!(geminiKey && geminiKey !== "MY_GEMINI_API_KEY");
+  const duckduckgoEnabled = getEnvVal("DUCKDUCKGO_ENABLED", "duckduckgo_enabled") !== "false";
 
   res.json({
     activeEngine: hasGroq
@@ -192,6 +195,9 @@ app.get("/api/ai/status", (req, res) => {
       : "Athena Greek Concierge Engine",
     hasGroqKey: hasGroq,
     hasGeminiKey: hasGemini,
+    liveSearch: duckduckgoEnabled
+      ? "DuckDuckGo (gratis, geen API-sleutel nodig)"
+      : "Uitgeschakeld",
   });
 });
 
@@ -207,6 +213,70 @@ function parseAIJsonBlock(text: string): any | null {
     return null;
   }
   return null;
+}
+
+const GREEK_ISLAND_NAMES = [
+  "naxos", "milos", "koufonisia", "santorini", "mykonos", "paros", "antiparos", "ios",
+  "tinos", "syros", "sifnos", "amorgos", "folegandros", "serifos", "kimolos", "samos",
+  "crete", "kreta", "rhodes", "corfu", "zakynthos", "kefalonia", "hydra", "poros", "egina",
+];
+
+const LIVE_INFO_KEYWORDS = [
+  // Restaurants & food
+  "restaurant", "taverna", "tavern", "eten", "eet", "eetcafé", "food", "menu", "menukaart",
+  "prijs", "prijzen", "kosten", "ontbijt", "lunch", "diner", "dinner", "gyros", "souvlaki",
+  "seafood", "fish", "octopus", "wijn", "drinks", "café", "cafe", "bistro", "grieks eten",
+  // Weather
+  "weer", "weersverwachting", "temperature", "temperatuur", "regen", "zon", "wind",
+  "meltemi", "graden", "forecast", "degrees", "het weer",
+  // Events
+  "events", "evenement", "evenementen", "festival", "feest", "concert", "party",
+  "panigiri", "celebratie",
+  // Ferry & transport
+  "ferry", "ferries", "veer", "timetable", "dienstregeling", "afvaart", "schepen", "boot",
+  "catamaran", "hydrofoil", "seajets", "blue star", "haven", "port", "veerboten",
+  // Sights & activities
+  "strand", "beach", "bezienswaardigheid", "bezienswaardigheden", "sights", "attracties",
+  "hike", "wandeling", "wandelen", "beste", "best", "top", "must-see", "shop", "shopping",
+  "winkels", "markt", "activities",
+  // Practical info
+  "open", "openingsuren", "openingstijden", "geopend", "entree", "ticket", "tickets",
+  "reserveren", "reservation", "booking", "hoe laat", "wanneer", "waar", "tips",
+];
+
+function needsLiveSearch(message: string): boolean {
+  const lower = message.toLowerCase();
+  return LIVE_INFO_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+function buildSearchQuery(message: string, context: string): string {
+  const cleaned = message
+    .replace(/^\/\w+\s*/i, "")
+    .replace(/^athena[,\s]+/i, "")
+    .trim();
+  if (!cleaned) return "Griekenland Cycladen";
+  const islandMatch = (context || "").match(/([A-Za-zÀ-ÿ'-]+):\s*\d{4}-\d{2}-\d{2}/);
+  const firstIsland = islandMatch ? islandMatch[1] : "";
+  const lower = cleaned.toLowerCase();
+  const mentionsIsland = GREEK_ISLAND_NAMES.some((n) => lower.includes(n));
+  if (!mentionsIsland && firstIsland) return `${cleaned} ${firstIsland}`;
+  return cleaned;
+}
+
+function formatSearchBlock(search: SearchResponse): string {
+  const lines: string[] = [`[Live Web Search Resultaten (DuckDuckGo) voor: "${search.query}"]`];
+  if (search.abstract) {
+    lines.push(`- Samenvatting: ${search.abstract} (${search.abstractUrl || ""})`);
+  }
+  search.results.forEach((r, i) => {
+    lines.push(`${i + 1}. ${r.title}\n   Bron: ${r.url}\n   ${r.snippet}`);
+  });
+  return lines.join("\n");
+}
+
+function mapSources(search: SearchResponse | null): { title: string; url: string }[] | undefined {
+  if (!search || search.results.length === 0) return undefined;
+  return search.results.slice(0, 5).map((r) => ({ title: r.title, url: r.url }));
 }
 
 // API: General Concierge Chat & Itinerary Auto-Parser
@@ -225,7 +295,23 @@ app.post("/api/chat", async (req, res) => {
 
     const travelerName = typeof userName === "string" && userName.trim() ? userName.trim() : "Reiziger";
 
-    const systemPrompt = isTripUpdateCommand
+    // Live web search via DuckDuckGo (free, no API key) to prevent hallucinations
+    const duckduckgoEnabled = getEnvVal("DUCKDUCKGO_ENABLED", "duckduckgo_enabled") !== "false";
+    let webSearch: SearchResponse | null = null;
+    let liveDataBlock = "";
+    if (duckduckgoEnabled && !isTripUpdateCommand && !attachment && needsLiveSearch(lastUserMsg)) {
+      const searchQuery = buildSearchQuery(lastUserMsg, context || "");
+      try {
+        webSearch = await searchDuckDuckGo(searchQuery);
+      } catch (searchErr) {
+        console.warn("DuckDuckGo search failed:", searchErr);
+      }
+      if (webSearch && (webSearch.abstract || webSearch.results.length > 0)) {
+        liveDataBlock = formatSearchBlock(webSearch);
+      }
+    }
+
+    let systemPrompt = isTripUpdateCommand
       ? `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
 You speak warmly, eloquently, and in fluent Dutch ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches).
 
@@ -315,12 +401,25 @@ Return JSON in this format:
 \`\`\`
 If no travel schedule update is present, reply in standard conversational Dutch without JSON.`;
 
+    if (liveDataBlock) {
+      systemPrompt += `
+
+LIVE WEB SEARCH DATA (just retrieved via DuckDuckGo, this is your source of truth for THIS answer):
+${liveDataBlock}
+
+RULES WHEN LIVE SEARCH DATA IS PRESENT:
+- You DO have real-time search results now. Base your answer on them and cite the source URLs inline, e.g. "(bron: <url>)".
+- Do NOT invent restaurants, prices, weather forecasts, events, or ferry times that are not present in the search data.
+- If the results do not fully answer the question, say so honestly and add general guidance from your own knowledge.
+- Keep your warm Athena concierge tone and reply in fluent Dutch.`;
+    }
+
     const userPromptText = userMsgList.map((m: any) => `${m.role === 'user' ? 'Traveler' : 'Athena'}: ${m.content}`).join('\n');
 
     // 1. Primary Engine: Try Groq AI (Llama 3.3 70B & Fallbacks)
     const groqUserPrompt = isTripUpdateCommand
       ? `The traveler used /tripupdate with the following new booking details:\n${tripUpdateDetails}\n\nCurrent trip context: ${context}\n\nExtract and return the full updated stays array as JSON.`
-      : `${userPromptText}${
+      : `${userPromptText}${liveDataBlock ? `\n\n${liveDataBlock}` : ''}${
           attachment?.text ? `\n\n[Bijgevoegd Document Content (${attachment.name})]:\n${attachment.text}` : ''
         }${
           attachment?.name && !attachment?.text ? `\n\n[Bijgevoegd Bestand: ${attachment.name}]` : ''
@@ -333,17 +432,22 @@ If no travel schedule update is present, reply in standard conversational Dutch 
         return res.json({
           reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI.",
           tripUpdate: parsedJson.tripUpdate,
-          engine: `Groq (${groqRes.model})`
+          engine: `Groq (${groqRes.model})`,
+          sources: mapSources(webSearch)
         });
       }
-      return res.json({ reply: groqRes.content, engine: `Groq (${groqRes.model})` });
+      return res.json({
+        reply: groqRes.content,
+        engine: `Groq (${groqRes.model})`,
+        sources: mapSources(webSearch)
+      });
     }
 
     // 2. Secondary Engine: Try Gemini AI safely (Multimodal fallback if image attached or Groq unavailable)
     try {
       const ai = getGeminiClient();
       if (ai) {
-        const parts: any[] = [{ text: `${systemPrompt}\n\nChat History:\n${userPromptText}\n\nAthena:` }];
+        const parts: any[] = [{ text: `${systemPrompt}\n\nChat History:\n${userPromptText}${liveDataBlock ? `\n\n${liveDataBlock}` : ''}\n\nAthena:` }];
         
         if (attachment) {
           if (attachment.base64 && attachment.type?.startsWith("image/")) {
@@ -372,13 +476,15 @@ If no travel schedule update is present, reply in standard conversational Dutch 
           return res.json({
             reply: parsedJson.reply || "Kalimera! Ik heb je reisplan verwerkt en je reisschema automatisch aangepast.",
             tripUpdate: parsedJson.tripUpdate,
-            engine: "Gemini 3.6 Flash (Itinerary Parser)"
+            engine: "Gemini 3.6 Flash (Itinerary Parser)",
+            sources: mapSources(webSearch)
           });
         }
 
         return res.json({
           reply: rawText || "Yassou! Hoe kan ik je verder helpen met je reis?",
-          engine: "Gemini 3.6 Flash"
+          engine: "Gemini 3.6 Flash",
+          sources: mapSources(webSearch)
         });
       }
     } catch (geminiErr: any) {
@@ -389,13 +495,18 @@ If no travel schedule update is present, reply in standard conversational Dutch 
 
     if (isTripUpdateCommand) {
       reply = `Kalimera! Ik heb je /tripupdate commando ontvangen maar kon de details niet volledig verwerken. Probeer het zo: /tripupdate Santorini, 17 sept - 21 sept, 4 nachten, Hotel Anastasis Apartments`;
+    } else if (webSearch && webSearch.results.length > 0) {
+      const top = webSearch.results.slice(0, 3);
+      reply = `Ik heb live gezocht via DuckDuckGo naar "${webSearch.query}". Hier zijn de meest relevante resultaten:\n\n${top
+        .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`)
+        .join("\n\n")}\n\nWil je dat ik hier iets specifieks voor je uitzoek?`;
     } else if (lastUserMsg.toLowerCase().includes("ferry")) {
       reply += "High-speed ferries (Seajets & Blue Star) memeren dagelijks aan tussen Naxos, Milos, en Koufonisia. Ik raad aan 48 uur van tevoren te boeken.";
     } else {
       reply += "Typ /tripupdate gevolgd door je boekingsgegevens om je reisschema direct aan te passen! Bijv: /tripupdate Santorini, 17 sept - 21 sept, Hotel Caldera View";
     }
 
-    res.json({ reply, engine: "Greek Concierge Local Fallback" });
+    res.json({ reply, engine: "Greek Concierge Local Fallback", sources: mapSources(webSearch) });
   } catch (error: any) {
     console.error("Chat error:", error);
     res.json({

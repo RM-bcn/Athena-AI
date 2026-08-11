@@ -202,6 +202,29 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                     {msg.content}
                   </p>
 
+                  {/* Live Search Source Links */}
+                  {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-[#e4efff]">
+                      <span className="font-['Inter'] text-[10px] font-bold uppercase tracking-wider text-[#717783]">
+                        Bronnen · live DuckDuckGo zoekresultaten
+                      </span>
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        {msg.sources.map((src, idx) => (
+                          <a
+                            key={idx}
+                            href={src.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-['Inter'] text-[#005BAE] hover:underline truncate"
+                            title={src.url}
+                          >
+                            {src.title || src.url}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Interactive Cards Bento Grid */}
                   {msg.cards && msg.cards.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
