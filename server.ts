@@ -481,6 +481,36 @@ async function callGroqAgent(
           continue;
         }
 
+        // Sommige modellen (vooral Groq 8b) verwerken de functie-aanroep als raw
+        // tekst in de content: <function=name{...}</function>, in plaats van via
+        // het gestructureerde tool_calls-veld. Parse + execute die tag en blijf in
+        // de agent-loop, anders wordt de rauwe tag als eind-antwoord getoond.
+        if (!toolCalls.length && content && /<\s*function=\w+[\s=]*\{/i.test(content)) {
+          const embedded = parseFailedGeneration(content);
+          if (embedded) {
+            toolRoundsUsed = true;
+            const result = await executeTool(embedded.name, embedded.arguments);
+            if (result.sources) {
+              for (const s of result.sources) {
+                if (!collectedSources.some((x) => x.url === s.url)) collectedSources.push(s);
+              }
+            }
+            messages.push({
+              role: "assistant",
+              content: null,
+              tool_calls: [
+                {
+                  id: `call_embedded_${rounds}`,
+                  type: "function",
+                  function: { name: embedded.name, arguments: JSON.stringify(embedded.arguments) },
+                },
+              ],
+            });
+            messages.push({ role: "tool", tool_call_id: `call_embedded_${rounds}`, content: result.text });
+            continue;
+          }
+        }
+
         if (content) {
           return { content, model, sources: collectedSources.slice(0, 8), rateLimited: hardRateLimited };
         }
