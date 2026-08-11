@@ -508,6 +508,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newHistory.map((m) => ({ role: m.role, content: m.content })),
+          userName: currentUser?.nickname || currentUser?.name || 'Reiziger',
           context: `Greek Island Hopping: ${currentTrip.title} (${currentTrip.stays.map((s) => `${s.island}: ${s.startDate} tot ${s.endDate}`).join(', ')})`,
           attachment: attachment
             ? {

@@ -138,12 +138,12 @@ export const initialChatMessages: ChatMessage[] = [
     role: 'assistant',
     senderName: 'Athena',
     timestamp: '10:24 AM',
-    content: "Kalimera, Alexandros! I'm Athena, your Greek island expert. I see you're planning a trip for September—the perfect time for the Cyclades. The winds are calmer and the sunset in Oia is less crowded.\n\nAre we looking for a romantic itinerary through Santorini and Milos, or perhaps something more adventurous in Naxos?"
+    content: "Kalimera! I'm Athena, your Greek island expert. I see you're planning a trip for September—the perfect time for the Cyclades. The winds are calmer and the sunset in Oia is less crowded.\n\nAre we looking for a romantic itinerary through Santorini and Milos, or perhaps something more adventurous in Naxos?"
   },
   {
     id: 'msg-2',
     role: 'user',
-    senderName: 'Alexandros P.',
+    senderName: 'Reiziger',
     avatar: CHAT_USER_AVATAR,
     timestamp: '10:26 AM',
     content: "I'm thinking of something adventurous! Naxos sounds great, but I also heard Koufonisia is a hidden gem. Can you help me plan a 5-day hop between them? Also, what's the ferry status for that week?"
