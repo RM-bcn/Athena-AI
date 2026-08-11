@@ -139,7 +139,7 @@ async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ c
     return null;
   }
 
-  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"];
+  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
 
   for (const model of models) {
     try {
@@ -169,6 +169,11 @@ async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ c
       } else {
         const errText = await res.text();
         console.warn(`Groq API model ${model} error (${res.status}):`, errText);
+        if (res.status === 429) {
+          const backoff = Math.min(parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000, 6000);
+          await sleep(backoff);
+          return callGroqAI(systemPrompt, userPrompt);
+        }
       }
     } catch (err) {
       console.warn(`Groq API exception for model ${model}:`, err);
@@ -176,6 +181,30 @@ async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ c
   }
 
   return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function parseRetryAfterMs(errText: string, retryAfter: string | null): number | null {
+  if (retryAfter) {
+    const secs = Number(retryAfter);
+    if (Number.isFinite(secs)) return secs * 1000;
+  }
+  const m = (errText || "").match(/try again in ([\d.]+)s/);
+  if (m) return Math.ceil(Number(m[1])) * 1000;
+  return null;
+}
+
+function parseFailedGeneration(generation: string): { name: string; arguments: any } | null {
+  const m = (generation || "").match(/<\s*function=(\w+)[=\s]*(\{[\s\S]*?\})<\s*\/\s*function\s*>/i);
+  if (!m) return null;
+  try {
+    return { name: m[1], arguments: JSON.parse(m[2]) };
+  } catch {
+    return null;
+  }
 }
 
 // API: AI Engine Status
@@ -344,7 +373,7 @@ async function callGroqAgent(
   const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
   if (!apiKey) return null;
 
-  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"];
+  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
 
   for (const model of models) {
     const messages: any[] = [
@@ -353,8 +382,9 @@ async function callGroqAgent(
     ];
     const collectedSources: Source[] = [];
     let rounds = 0;
+    let toolRoundsUsed = false;
     try {
-      while (rounds < 3) {
+      while (rounds < 4) {
         rounds++;
         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
@@ -375,6 +405,37 @@ async function callGroqAgent(
         if (!res.ok) {
           const errText = await res.text();
           console.warn(`Groq agent model ${model} error (${res.status}):`, errText);
+          if (res.status === 429) {
+            const backoff = Math.min(parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000, 6000);
+            await sleep(backoff);
+            rounds--; // retry this round after backoff
+            continue;
+          }
+          if (res.status === 400 && errText.includes("tool_use_failed")) {
+            const parsed = parseFailedGeneration(errText);
+            if (parsed) {
+              toolRoundsUsed = true;
+              const result = await executeTool(parsed.name, parsed.arguments);
+              if (result.sources) {
+                for (const s of result.sources) {
+                  if (!collectedSources.some((x) => x.url === s.url)) collectedSources.push(s);
+                }
+              }
+              messages.push({
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: "call_retry_0",
+                    type: "function",
+                    function: { name: parsed.name, arguments: JSON.stringify(parsed.arguments) },
+                  },
+                ],
+              });
+              messages.push({ role: "tool", tool_call_id: "call_retry_0", content: result.text });
+              continue;
+            }
+          }
           break;
         }
 
@@ -384,6 +445,7 @@ async function callGroqAgent(
         const toolCalls = msg?.tool_calls || [];
 
         if (toolCalls.length > 0) {
+          toolRoundsUsed = true;
           messages.push(msg);
           for (const tc of toolCalls) {
             let args: any = {};
@@ -407,6 +469,30 @@ async function callGroqAgent(
           return { content, model, sources: collectedSources.slice(0, 8) };
         }
         return null;
+      }
+
+      // Tool rounds exhausted without a final answer: synthesize from the tool results.
+      if (toolRoundsUsed && collectedSources.length > 0) {
+        const finalRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.7,
+            max_tokens: 1600,
+          }),
+        });
+        if (finalRes.ok) {
+          const finalData = await finalRes.json();
+          const finalContent = finalData.choices?.[0]?.message?.content;
+          if (finalContent) {
+            return { content: finalContent, model, sources: collectedSources.slice(0, 8) };
+          }
+        }
       }
     } catch (err) {
       console.warn(`Groq agent exception for model ${model}:`, err);

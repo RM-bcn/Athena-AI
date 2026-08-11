@@ -122,6 +122,18 @@ export async function getWeather(location: string): Promise<ToolResult> {
 // ---------------------------------------------------------------------------
 // Tool 2: search_web — DuckDuckGo primary, Wikipedia/Wikivoyage fallback
 // ---------------------------------------------------------------------------
+function cleanFallbackQuery(query: string): string {
+  const cleaned = query
+    .toLowerCase()
+    .replace(
+      /\b(wat|welke|welk|hoe|waar|wanneer|wie|is|er|een|de|het|van|in|op|naar|met|voor|over|zijn|kan|kunnen|ik|je|jij|jouw|geef|moet|moeten|mijn|die|dat|aan|als|of|en|niet|graag|goede|beste|leuke|leuke|echt|even|geven|zijn er)\b/g,
+      " "
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || query;
+}
+
 async function wikipediaSearch(query: string, site: "wikipedia" | "wikivoyage"): Promise<ToolResult> {
   const host = site === "wikivoyage" ? "nl.wikivoyage.org" : "nl.wikipedia.org";
   const searchUrl = `https://${host}/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5`;
@@ -174,8 +186,9 @@ export async function searchWeb(query: string): Promise<ToolResult> {
   }
 
   // Silent fallback: Wikipedia + Wikivoyage
-  const wiki = await wikipediaSearch(q, "wikipedia");
-  const voy = await wikipediaSearch(q, "wikivoyage");
+  const cleanQ = cleanFallbackQuery(q);
+  const wiki = await wikipediaSearch(cleanQ, "wikipedia");
+  const voy = await wikipediaSearch(cleanQ, "wikivoyage");
   sources.push(...(wiki.sources || []), ...(voy.sources || []));
   const parts = [wiki.text, voy.text].filter(Boolean);
   if (parts.length === 0) {
@@ -254,45 +267,59 @@ export async function getCityTips(city: string): Promise<ToolResult> {
   const sources: Source[] = [];
   const parts: string[] = [];
 
-  // Wikipedia intro
-  try {
-    const wiki = await fetchWithTimeout(
-      `https://nl.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&redirects=1&titles=${encodeURIComponent(c)}&format=json`,
-      { headers: { "User-Agent": UA, Accept: "application/json" } }
-    );
-    if (wiki.ok) {
+  const candidates = [c, `${c} (eiland)`, `${c} (island)`];
+  const base = c.toLowerCase();
+
+  const isBadPage = (page: any): boolean => {
+    if (!page?.extract || page.missing) return true;
+    if (page.pageprops?.disambiguation) return true;
+    if (!String(page.title).toLowerCase().includes(base)) return true;
+    const head = String(page.extract).slice(0, 120);
+    if (/(kan|kunnen) verwijzen naar|verwijzing naar|is een naam voor/i.test(head)) return true;
+    return false;
+  };
+
+  // Wikipedia intro (skip disambiguations / wrong redirects)
+  for (const title of candidates) {
+    try {
+      const wiki = await fetchWithTimeout(
+        `https://nl.wikipedia.org/w/api.php?action=query&prop=extracts|pageprops&exintro=1&explaintext=1&redirects=1&titles=${encodeURIComponent(title)}&format=json`,
+        { headers: { "User-Agent": UA, Accept: "application/json" } }
+      );
+      if (!wiki.ok) continue;
       const wd = await wiki.json();
       const page = Object.values(wd?.query?.pages || {})[0] as any;
-      if (page?.extract) {
-        parts.push(`Wikipedia over ${page.title}: ${truncate(page.extract, 900)}`);
-        sources.push({ title: `Wikipedia: ${page.title}`, url: `https://nl.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, "_"))}` });
-      }
+      if (isBadPage(page)) continue;
+      parts.push(`Wikipedia over ${page.title}: ${truncate(page.extract, 900)}`);
+      sources.push({ title: `Wikipedia: ${page.title}`, url: `https://nl.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, "_"))}` });
+      break;
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
-  // Wikivoyage guide (plain text, capped)
-  try {
-    const voy = await fetchWithTimeout(
-      `https://nl.wikivoyage.org/w/api.php?action=query&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(c)}&format=json`,
-      { headers: { "User-Agent": UA, Accept: "application/json" } }
-    );
-    if (voy.ok) {
+  // Wikivoyage guide (plain text, capped) — skip wrong redirects
+  for (const title of candidates) {
+    try {
+      const voy = await fetchWithTimeout(
+        `https://nl.wikivoyage.org/w/api.php?action=query&prop=extracts|pageprops&explaintext=1&redirects=1&titles=${encodeURIComponent(title)}&format=json`,
+        { headers: { "User-Agent": UA, Accept: "application/json" } }
+      );
+      if (!voy.ok) continue;
       const vd = await voy.json();
       const page = Object.values(vd?.query?.pages || {})[0] as any;
-      if (page?.extract) {
-        const extract = page.extract;
-        // Prefer the restaurant/eat/drink section if present
-        const eatMarker = extract.search(/(Eten|Restaurants|Eetgelegenheden)/i);
-        const start = eatMarker >= 0 ? Math.max(0, eatMarker - 100) : 0;
-        const tip = truncate(extract.slice(start), 4000);
-        parts.push(`Reisgids (Wikivoyage) ${page.title}: ${tip}`);
-        sources.push({ title: `Wikivoyage: ${page.title}`, url: `https://nl.wikivoyage.org/wiki/${encodeURIComponent(page.title.replace(/ /g, "_"))}` });
-      }
+      if (isBadPage(page)) continue;
+      const extract = page.extract;
+      // Prefer the restaurant/eat/drink section if present
+      const eatMarker = extract.search(/(Eten|Restaurants|Eetgelegenheden)/i);
+      const start = eatMarker >= 0 ? Math.max(0, eatMarker - 100) : 0;
+      const tip = truncate(extract.slice(start), 4000);
+      parts.push(`Reisgids (Wikivoyage) ${page.title}: ${tip}`);
+      sources.push({ title: `Wikivoyage: ${page.title}`, url: `https://nl.wikivoyage.org/wiki/${encodeURIComponent(page.title.replace(/ /g, "_"))}` });
+      break;
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   if (parts.length === 0) return { text: `Geen reistips gevonden voor "${c}".`, sources };
