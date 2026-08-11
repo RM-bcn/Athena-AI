@@ -224,8 +224,15 @@ export default function App() {
   };
 
 
-  // Navigation Guard: guests cannot access the chat
+  // Navigation Guard: block unauthenticated users from chat and itinerary
   const handleSetActiveTab = (tab: ActiveTab) => {
+    const isAuthenticated = currentUser !== null || isGuestMode;
+
+    if (!isAuthenticated && (tab === 'chat' || tab === 'itinerary' || tab === 'quick-help' || tab === 'settings' || tab === 'profile')) {
+      setActiveTab('login');
+      return;
+    }
+
     if (tab === 'chat' && isGuestMode) return;
     setActiveTab(tab);
   };
