@@ -140,8 +140,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               </div>
               <div className="w-9 h-9 rounded-full border-2 border-[#005BAE] overflow-hidden flex-shrink-0 bg-[#d2e4ff]">
                 <img
-                  src={currentUser.avatar || USER_AVATAR}
-                  alt={currentUser.name}
+                  src={currentUser.avatarUrl || currentUser.avatar || USER_AVATAR}
+                  alt={currentUser.nickname || currentUser.name}
                   className="w-full h-full object-cover"
                 />
               </div>

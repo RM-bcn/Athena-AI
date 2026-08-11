@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Bell, Moon, Sun, Globe, User, Key, Cpu, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Settings, Shield, Bell, Moon, Sun, Globe, User, Key, Cpu, Sparkles, CheckCircle2, ChevronRight, ImagePlus } from 'lucide-react';
+import { UserAccount } from '../types';
 
-export const SettingsView: React.FC = () => {
+interface SettingsViewProps {
+  currentUser: UserAccount | null;
+  onOpenProfile: () => void;
+}
+
+export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser, onOpenProfile }) => {
   const [aiEngine, setAiEngine] = useState<string>('Groq Llama-3.3-70B (Primary)');
   const [hasGroq, setHasGroq] = useState<boolean>(true);
 
@@ -16,6 +22,10 @@ export const SettingsView: React.FC = () => {
       })
       .catch(() => {});
   }, []);
+
+  const displayName = currentUser?.nickname || currentUser?.name || 'Gast';
+  const displayEmail = currentUser?.email || 'Niet ingelogd';
+  const avatarSrc = currentUser?.avatarUrl || currentUser?.avatar;
 
   return (
     <main className="md:ml-64 pt-24 min-h-screen px-6 md:px-12 pb-16 bg-white">
@@ -33,14 +43,33 @@ export const SettingsView: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-[24px] border border-[#e1efff] p-6 shadow-sm space-y-6">
-          <div className="flex items-center gap-4 pb-6 border-b border-[#f0f4f9]">
-            <div className="w-12 h-12 rounded-2xl bg-[#f0f4f9] text-[#005BAE] flex items-center justify-center">
-              <User className="w-6 h-6" />
+          <div className="flex items-center justify-between gap-4 pb-6 border-b border-[#f0f4f9]">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#f0f4f9] text-[#005BAE] flex items-center justify-center overflow-hidden flex-shrink-0">
+                {avatarSrc ? (
+                  <img src={avatarSrc} alt={displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-7 h-7" />
+                )}
+              </div>
+              <div>
+                <h3 className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d]">{displayName}</h3>
+                <p className="font-['Inter'] text-xs text-[#717783]">{displayEmail}</p>
+                <p className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold mt-0.5">
+                  {currentUser ? `Reiscode: ${currentUser.tripCode}` : 'Reiscode: ATH-2026'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d]">Traveler Profile</h3>
-              <p className="font-['Inter'] text-xs text-[#717783]">Alexandros P. • dennis.van.rooden@gmail.com</p>
-            </div>
+            {currentUser && (
+              <button
+                onClick={onOpenProfile}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer flex-shrink-0"
+              >
+                <ImagePlus className="w-4 h-4" />
+                Mijn Profiel
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div className="space-y-4">

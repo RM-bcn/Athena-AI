@@ -7,6 +7,7 @@ import {
   getOrCreateSpreadsheet,
   saveTripToSheet,
   loadTripFromSheet,
+  getUserFromSheet,
 } from "./server/sheets-service.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
 
@@ -97,6 +98,28 @@ app.post("/api/sheets/save", async (req, res) => {
 
 // API: Update User Profile (nickname, avatar, password)
 app.post("/api/profile/update", handleProfileUpdate);
+
+// API: Get current user profile from Google Sheets (used after login to restore avatar/nickname)
+app.get("/api/user", async (req, res) => {
+  try {
+    const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
+    const username = typeof req.query.username === "string" ? req.query.username.trim() : "";
+    if (!email && !username) {
+      return res.status(400).json({ success: false, error: "E-mailadres of gebruikersnaam is verplicht." });
+    }
+
+    const user = await getUserFromSheet(email, username);
+    if (!user) {
+      return res.status(404).json({ success: false, error: "Gebruiker niet gevonden." });
+    }
+
+    const { passwordHash: _removed, ...safeUser } = user;
+    return res.json({ success: true, user: safeUser });
+  } catch (err: any) {
+    console.error("[User] Fetch error:", err?.message || err);
+    return res.status(500).json({ success: false, error: err?.message || "Fout bij ophalen van gebruiker." });
+  }
+});
 
 // Helper to get Gemini AI instance safely
 function getGeminiClient() {
@@ -189,7 +212,7 @@ function parseAIJsonBlock(text: string): any | null {
 // API: General Concierge Chat & Itinerary Auto-Parser
 app.post("/api/chat", async (req, res) => {
   try {
-    const { messages, context, attachment } = req.body;
+    const { messages, context, userName, attachment } = req.body;
 
     const userMsgList = messages || [];
     const lastUserMsg = userMsgList[userMsgList.length - 1]?.content || "";
@@ -200,10 +223,20 @@ app.post("/api/chat", async (req, res) => {
       ? lastUserMsg.trim().substring("/tripupdate".length).trim()
       : "";
 
+    const travelerName = typeof userName === "string" && userName.trim() ? userName.trim() : "Reiziger";
+
     const systemPrompt = isTripUpdateCommand
       ? `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
-You speak warmly, eloquently, and in fluent Dutch.
+You speak warmly, eloquently, and in fluent Dutch ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches).
+
+CRITICAL USER IDENTIFICATION RULE:
+- NEVER assume or invent a user name like "Alexandros".
+- Address the user by their provided name, or use "Reiziger" (Traveler) / neutral greetings like "Kalimera!" if no name is given.
+- Only use a specific name if it appears in the conversation history or context provided.
+- Current traveler name: ${travelerName}
+
 Current traveler context: ${context || "Cyclades Hopping"}.
+Current traveler name: ${travelerName}.
 
 The traveler has used the /tripupdate command. They are providing you with new travel information to update their itinerary.
 You MUST parse the following details and ALWAYS return a JSON tripUpdate, even if the details are partial.
@@ -235,7 +268,26 @@ IMPORTANT: The stays array must include ALL current stays from the context PLUS 
 Do NOT return plain text. Only return the JSON block above.`
       : `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
 You speak warmly, eloquently, and in fluent Dutch ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches).
+
+CRITICAL USER IDENTIFICATION RULE:
+- NEVER assume or invent a user name like "Alexandros".
+- Address the user by their provided name, or use "Reiziger" (Traveler) / neutral greetings like "Kalimera!" if no name is given.
+- Only use a specific name if it appears in the conversation history or context provided.
+- Current traveler name: ${travelerName}
+
+CRITICAL ANTI-HALLUCINATION RULES FOR RESTAURANTS & RECOMMENDATIONS:
+- DO NOT invent or hallucinate specific restaurant names, menu items, prices, or locations unless they are well-known, established establishments you are confidently certain about.
+- When asked for restaurant recommendations or food tips:
+  * Acknowledge that you don't have real-time access to current menus, prices, opening hours, or availability.
+  * Suggest the USER search online for current information using Google Maps, TripAdvisor, Booking.com, or local tourism websites.
+  * Offer general guidance about typical dishes, areas known for good food, neighborhoods to explore, or what to look for in quality tavernas.
+  * Use phrases like: "Ik raad aan om online te zoeken naar actuele reviews op Google Maps of TripAdvisor" or "Voor de meest recente menu's, prijzen en openingstijden, kun je het beste direct bij het restaurant kijken of een platform zoals TripAdvisor raadplegen".
+- If unsure about specific details, be honest and transparent: "Ik heb geen live toegang tot actuele informatie, maar ik kan je wel algemene tips geven...".
+- NEVER make up specific prices, dish names, or street addresses unless you are absolutely certain from your training data about well-established venues.
+- When providing recommendations, frame them as general suggestions rather than definitive statements.
+
 Current traveler context: ${context || "Cyclades Hopping"}.
+Current traveler name: ${travelerName}.
 
 CRITICAL ITINERARY AUTOMATION INSTRUCTION:
 If the user uploads a document/image/file or provides a text describing an itinerary, travel schedule, flight/ferry tickets, or hotel stays:

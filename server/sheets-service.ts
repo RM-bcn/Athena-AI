@@ -591,7 +591,6 @@ export async function updateUserProfileInSheet(
     // Update existing row: merge with current values so untouched columns are preserved
     const existing = await getUserFromSheet(identifier.email || "", identifier.username || "");
     const values = [
-      existing?.nickname || "",
       updates.nickname !== undefined ? updates.nickname : (existing?.nickname || ""),
       updates.avatarUrl !== undefined ? updates.avatarUrl : (existing?.avatarUrl || ""),
       updates.passwordHash !== undefined ? updates.passwordHash : (existing?.passwordHash || ""),

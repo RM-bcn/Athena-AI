@@ -1,4 +1,4 @@
-export type ActiveTab = 'itinerary' | 'quick-help' | 'chat' | 'settings' | 'support' | 'login' | 'not-found';
+export type ActiveTab = 'itinerary' | 'quick-help' | 'chat' | 'settings' | 'support' | 'login' | 'not-found' | 'profile';
 export type ChatSubTab = 'current' | 'history' | 'favorites';
 
 export interface UserAccount {

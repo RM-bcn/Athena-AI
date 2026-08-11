@@ -7,6 +7,7 @@ import { MyItineraryView } from './components/MyItineraryView';
 import { QuickHelpView } from './components/QuickHelpView';
 import { ChatInterfaceView } from './components/ChatInterfaceView';
 import { SettingsView } from './components/SettingsView';
+import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
 import { LoginView } from './components/LoginView';
 import { NotFoundView } from './components/NotFoundView';
@@ -240,6 +241,33 @@ export default function App() {
       console.error(e);
     }
     setActiveTab('itinerary');
+
+    // Restore the latest profile (avatar/nickname) from Google Sheets so it survives logout/login
+    const email = user.email;
+    const username = user.username;
+    fetch(`/api/user?email=${encodeURIComponent(email)}&username=${encodeURIComponent(username)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success && data.user) {
+          const sheetUser = data.user as UserAccount;
+          const merged: UserAccount = {
+            ...user,
+            nickname: sheetUser.nickname || user.nickname,
+            avatarUrl: sheetUser.avatarUrl || user.avatarUrl,
+            avatar: sheetUser.avatar || user.avatar,
+            name: sheetUser.name || user.name,
+            role: sheetUser.role || user.role,
+            tripCode: sheetUser.tripCode || user.tripCode,
+          };
+          setCurrentUser(merged);
+          try {
+            localStorage.setItem('athena_active_user', JSON.stringify(merged));
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      })
+      .catch((err) => console.warn("Could not restore profile from sheet:", err));
   };
 
   const handleAccessTripCode = (code: string) => {
@@ -265,6 +293,54 @@ export default function App() {
       console.error(e);
     }
     setActiveTab('login');
+  };
+
+  // Update user profile via backend API, then sync React state + localStorage
+  const handleUpdateProfile = async (payload: {
+    nickname?: string;
+    avatarData?: string;
+    newPassword?: string;
+    currentPassword?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Je bent niet ingelogd.' };
+    }
+
+    try {
+      const res = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          username: currentUser.username,
+          nickname: payload.nickname,
+          avatarData: payload.avatarData,
+          currentPassword: payload.currentPassword,
+          newPassword: payload.newPassword,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || `Profiel bijwerken mislukt (HTTP ${res.status}).` };
+      }
+
+      if (data.user) {
+        const updatedUser: UserAccount = { ...currentUser, ...data.user };
+        setCurrentUser(updatedUser);
+        try {
+          localStorage.setItem('athena_active_user', JSON.stringify(updatedUser));
+        } catch (e) {
+          console.error("Failed to save user to localStorage", e);
+        }
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error("Profile update error:", err);
+      return { success: false, error: err?.message || 'Netwerkfout bij het bijwerken van je profiel.' };
+    }
   };
 
   // Save / Edit Stay Handler (Dennis or Joyce editing trip)
@@ -405,11 +481,12 @@ export default function App() {
     attachment?: { name: string; type: string; base64?: string; text?: string; isImage?: boolean }
   ) => {
     if (isGuestMode) return;
-    const sender = currentUser?.name || 'Reiziger';
+    const sender = currentUser?.nickname || currentUser?.name || 'Reiziger';
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
       senderName: sender,
+      avatar: currentUser?.avatarUrl || currentUser?.avatar,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       content: text,
       attachment: attachment
@@ -431,6 +508,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newHistory.map((m) => ({ role: m.role, content: m.content })),
+          userName: currentUser?.nickname || currentUser?.name || 'Reiziger',
           context: `Greek Island Hopping: ${currentTrip.title} (${currentTrip.stays.map((s) => `${s.island}: ${s.startDate} tot ${s.endDate}`).join(', ')})`,
           attachment: attachment
             ? {
@@ -574,7 +652,7 @@ export default function App() {
         currentUser={currentUser}
         isGuestMode={isGuestMode}
         tripCode={tripCode}
-        onOpenProfile={() => setActiveTab('settings')}
+        onOpenProfile={() => setActiveTab('profile')}
         onSignOut={handleSignOut}
         onLoginClick={() => setActiveTab('login')}
         onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
@@ -633,7 +711,20 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'settings' && <SettingsView />}
+        {activeTab === 'settings' && (
+          <SettingsView
+            currentUser={currentUser}
+            onOpenProfile={() => setActiveTab('profile')}
+          />
+        )}
+
+        {activeTab === 'profile' && currentUser && (
+          <ProfileView
+            currentUser={currentUser}
+            onUpdateUser={handleUpdateProfile}
+            onBack={() => setActiveTab('settings')}
+          />
+        )}
 
         {activeTab === 'support' && <SupportView />}
 
