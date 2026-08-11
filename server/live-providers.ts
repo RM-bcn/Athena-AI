@@ -198,48 +198,106 @@ export async function searchWeb(query: string): Promise<ToolResult> {
 }
 
 // ---------------------------------------------------------------------------
-// Tool 3: find_restaurants — Nominatim geocoding + Overpass (OpenStreetMap)
+// Geocoding helper: Photon (fast, tolerant of Dutch names) preferred, with a
+// Greece preference filter; Nominatim as fallback. Returns lat/lon/name.
+// ---------------------------------------------------------------------------
+async function geocodeLocation(loc: string): Promise<{ lat: number; lon: number; name: string } | null> {
+  const variants: string[] = [loc];
+  const firstToken = loc.split(",")[0].trim();
+  if (firstToken && firstToken !== loc) variants.push(firstToken);
+
+  const GREEK_PLACES = [
+    "naxos", "milos", "koufonisia", "santorini", "thira", "mykonos", "paros", "antiparos",
+    "ios", "tinos", "syros", "sifnos", "amorgos", "folegandros", "serifos", "kimolos",
+    "athene", "athens", "glyfada", "thessaloniki", "sounion", "delphi", "meteora",
+    "crete", "kreta", "rhodes", "rodos", "zakynthos", "corfu", "kerkyra", "hydra",
+  ];
+  const qLower = loc.toLowerCase();
+  const likelyGreek = GREEK_PLACES.some((p) => qLower.includes(p));
+
+  const isGreece = (p: any): boolean =>
+    String(p?.countrycode).toUpperCase() === "GR" ||
+    /griechenland|greece|hellas|ellada|ελλάδα/i.test(String(p?.country || ""));
+
+  // 1) Photon — fast, tolerant of Dutch names; only accept non-Greek results for non-Greek queries
+  for (const v of variants) {
+    try {
+      const res = await fetchWithTimeout(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(v)}&limit=5`,
+        { headers: { "User-Agent": UA, Accept: "application/json" } }
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const features: any[] = data?.features || [];
+      const gr = features.find((f) => isGreece(f?.properties));
+      const pick = gr || (likelyGreek ? undefined : features[0]);
+      if (pick?.geometry?.coordinates) {
+        return {
+          lat: pick.geometry.coordinates[1],
+          lon: pick.geometry.coordinates[0],
+          name: pick.properties?.name || firstToken || loc,
+        };
+      }
+    } catch {
+      // try next variant / fallback
+    }
+  }
+
+  // 2) Nominatim fallback
+  for (const v of variants) {
+    try {
+      const geo = await fetchWithTimeout(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(v)}`,
+        { headers: { "User-Agent": UA } }
+      );
+      if (!geo.ok) continue;
+      const ps = await geo.json();
+      const place = ps?.[0];
+      if (place) {
+        return { lat: Number(place.lat), lon: Number(place.lon), name: place.display_name?.split(",")[0] || loc };
+      }
+    } catch {
+      // continue
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Tool 3: find_restaurants — geocoding + Overpass (OpenStreetMap)
 // ---------------------------------------------------------------------------
 export async function findRestaurants(location: string, radius: number = 5000): Promise<ToolResult> {
   const loc = location?.trim();
   if (!loc) return { text: "Geen locatie opgegeven." };
 
-  // Try several query variants so "Glyfada, Athene" also resolves (Nominatim needs "Glyfada, Griekenland")
-  const variants = [loc];
-  if (!/griekenland|greece|ellada|ελλαδα/i.test(loc)) {
-    variants.push(`${loc}, Griekenland`, `${loc}, Greece`);
-  }
-  const firstToken = loc.split(",")[0].trim();
-  if (firstToken && firstToken !== loc) variants.push(firstToken);
-
-  let place: any = null;
-  for (const v of variants) {
-    const geo = await fetchWithTimeout(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(v)}`,
-      { headers: { "User-Agent": UA } }
-    );
-    if (!geo.ok) continue;
-    const ps = await geo.json();
-    if (ps?.[0]) {
-      place = ps[0];
-      break;
-    }
-  }
+  const place = await geocodeLocation(loc);
   if (!place) return { text: `Locatie "${loc}" niet gevonden op OpenStreetMap.` };
 
-  const lat = Number(place.lat);
-  const lon = Number(place.lon);
+  const { lat, lon } = place;
   const r = Math.min(Math.max(Number(radius) || 5000, 500), 15000);
 
   const query = `[out:json][timeout:15];(node["amenity"="restaurant"](around:${r},${lat},${lon});way["amenity"="restaurant"](around:${r},${lat},${lon}););out center 14;`;
-  const overpass = await fetchWithTimeout("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA },
-    body: `data=${encodeURIComponent(query)}`,
-  });
-  if (!overpass.ok) return { text: "Restaurants niet beschikbaar (Overpass mislukt)." };
+  const overpassMirrors = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+  ];
+  let odata: any = null;
+  for (const mirror of overpassMirrors) {
+    try {
+      const overpass = await fetchWithTimeout(
+        `${mirror}?data=${encodeURIComponent(query)}`,
+        { headers: { "User-Agent": UA, Accept: "application/json" } }
+      );
+      if (overpass.ok) {
+        odata = await overpass.json();
+        break;
+      }
+    } catch {
+      // try next mirror
+    }
+  }
+  if (!odata) return { text: `Live OSM restaurant data is momenteel niet beschikbaar (Overpass overbelast). Val terug op get_city_tips om eetgelegenheden uit de reisgids op te zoeken voor ${loc}.` };
 
-  const odata = await overpass.json();
   const elements = odata?.elements || [];
   const withName = elements
     .map((el: any) => ({
@@ -254,7 +312,7 @@ export async function findRestaurants(location: string, radius: number = 5000): 
 
   if (withName.length === 0) return { text: `Geen restaurants gevonden rond "${loc}".` };
 
-  const lines: string[] = [`Restaurants in de buurt van ${place.display_name?.split(",")[0] || loc}:`];
+  const lines: string[] = [`Restaurants in de buurt van ${place.name || loc}:`];
   withName.slice(0, 10).forEach((e: any, i: number) => {
     const bits = [e.name];
     if (e.cuisine) bits.push(`keuken: ${e.cuisine}`);
@@ -266,7 +324,7 @@ export async function findRestaurants(location: string, radius: number = 5000): 
   return {
     text: lines.join("\n"),
     sources: [
-      { title: `OpenStreetMap restaurants rond ${place.display_name?.split(",")[0] || loc}`, url: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=15/${lat}/${lon}` },
+      { title: `OpenStreetMap restaurants rond ${place.name || loc}`, url: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=15/${lat}/${lon}` },
     ],
   };
 }
