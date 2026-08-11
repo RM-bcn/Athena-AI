@@ -295,7 +295,7 @@ const TOOL_DEFINITIONS = [
     function: {
       name: "search_web",
       description:
-        "Live zoekopdracht op het web (DuckDuckGo, met Wikipedia/Wikivoyage als fallback) voor actuele info: restaurants, taverna's, prijzen, openingstijden, evenementen, ferry's, excursies, bezienswaardigheden. Geef een gerichte Nederlandse zoekopdracht, b.v. 'beste taverna Naxos vis'.",
+        "Live zoekopdracht op het web (DuckDuckGo, met Wikipedia/Wikivoyage als fallback) voor actuele info en algemene vragen: prijzen, openingstijden, evenementen, ferry's, excursies, bezienswaardigheden, lokale weetjes. Gebruik NIET voor een lijst van concrete restaurants: daarvoor is find_restaurants beter (via OpenStreetMap). Geef een gerichte Nederlandse zoekopdracht, b.v. 'veerboot Naxos Koufonisia tijden'.",
       parameters: {
         type: "object",
         properties: {
@@ -651,9 +651,9 @@ Return JSON in this format:
 If no travel schedule update is present, reply in standard conversational Dutch without JSON.
 
 LIVE INFO TOOLS AVAILABLE (use them when the traveler asks for current/practical information):
-- search_web(query): live web search (DuckDuckGo, Wikipedia & Wikivoyage fallback) for restaurants, taverna's, prijzen, openingstijden, evenementen, ferry's, excursies.
+- search_web(query): live web search (DuckDuckGo, Wikipedia & Wikivoyage fallback) for prijzen, openingstijden, evenementen, ferry's, excursies en algemene zoekvragen.
 - get_weather(location): live weersverwachting (vandaag + 5 dagen) via Open-Meteo.
-- find_restaurants(location): concrete restaurants in de buurt via OpenStreetMap (namen, keuken, adres, openingstijden).
+- find_restaurants(location): concrete restaurants in de buurt via OpenStreetMap (namen, keuken, adres, openingstijden). GEBRUIK DEZE VOOR RESTAURANTVRAGEN.
 - get_city_tips(city): reistips over een bestemming via Wikipedia & Wikivoyage.
 When the traveler asks for live/actuele info, ALWAYS call the matching tool first and base your answer on the results. Cite the bronnen. Only when a tool returns nothing should you give general guidance and suggest online search.`;
 

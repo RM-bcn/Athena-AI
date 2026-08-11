@@ -126,7 +126,7 @@ function cleanFallbackQuery(query: string): string {
   const cleaned = query
     .toLowerCase()
     .replace(
-      /\b(wat|welke|welk|hoe|waar|wanneer|wie|is|er|een|de|het|van|in|op|naar|met|voor|over|zijn|kan|kunnen|ik|je|jij|jouw|geef|moet|moeten|mijn|die|dat|aan|als|of|en|niet|graag|goede|beste|leuke|leuke|echt|even|geven|zijn er)\b/g,
+      /\b(wat|welke|welk|hoe|waar|wanneer|wie|is|er|een|de|het|van|in|op|naar|met|voor|over|zijn|kan|kunnen|ik|je|jij|jouw|geef|moet|moeten|mijn|die|dat|aan|als|of|en|niet|graag|goede|beste|leuke|echt|even|geven|zijn er|restaurants?|tavernas?|keukens?|gerechten|menu|prijzen|openingstijden|hotels?|bezienswaardigheden|reistips|tips|excursies|ferries?|veerboot|varen|evenementen|activiteiten|suggesties|aanraders?|stad|stadjes|plaats)\b/g,
       " "
     )
     .replace(/\s+/g, " ")
