@@ -1,1 +1,19 @@
-Nothing should be ignored based on the provided file changes. The only modified file is 'server/sheets-service.ts', which appears to be a source code file and should not be added to .gitignore.
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Vercel local state
+.vercel/
+
+# Logs
+npm-debug.log*
+yarn-error.log*
+*.log
