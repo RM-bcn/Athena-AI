@@ -513,19 +513,26 @@ const WEATHER_KEYWORDS = [
   "degrees", "forecast", "regen", "zon", "wind", "meltemi",
 ];
 
-async function probeFallback(message: string, context: string): Promise<ToolResult | null> {
+function formatDate(dateStr: string): string {
+  const parts = (dateStr || "").split("-");
+  if (parts.length < 3) return dateStr || "?";
+  const months = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+  return `${Number(parts[2])} ${months[Number(parts[1]) - 1] || parts[1]}`;
+}
+
+async function probeFallback(message: string, context: string, defaultIsland = ""): Promise<ToolResult | null> {
   const lower = message.toLowerCase();
   const islandMatch = (context || "").match(/([A-Za-zÀ-ÿ'-]+):\s*\d{4}-\d{2}-\d{2}/);
   const firstIsland = islandMatch ? islandMatch[1] : "";
   if (WEATHER_KEYWORDS.some((k) => lower.includes(k))) {
-    const mentioned = lower.match(/\b(naxos|milos|koufonisia|santorini|mykonos|paros|antiparos|ios|tinos|syros|sifnos|amorgos|folegandros|serifos|kimolos)\b/);
-    const loc = mentioned?.[1] || firstIsland || "Naxos";
+    const mentioned = lower.match(/\b(naxos|milos|koufonisia|santorini|mykonos|paros|antiparos|ios|tinos|syros|sifnos|amorgos|folegandros|serifos|kimolos|athene|glyfada)\b/);
+    const loc = mentioned?.[1] || firstIsland || defaultIsland || "Naxos";
     return getWeather(loc);
   }
-  return searchWeb(buildSearchQuery(message, context));
+  return searchWeb(buildSearchQuery(message, context, defaultIsland));
 }
 
-function buildSearchQuery(message: string, context: string): string {
+function buildSearchQuery(message: string, context: string, defaultIsland = ""): string {
   const cleaned = message
     .replace(/^\/\w+\s*/i, "")
     .replace(/^athena[,\s]+/i, "")
@@ -535,7 +542,7 @@ function buildSearchQuery(message: string, context: string): string {
   const firstIsland = islandMatch ? islandMatch[1] : "";
   const lower = cleaned.toLowerCase();
   const mentionsIsland = GREEK_ISLAND_NAMES.some((n) => lower.includes(n));
-  if (!mentionsIsland && firstIsland) return `${cleaned} ${firstIsland}`;
+  if (!mentionsIsland && (firstIsland || defaultIsland)) return `${cleaned} ${firstIsland || defaultIsland}`;
   return cleaned;
 }
 
@@ -559,6 +566,34 @@ app.post("/api/chat", async (req, res) => {
     const needsLive = duckduckgoEnabled && !isTripUpdateCommand && !attachment && needsLiveSearch(lastUserMsg);
     let liveDataBlock = "";
     let fallbackSources: Source[] = [];
+
+    // Build traveler context from Google Sheets so Athena knows where the traveler is staying
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    let tripContextBlock = "";
+    let currentIsland = "";
+    if (!isTripUpdateCommand && isGoogleAuthConfigured()) {
+      try {
+        const { trip } = await loadTripFromSheet();
+        const stays = (trip?.stays || []).sort((a: any, b: any) => (a.startDate || "").localeCompare(b.startDate || ""));
+        if (stays.length > 0) {
+          const current =
+            stays.find((s: any) => todayStr >= s.startDate && todayStr <= s.endDate) ||
+            stays.find((s: any) => s.startDate >= todayStr) ||
+            stays[0];
+          currentIsland = current?.island || "";
+          const lines = [
+            "REIZIGERCONTEXT (opgehaald uit jouw Google Sheets reisplanning — dit is de waarheid over waar de reiziger verblijft):",
+            `- Huidig/volgend verblijf: ${current.island}${current.accommodationName ? ` (${current.accommodationName})` : ""}, ${formatDate(current.startDate)} t/m ${formatDate(current.endDate)}${current.nights ? `, ${current.nights} nachten` : ""}`,
+            `- Volledige route: ${stays.map((s: any) => `${s.island} (${formatDate(s.startDate)}-${formatDate(s.endDate)})`).join(", ")}`,
+            "- Gebruik dit verblijf als uitgangspunt bij aanbevelingen (restaurants, stranden, weer, activiteiten in de buurt).",
+          ];
+          tripContextBlock = lines.join("\n");
+        }
+      } catch (tripErr: any) {
+        console.warn("Trip context load from sheet skipped:", tripErr?.message || tripErr);
+      }
+    }
 
     let systemPrompt = isTripUpdateCommand
       ? `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
@@ -610,16 +645,13 @@ CRITICAL USER IDENTIFICATION RULE:
 - Only use a specific name if it appears in the conversation history or context provided.
 - Current traveler name: ${travelerName}
 
-CRITICAL ANTI-HALLUCINATION RULES FOR RESTAURANTS & RECOMMENDATIONS:
-- DO NOT invent or hallucinate specific restaurant names, menu items, prices, or locations unless they are well-known, established establishments you are confidently certain about.
-- When asked for restaurant recommendations or food tips:
-  * Acknowledge that you don't have real-time access to current menus, prices, opening hours, or availability.
-  * Suggest the USER search online for current information using Google Maps, TripAdvisor, Booking.com, or local tourism websites.
-  * Offer general guidance about typical dishes, areas known for good food, neighborhoods to explore, or what to look for in quality tavernas.
-  * Use phrases like: "Ik raad aan om online te zoeken naar actuele reviews op Google Maps of TripAdvisor" or "Voor de meest recente menu's, prijzen en openingstijden, kun je het beste direct bij het restaurant kijken of een platform zoals TripAdvisor raadplegen".
-- If unsure about specific details, be honest and transparent: "Ik heb geen live toegang tot actuele informatie, maar ik kan je wel algemene tips geven...".
-- NEVER make up specific prices, dish names, or street addresses unless you are absolutely certain from your training data about well-established venues.
-- When providing recommendations, frame them as general suggestions rather than definitive statements.
+CRITICAL RESEARCH RULES (use your live tools FIRST — never guess when you can look it up):
+- When the traveler asks about restaurants, taverna's or food: ALWAYS call find_restaurants first. It works via OpenStreetMap and also covers cities like Athene/Glyfada. Recommend the real places it returns, including their cuisine and address.
+- When the traveler asks about weather, events, ferries, sights or practical info: call the matching live tool (get_weather, search_web, get_city_tips) BEFORE answering.
+- Never invent restaurant names, prices, opening hours, ratings or locations. Only list what the tool results actually contain.
+- Never claim you used Google Maps, TripAdvisor, Booking.com or any other source that is not actually present in the tool results.
+- Do NOT narrate what you are about to do (e.g. "Ik zal een live zoekactie uitvoeren..."). Call the tool directly and immediately give the concrete answer.
+- If a tool returns no useful results, say that honestly, then give general (non-fabricated) guidance and suggest online search.
 
 Current traveler context: ${context || "Cyclades Hopping"}.
 Current traveler name: ${travelerName}.
@@ -650,12 +682,16 @@ Return JSON in this format:
 \`\`\`
 If no travel schedule update is present, reply in standard conversational Dutch without JSON.
 
-LIVE INFO TOOLS AVAILABLE (use them when the traveler asks for current/practical information):
-- search_web(query): live web search (DuckDuckGo, Wikipedia & Wikivoyage fallback) for prijzen, openingstijden, evenementen, ferry's, excursies en algemene zoekvragen.
+LIVE INFO TOOLS AVAILABLE (use them for any current/practical information):
+- find_restaurants(location): concrete restaurants via OpenStreetMap (namen, keuken, adres, openingstijden). GEBRUIK DEZE VOOR ALLE RESTAURANT-/TAVERNA-/EETVRAGEN — werkt ook in steden als Athene/Glyfada.
 - get_weather(location): live weersverwachting (vandaag + 5 dagen) via Open-Meteo.
-- find_restaurants(location): concrete restaurants in de buurt via OpenStreetMap (namen, keuken, adres, openingstijden). GEBRUIK DEZE VOOR RESTAURANTVRAGEN.
 - get_city_tips(city): reistips over een bestemming via Wikipedia & Wikivoyage.
-When the traveler asks for live/actuele info, ALWAYS call the matching tool first and base your answer on the results. Cite the bronnen. Only when a tool returns nothing should you give general guidance and suggest online search.`;
+- search_web(query): web search (DuckDuckGo, Wikipedia & Wikivoyage fallback) voor ferry's, evenementen, prijzen, openingstijden en algemene vragen (NIET voor restaurantlijsten).
+Werkwijze: roep direct het juiste gereedschap aan en geef meteen het antwoord. Gebruik uitsluitend namen/feiten uit de tool-resultaten, verzin niets en claim geen bronnen die je niet echt gebruikt hebt. Citeer de bronnen.`;
+
+    if (tripContextBlock) {
+      systemPrompt += `\n\n${tripContextBlock}`;
+    }
 
     if (liveDataBlock) {
       systemPrompt += `
@@ -702,7 +738,7 @@ RULES WHEN LIVE DATA IS PRESENT:
     // 1b. Fallback: live data probe (weather / DDG web search) when tool agent unavailable
     if (needsLive && !liveDataBlock) {
       try {
-        const probe = await probeFallback(lastUserMsg, context || "");
+        const probe = await probeFallback(lastUserMsg, context || "", currentIsland);
         if (probe && probe.text && probe.text !== "Geen resultaten gevonden.") {
           liveDataBlock = probe.text;
           if (probe.sources) fallbackSources = probe.sources;

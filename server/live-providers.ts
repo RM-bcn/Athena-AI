@@ -204,13 +204,27 @@ export async function findRestaurants(location: string, radius: number = 5000): 
   const loc = location?.trim();
   if (!loc) return { text: "Geen locatie opgegeven." };
 
-  const geo = await fetchWithTimeout(
-    `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(loc)}`,
-    { headers: { "User-Agent": UA } }
-  );
-  if (!geo.ok) return { text: "Locatie niet gevonden (Nominatim mislukt)." };
-  const places = await geo.json();
-  const place = places?.[0];
+  // Try several query variants so "Glyfada, Athene" also resolves (Nominatim needs "Glyfada, Griekenland")
+  const variants = [loc];
+  if (!/griekenland|greece|ellada|ελλαδα/i.test(loc)) {
+    variants.push(`${loc}, Griekenland`, `${loc}, Greece`);
+  }
+  const firstToken = loc.split(",")[0].trim();
+  if (firstToken && firstToken !== loc) variants.push(firstToken);
+
+  let place: any = null;
+  for (const v of variants) {
+    const geo = await fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(v)}`,
+      { headers: { "User-Agent": UA } }
+    );
+    if (!geo.ok) continue;
+    const ps = await geo.json();
+    if (ps?.[0]) {
+      place = ps[0];
+      break;
+    }
+  }
   if (!place) return { text: `Locatie "${loc}" niet gevonden op OpenStreetMap.` };
 
   const lat = Number(place.lat);
