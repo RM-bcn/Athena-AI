@@ -7,6 +7,7 @@ import {
   getOrCreateSpreadsheet,
   saveTripToSheet,
   loadTripFromSheet,
+  getUserFromSheet,
 } from "./server/sheets-service.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
 
@@ -97,6 +98,28 @@ app.post("/api/sheets/save", async (req, res) => {
 
 // API: Update User Profile (nickname, avatar, password)
 app.post("/api/profile/update", handleProfileUpdate);
+
+// API: Get current user profile from Google Sheets (used after login to restore avatar/nickname)
+app.get("/api/user", async (req, res) => {
+  try {
+    const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
+    const username = typeof req.query.username === "string" ? req.query.username.trim() : "";
+    if (!email && !username) {
+      return res.status(400).json({ success: false, error: "E-mailadres of gebruikersnaam is verplicht." });
+    }
+
+    const user = await getUserFromSheet(email, username);
+    if (!user) {
+      return res.status(404).json({ success: false, error: "Gebruiker niet gevonden." });
+    }
+
+    const { passwordHash: _removed, ...safeUser } = user;
+    return res.json({ success: true, user: safeUser });
+  } catch (err: any) {
+    console.error("[User] Fetch error:", err?.message || err);
+    return res.status(500).json({ success: false, error: err?.message || "Fout bij ophalen van gebruiker." });
+  }
+});
 
 // Helper to get Gemini AI instance safely
 function getGeminiClient() {

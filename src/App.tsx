@@ -241,6 +241,33 @@ export default function App() {
       console.error(e);
     }
     setActiveTab('itinerary');
+
+    // Restore the latest profile (avatar/nickname) from Google Sheets so it survives logout/login
+    const email = user.email;
+    const username = user.username;
+    fetch(`/api/user?email=${encodeURIComponent(email)}&username=${encodeURIComponent(username)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success && data.user) {
+          const sheetUser = data.user as UserAccount;
+          const merged: UserAccount = {
+            ...user,
+            nickname: sheetUser.nickname || user.nickname,
+            avatarUrl: sheetUser.avatarUrl || user.avatarUrl,
+            avatar: sheetUser.avatar || user.avatar,
+            name: sheetUser.name || user.name,
+            role: sheetUser.role || user.role,
+            tripCode: sheetUser.tripCode || user.tripCode,
+          };
+          setCurrentUser(merged);
+          try {
+            localStorage.setItem('athena_active_user', JSON.stringify(merged));
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      })
+      .catch((err) => console.warn("Could not restore profile from sheet:", err));
   };
 
   const handleAccessTripCode = (code: string) => {
