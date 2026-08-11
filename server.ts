@@ -10,8 +10,8 @@ import {
   getUserFromSheet,
 } from "./server/sheets-service.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
-import { searchDuckDuckGo } from "./server/duckduckgo-search.js";
-import type { SearchResponse } from "./server/duckduckgo-search.js";
+import { getWeather, searchWeb, findRestaurants, getCityTips } from "./server/live-providers.js";
+import type { ToolResult, Source } from "./server/live-providers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -249,6 +249,189 @@ function needsLiveSearch(message: string): boolean {
   return LIVE_INFO_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
+// ---------------------------------------------------------------------------
+// Groq tool-calling agent (live info tools: search_web, get_weather,
+// find_restaurants, get_city_tips) — all providers are free & keyless.
+// ---------------------------------------------------------------------------
+const TOOL_DEFINITIONS = [
+  {
+    type: "function",
+    function: {
+      name: "search_web",
+      description:
+        "Live zoekopdracht op het web (DuckDuckGo, met Wikipedia/Wikivoyage als fallback) voor actuele info: restaurants, taverna's, prijzen, openingstijden, evenementen, ferry's, excursies, bezienswaardigheden. Geef een gerichte Nederlandse zoekopdracht, b.v. 'beste taverna Naxos vis'.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "De zoekopdracht, in het Nederlands, b.v. 'beste restaurants Naxos 2026'" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_weather",
+      description:
+        "Huidige weersverwachting (vandaag + 5 dagen) voor een plaats of eiland via Open-Meteo (gratis, geen sleutel). Gebruik dit wanneer de reiziger vraagt naar het weer, temperaturen, regen of wind.",
+      parameters: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "Plaats of eiland, b.v. 'Naxos, Griekenland'" },
+        },
+        required: ["location"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "find_restaurants",
+      description:
+        "Live restaurants rond een locatie opvragen via OpenStreetMap (namen, keuken, adres, openingstijden). Gebruik dit voor concrete restaurants in de buurt van een plaats.",
+      parameters: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "Plaats of eiland, b.v. 'Naxos Stad'" },
+          radius: { type: "number", description: "Zoekstraal in meters (optioneel, standaard 5000)" },
+        },
+        required: ["location"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_city_tips",
+      description:
+        "Reistips over een stad of eiland uit Wikipedia en Wikivoyage: bezienswaardigheden, wat te doen, achtergrond. Gebruik dit voor algemene vragen over een bestemming.",
+      parameters: {
+        type: "object",
+        properties: {
+          city: { type: "string", description: "Stad of eiland, b.v. 'Naxos'" },
+        },
+        required: ["city"],
+      },
+    },
+  },
+];
+
+async function executeTool(name: string, args: any): Promise<ToolResult> {
+  try {
+    switch (name) {
+      case "search_web":
+        return await searchWeb(args?.query || "");
+      case "get_weather":
+        return await getWeather(args?.location || "");
+      case "find_restaurants":
+        return await findRestaurants(args?.location || "", args?.radius);
+      case "get_city_tips":
+        return await getCityTips(args?.city || "");
+      default:
+        return { text: `Onbekende tool: ${name}` };
+    }
+  } catch (err: any) {
+    console.warn(`Tool ${name} error:`, err?.message || err);
+    return { text: `Fout bij het uitvoeren van ${name}: ${err?.message || err}` };
+  }
+}
+
+async function callGroqAgent(
+  systemPrompt: string,
+  userPrompt: string
+): Promise<{ content: string; model: string; sources: Source[] } | null> {
+  const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
+  if (!apiKey) return null;
+
+  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"];
+
+  for (const model of models) {
+    const messages: any[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ];
+    const collectedSources: Source[] = [];
+    let rounds = 0;
+    try {
+      while (rounds < 3) {
+        rounds++;
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.7,
+            max_tokens: 1600,
+            tools: TOOL_DEFINITIONS,
+            tool_choice: "auto",
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn(`Groq agent model ${model} error (${res.status}):`, errText);
+          break;
+        }
+
+        const data = await res.json();
+        const msg = data.choices?.[0]?.message;
+        const content = msg?.content || "";
+        const toolCalls = msg?.tool_calls || [];
+
+        if (toolCalls.length > 0) {
+          messages.push(msg);
+          for (const tc of toolCalls) {
+            let args: any = {};
+            try {
+              args = JSON.parse(tc.function?.arguments || "{}");
+            } catch {
+              args = {};
+            }
+            const result = await executeTool(tc.function?.name, args);
+            if (result.sources) {
+              for (const s of result.sources) {
+                if (!collectedSources.some((x) => x.url === s.url)) collectedSources.push(s);
+              }
+            }
+            messages.push({ role: "tool", tool_call_id: tc.id, content: result.text });
+          }
+          continue;
+        }
+
+        if (content) {
+          return { content, model, sources: collectedSources.slice(0, 8) };
+        }
+        return null;
+      }
+    } catch (err) {
+      console.warn(`Groq agent exception for model ${model}:`, err);
+    }
+  }
+  return null;
+}
+
+const WEATHER_KEYWORDS = [
+  "weer", "weers", "weersverwachting", "temperatuur", "temperature", "graden",
+  "degrees", "forecast", "regen", "zon", "wind", "meltemi",
+];
+
+async function probeFallback(message: string, context: string): Promise<ToolResult | null> {
+  const lower = message.toLowerCase();
+  const islandMatch = (context || "").match(/([A-Za-zÀ-ÿ'-]+):\s*\d{4}-\d{2}-\d{2}/);
+  const firstIsland = islandMatch ? islandMatch[1] : "";
+  if (WEATHER_KEYWORDS.some((k) => lower.includes(k))) {
+    const mentioned = lower.match(/\b(naxos|milos|koufonisia|santorini|mykonos|paros|antiparos|ios|tinos|syros|sifnos|amorgos|folegandros|serifos|kimolos)\b/);
+    const loc = mentioned?.[1] || firstIsland || "Naxos";
+    return getWeather(loc);
+  }
+  return searchWeb(buildSearchQuery(message, context));
+}
+
 function buildSearchQuery(message: string, context: string): string {
   const cleaned = message
     .replace(/^\/\w+\s*/i, "")
@@ -261,22 +444,6 @@ function buildSearchQuery(message: string, context: string): string {
   const mentionsIsland = GREEK_ISLAND_NAMES.some((n) => lower.includes(n));
   if (!mentionsIsland && firstIsland) return `${cleaned} ${firstIsland}`;
   return cleaned;
-}
-
-function formatSearchBlock(search: SearchResponse): string {
-  const lines: string[] = [`[Live Web Search Resultaten (DuckDuckGo) voor: "${search.query}"]`];
-  if (search.abstract) {
-    lines.push(`- Samenvatting: ${search.abstract} (${search.abstractUrl || ""})`);
-  }
-  search.results.forEach((r, i) => {
-    lines.push(`${i + 1}. ${r.title}\n   Bron: ${r.url}\n   ${r.snippet}`);
-  });
-  return lines.join("\n");
-}
-
-function mapSources(search: SearchResponse | null): { title: string; url: string }[] | undefined {
-  if (!search || search.results.length === 0) return undefined;
-  return search.results.slice(0, 5).map((r) => ({ title: r.title, url: r.url }));
 }
 
 // API: General Concierge Chat & Itinerary Auto-Parser
@@ -295,21 +462,10 @@ app.post("/api/chat", async (req, res) => {
 
     const travelerName = typeof userName === "string" && userName.trim() ? userName.trim() : "Reiziger";
 
-    // Live web search via DuckDuckGo (free, no API key) to prevent hallucinations
     const duckduckgoEnabled = getEnvVal("DUCKDUCKGO_ENABLED", "duckduckgo_enabled") !== "false";
-    let webSearch: SearchResponse | null = null;
+    const needsLive = duckduckgoEnabled && !isTripUpdateCommand && !attachment && needsLiveSearch(lastUserMsg);
     let liveDataBlock = "";
-    if (duckduckgoEnabled && !isTripUpdateCommand && !attachment && needsLiveSearch(lastUserMsg)) {
-      const searchQuery = buildSearchQuery(lastUserMsg, context || "");
-      try {
-        webSearch = await searchDuckDuckGo(searchQuery);
-      } catch (searchErr) {
-        console.warn("DuckDuckGo search failed:", searchErr);
-      }
-      if (webSearch && (webSearch.abstract || webSearch.results.length > 0)) {
-        liveDataBlock = formatSearchBlock(webSearch);
-      }
-    }
+    let fallbackSources: Source[] = [];
 
     let systemPrompt = isTripUpdateCommand
       ? `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
@@ -399,24 +555,71 @@ Return JSON in this format:
   }
 }
 \`\`\`
-If no travel schedule update is present, reply in standard conversational Dutch without JSON.`;
+If no travel schedule update is present, reply in standard conversational Dutch without JSON.
+
+LIVE INFO TOOLS AVAILABLE (use them when the traveler asks for current/practical information):
+- search_web(query): live web search (DuckDuckGo, Wikipedia & Wikivoyage fallback) for restaurants, taverna's, prijzen, openingstijden, evenementen, ferry's, excursies.
+- get_weather(location): live weersverwachting (vandaag + 5 dagen) via Open-Meteo.
+- find_restaurants(location): concrete restaurants in de buurt via OpenStreetMap (namen, keuken, adres, openingstijden).
+- get_city_tips(city): reistips over een bestemming via Wikipedia & Wikivoyage.
+When the traveler asks for live/actuele info, ALWAYS call the matching tool first and base your answer on the results. Cite the bronnen. Only when a tool returns nothing should you give general guidance and suggest online search.`;
 
     if (liveDataBlock) {
       systemPrompt += `
 
-LIVE WEB SEARCH DATA (just retrieved via DuckDuckGo, this is your source of truth for THIS answer):
+LIVE DATA RETRIEVED (this is your source of truth for THIS answer):
 ${liveDataBlock}
 
-RULES WHEN LIVE SEARCH DATA IS PRESENT:
-- You DO have real-time search results now. Base your answer on them and cite the source URLs inline, e.g. "(bron: <url>)".
-- Do NOT invent restaurants, prices, weather forecasts, events, or ferry times that are not present in the search data.
-- If the results do not fully answer the question, say so honestly and add general guidance from your own knowledge.
+RULES WHEN LIVE DATA IS PRESENT:
+- You DO have real-time data now. Base your answer on it and cite the source URLs inline, e.g. "(bron: <url>)".
+- Do NOT invent restaurants, prices, weather forecasts, events, or ferry times that are not present in the data.
+- If the data does not fully answer the question, say so honestly and add general guidance from your own knowledge.
 - Keep your warm Athena concierge tone and reply in fluent Dutch.`;
     }
 
     const userPromptText = userMsgList.map((m: any) => `${m.role === 'user' ? 'Traveler' : 'Athena'}: ${m.content}`).join('\n');
 
-    // 1. Primary Engine: Try Groq AI (Llama 3.3 70B & Fallbacks)
+    // 1. Primary Engine: Groq tool-calling agent (live info tools)
+    let agentRes: { content: string; model: string; sources: Source[] } | null = null;
+    if (needsLive) {
+      try {
+        agentRes = await callGroqAgent(systemPrompt, userPromptText);
+      } catch (agentErr) {
+        console.warn("Groq agent failed, falling back:", agentErr);
+      }
+    }
+
+    if (agentRes && agentRes.content) {
+      const parsedJson = parseAIJsonBlock(agentRes.content);
+      if (parsedJson && parsedJson.tripUpdate) {
+        return res.json({
+          reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt.",
+          tripUpdate: parsedJson.tripUpdate,
+          engine: `Groq (${agentRes.model})`,
+          sources: agentRes.sources.length ? agentRes.sources : undefined
+        });
+      }
+      return res.json({
+        reply: agentRes.content,
+        engine: `Groq (${agentRes.model})`,
+        sources: agentRes.sources.length ? agentRes.sources : undefined
+      });
+    }
+
+    // 1b. Fallback: live data probe (weather / DDG web search) when tool agent unavailable
+    if (needsLive && !liveDataBlock) {
+      try {
+        const probe = await probeFallback(lastUserMsg, context || "");
+        if (probe && probe.text && probe.text !== "Geen resultaten gevonden.") {
+          liveDataBlock = probe.text;
+          if (probe.sources) fallbackSources = probe.sources;
+        }
+      } catch (probeErr) {
+        console.warn("Live data probe failed:", probeErr);
+      }
+    }
+
+    // 2. Classic Groq call
     const groqUserPrompt = isTripUpdateCommand
       ? `The traveler used /tripupdate with the following new booking details:\n${tripUpdateDetails}\n\nCurrent trip context: ${context}\n\nExtract and return the full updated stays array as JSON.`
       : `${userPromptText}${liveDataBlock ? `\n\n${liveDataBlock}` : ''}${
@@ -433,13 +636,13 @@ RULES WHEN LIVE SEARCH DATA IS PRESENT:
           reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI.",
           tripUpdate: parsedJson.tripUpdate,
           engine: `Groq (${groqRes.model})`,
-          sources: mapSources(webSearch)
+          sources: fallbackSources.length ? fallbackSources : undefined
         });
       }
       return res.json({
         reply: groqRes.content,
         engine: `Groq (${groqRes.model})`,
-        sources: mapSources(webSearch)
+        sources: fallbackSources.length ? fallbackSources : undefined
       });
     }
 
@@ -477,14 +680,14 @@ RULES WHEN LIVE SEARCH DATA IS PRESENT:
             reply: parsedJson.reply || "Kalimera! Ik heb je reisplan verwerkt en je reisschema automatisch aangepast.",
             tripUpdate: parsedJson.tripUpdate,
             engine: "Gemini 3.6 Flash (Itinerary Parser)",
-            sources: mapSources(webSearch)
+            sources: fallbackSources.length ? fallbackSources : undefined
           });
         }
 
         return res.json({
           reply: rawText || "Yassou! Hoe kan ik je verder helpen met je reis?",
           engine: "Gemini 3.6 Flash",
-          sources: mapSources(webSearch)
+          sources: fallbackSources.length ? fallbackSources : undefined
         });
       }
     } catch (geminiErr: any) {
@@ -495,18 +698,15 @@ RULES WHEN LIVE SEARCH DATA IS PRESENT:
 
     if (isTripUpdateCommand) {
       reply = `Kalimera! Ik heb je /tripupdate commando ontvangen maar kon de details niet volledig verwerken. Probeer het zo: /tripupdate Santorini, 17 sept - 21 sept, 4 nachten, Hotel Anastasis Apartments`;
-    } else if (webSearch && webSearch.results.length > 0) {
-      const top = webSearch.results.slice(0, 3);
-      reply = `Ik heb live gezocht via DuckDuckGo naar "${webSearch.query}". Hier zijn de meest relevante resultaten:\n\n${top
-        .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`)
-        .join("\n\n")}\n\nWil je dat ik hier iets specifieks voor je uitzoek?`;
+    } else if (liveDataBlock) {
+      reply = liveDataBlock;
     } else if (lastUserMsg.toLowerCase().includes("ferry")) {
-      reply += "High-speed ferries (Seajets & Blue Star) memeren dagelijks aan tussen Naxos, Milos, en Koufonisia. Ik raad aan 48 uur van tevoren te boeken.";
+      reply += "High-speed ferries (Seajets & Blue Star) meren dagelijks aan tussen Naxos, Milos, en Koufonisia. Ik raad aan 48 uur van tevoren te boeken.";
     } else {
       reply += "Typ /tripupdate gevolgd door je boekingsgegevens om je reisschema direct aan te passen! Bijv: /tripupdate Santorini, 17 sept - 21 sept, Hotel Caldera View";
     }
 
-    res.json({ reply, engine: "Greek Concierge Local Fallback", sources: mapSources(webSearch) });
+    res.json({ reply, engine: "Greek Concierge Local Fallback", sources: fallbackSources.length ? fallbackSources : undefined });
   } catch (error: any) {
     console.error("Chat error:", error);
     res.json({
