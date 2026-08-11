@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatMessage, ChatSubTab } from '../types';
+import { ChatMessage, ChatSubTab, TripData } from '../types';
 import { CHAT_BACKGROUND_IMAGE } from '../data/initialData';
 import {
   Sailboat,
@@ -10,7 +10,6 @@ import {
   Paperclip,
   Mic,
   ArrowUp,
-  Sun,
   Clock,
   Send,
   Loader2,
@@ -19,12 +18,14 @@ import {
   FileSpreadsheet,
   CheckCircle2
 } from 'lucide-react';
+import { WeatherCard } from './WeatherCard';
 
 interface ChatInterfaceViewProps {
   chatSubTab: ChatSubTab;
   messages: ChatMessage[];
   onSendMessage: (text: string, attachment?: { name: string; type: string; base64?: string; text?: string; isImage?: boolean }) => Promise<void>;
   onTriggerQuickAction: (action: string) => void;
+  currentTrip: TripData;
 }
 
 export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
@@ -32,6 +33,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
   messages,
   onSendMessage,
   onTriggerQuickAction,
+  currentTrip,
 }) => {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -112,34 +114,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
       }}
     >
       {/* Floating Weather Card on Top Right */}
-      <aside className="absolute top-24 right-10 w-64 p-4 bg-white/85 backdrop-blur-md rounded-2xl shadow-xl border border-[#005BAE]/10 hidden xl:block z-30">
-        <div className="flex items-center gap-2 mb-2">
-          <Sun className="w-5 h-5 text-[#9f402d]" />
-          <span className="font-['Inter'] text-[11px] font-bold uppercase tracking-wider text-[#9f402d]">
-            Weather Update
-          </span>
-        </div>
-        <h3 className="font-['Plus_Jakarta_Sans'] text-xl font-bold text-[#001a33] mb-0.5">
-          Naxos, GR
-        </h3>
-        <p className="font-['Plus_Jakarta_Sans'] text-3xl font-bold text-[#005BAE]">
-          28°C
-        </p>
-        <p className="font-['Inter'] text-xs text-[#404752] mt-1">
-          Sunny with a gentle Meltemi breeze.
-        </p>
-
-        <div className="mt-4 pt-3 border-t border-[#e4efff]">
-          <div className="flex justify-between items-center text-[10px] font-['Inter'] font-semibold text-[#717783]">
-            <span>SUNRISE</span>
-            <span>SUNSET</span>
-          </div>
-          <div className="flex justify-between items-center font-['Inter'] text-xs font-medium text-[#001a33] mt-0.5">
-            <span>06:42 AM</span>
-            <span>08:14 PM</span>
-          </div>
-        </div>
-      </aside>
+      <WeatherCard trip={currentTrip} variant="floating" />
 
       {/* Main Chat Conversation Space */}
       <div className="flex-1 flex flex-col pt-24 px-4 md:px-12 pb-24 md:pb-44 overflow-y-auto">

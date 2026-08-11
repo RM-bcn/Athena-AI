@@ -716,6 +716,7 @@ export default function App() {
             messages={messages}
             onSendMessage={handleSendMessage}
             onTriggerQuickAction={handleTriggerQuickAction}
+            currentTrip={currentTrip}
           />
         )}
 

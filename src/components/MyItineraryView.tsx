@@ -38,6 +38,7 @@ import {
   Lock
 } from 'lucide-react';
 import { EditStayModal } from './Modals/EditStayModal';
+import { WeatherCard } from './WeatherCard';
 
 interface MyItineraryViewProps {
   currentTrip: TripData;
@@ -734,23 +735,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
           </div>
 
           {/* Weather Banner */}
-          <div className="bg-[#005BAE] text-white rounded-[24px] p-6 shadow-lg relative overflow-hidden">
-            <div className="relative z-10">
-              <div className="flex justify-between items-center mb-4">
-                <span className="font-['Inter'] text-xs text-white/80 font-medium">Weerbericht Cycladen</span>
-                <Sun className="w-5 h-5 text-amber-300 animate-pulse" />
-              </div>
-
-              <div className="flex items-end gap-1">
-                <span className="text-5xl font-bold font-['Plus_Jakarta_Sans']">28°</span>
-                <span className="text-xl pb-1 font-['Plus_Jakarta_Sans']">C</span>
-              </div>
-
-              <p className="mt-2 text-white/90 font-['Inter'] text-xs leading-relaxed">
-                Zonnig met milde Meltemi zeewind. Ideaal zeilweer tussen de eilanden.
-              </p>
-            </div>
-          </div>
+          <WeatherCard trip={currentTrip} variant="banner" />
         </div>
       </div>
 
