@@ -8,10 +8,16 @@ import {
   saveTripToSheet,
   loadTripFromSheet,
   getUserFromSheet,
+  saveChatHistoryToSheet,
+  loadChatHistoryFromSheet,
+  saveFavoritesToSheet,
+  loadFavoritesFromSheet,
 } from "./server/sheets-service.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
 import { getWeather, searchWeb, findRestaurants, getCityTips } from "./server/live-providers.js";
 import type { ToolResult, Source } from "./server/live-providers.js";
+import { transliterateGreek } from "./server/transliterate.js";
+import { translateWithMyMemory } from "./server/translate-fallback.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,6 +101,62 @@ app.post("/api/sheets/save", async (req, res) => {
       success: false,
       error: err.message || "Fout bij opslaan naar Google Sheets."
     });
+  }
+});
+
+// API: Chat History (Google Sheets backed; client keeps localStorage fallback)
+app.get("/api/chat/history", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.json({ messages: [] });
+    }
+    const messages = await loadChatHistoryFromSheet();
+    res.json({ messages });
+  } catch (err: any) {
+    console.warn("Chat history load error:", err?.message || err);
+    res.json({ messages: [] });
+  }
+});
+
+app.post("/api/chat/history", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.json({ success: false, error: "Google Sheets niet geconfigureerd." });
+    }
+    const { messages } = req.body;
+    await saveChatHistoryToSheet(messages || []);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.warn("Chat history save error:", err?.message || err);
+    res.json({ success: false, error: err?.message || "Failed to save chat history" });
+  }
+});
+
+// API: Favorites (saved Athena answers; Google Sheets backed)
+app.get("/api/chat/favorites", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.json({ favorites: [] });
+    }
+    const favorites = await loadFavoritesFromSheet();
+    res.json({ favorites });
+  } catch (err: any) {
+    console.warn("Favorites load error:", err?.message || err);
+    res.json({ favorites: [] });
+  }
+});
+
+app.post("/api/chat/favorites", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.json({ success: false, error: "Google Sheets niet geconfigureerd." });
+    }
+    const { favorites } = req.body;
+    await saveFavoritesToSheet(favorites || []);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.warn("Favorites save error:", err?.message || err);
+    res.json({ success: false, error: err?.message || "Failed to save favorites" });
   }
 });
 
@@ -638,6 +700,9 @@ app.post("/api/chat", async (req, res) => {
       ? `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
 You speak warmly, eloquently, and in fluent Dutch ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches).
 
+CRITICAL SCRIPT RULE:
+- NEVER output Greek script (Greek alphabet). Always transliterate Greek names, dishes and places into Latin characters (e.g. "O Thanasis" instead of "Ο Θανάσης", "To Stitiko" instead of "Το στιτικό", "gyros" instead of "γύρος").
+
 CRITICAL USER IDENTIFICATION RULE:
 - NEVER assume or invent a user name like "Alexandros".
 - Address the user by their provided name, or use "Reiziger" (Traveler) / neutral greetings like "Kalimera!" if no name is given.
@@ -677,6 +742,9 @@ IMPORTANT: The stays array must include ALL current stays from the context PLUS 
 Do NOT return plain text. Only return the JSON block above.`
       : `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
 You speak warmly, eloquently, and in fluent Dutch ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches).
+
+CRITICAL SCRIPT RULE:
+- NEVER output Greek script (Greek alphabet). Always transliterate Greek names, dishes and places into Latin characters (e.g. "O Thanasis" instead of "Ο Θανάσης", "To Stitiko" instead of "Το στιτικό", "gyros" instead of "γύρος").
 
 CRITICAL USER IDENTIFICATION RULE:
 - NEVER assume or invent a user name like "Alexandros".
@@ -762,14 +830,14 @@ RULES WHEN LIVE DATA IS PRESENT:
       const parsedJson = parseAIJsonBlock(agentRes.content);
       if (parsedJson && parsedJson.tripUpdate) {
         return res.json({
-          reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt.",
+          reply: transliterateGreek(parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt."),
           tripUpdate: parsedJson.tripUpdate,
           engine: `Groq (${agentRes.model})`,
           sources: agentRes.sources.length ? agentRes.sources : undefined
         });
       }
       return res.json({
-        reply: agentRes.content,
+        reply: transliterateGreek(agentRes.content),
         engine: `Groq (${agentRes.model})`,
         sources: agentRes.sources.length ? agentRes.sources : undefined
       });
@@ -804,14 +872,14 @@ RULES WHEN LIVE DATA IS PRESENT:
         const parsedJson = parseAIJsonBlock(groqRes.content);
         if (parsedJson && parsedJson.tripUpdate) {
           return res.json({
-            reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI.",
+            reply: transliterateGreek(parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI."),
             tripUpdate: parsedJson.tripUpdate,
             engine: `Groq (${groqRes.model})`,
             sources: fallbackSources.length ? fallbackSources : undefined
           });
         }
         return res.json({
-          reply: groqRes.content,
+          reply: transliterateGreek(groqRes.content),
           engine: `Groq (${groqRes.model})`,
           sources: fallbackSources.length ? fallbackSources : undefined
         });
@@ -885,7 +953,7 @@ RULES WHEN LIVE DATA IS PRESENT:
         const parsedJson = parseAIJsonBlock(rawText);
         if (parsedJson && parsedJson.tripUpdate) {
           return res.json({
-            reply: parsedJson.reply || "Kalimera! Ik heb je reisplan verwerkt en je reisschema automatisch aangepast.",
+            reply: transliterateGreek(parsedJson.reply || "Kalimera! Ik heb je reisplan verwerkt en je reisschema automatisch aangepast."),
             tripUpdate: parsedJson.tripUpdate,
             engine: "Gemini 3.6 Flash (Itinerary Parser)",
             sources: fallbackSources.length ? fallbackSources : undefined,
@@ -893,7 +961,7 @@ RULES WHEN LIVE DATA IS PRESENT:
         }
 
         return res.json({
-          reply: rawText || "Yassou! Hoe kan ik je verder helpen met je reis?",
+          reply: transliterateGreek(rawText || "Yassou! Hoe kan ik je verder helpen met je reis?"),
           engine: "Gemini 3.6 Flash",
           sources: fallbackSources.length ? fallbackSources : undefined,
         });
@@ -914,11 +982,11 @@ RULES WHEN LIVE DATA IS PRESENT:
       reply += "Typ /tripupdate gevolgd door je boekingsgegevens om je reisschema direct aan te passen! Bijv: /tripupdate Santorini, 17 sept - 21 sept, Hotel Caldera View";
     }
 
-    res.json({ reply, engine: "Greek Concierge Local Fallback", sources: fallbackSources.length ? fallbackSources : undefined });
+    res.json({ reply: transliterateGreek(reply), engine: "Greek Concierge Local Fallback", sources: fallbackSources.length ? fallbackSources : undefined });
   } catch (error: any) {
     console.error("Chat error:", error);
     res.json({
-      reply: "Yassas! Je bestand/bericht is ontvangen. Ik help je graag met je reis!"
+      reply: transliterateGreek("Yassas! Je bestand/bericht is ontvangen. Ik help je graag met je reis!")
     });
   }
 });
@@ -929,14 +997,27 @@ app.post("/api/translate-menu", async (req, res) => {
     const { imageBase64, textPrompt } = req.body;
     const ai = getGeminiClient();
 
+    const prompt = textPrompt || "Translate and explain this Greek restaurant menu in detail for a traveler. List dishes, ingredients, dietary notes, and local drink recommendations. Never use Greek script; transliterate all Greek names into Latin characters.";
+
     if (!ai) {
+      const groqRes = await callGroqAI(
+        "You are Athena AI, a Greek taverna menu translator. Translate the given Greek menu text for a traveler, explain the dishes, and NEVER output Greek script: transliterate all Greek names into Latin characters (e.g. 'Moussaka', 'Souvlaki').",
+        prompt
+      );
+      if (groqRes && groqRes.content) {
+        return res.json({ translation: transliterateGreek(groqRes.content) });
+      }
+
+      const mm = await translateWithMyMemory(typeof textPrompt === "string" ? textPrompt : "");
+      if (mm) {
+        return res.json({ translation: transliterateGreek(`🇬 **Greek Menu Decoded**:\n\n${mm}`) });
+      }
+
       return res.json({
-        translation: "🇬🇷 **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** (Άρνι Κλέφτικο) — Slow-baked lamb with herbs, garlic & Naxian potatoes.\n2. **Naxian Graviera** (Γραβιέρα Νάξου) — PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** (Χταπόδι Ψητό) — Grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** (Τοματοκεφτέδες) — Crispy Aegean tomato fritters with fresh mint.\n\n🍷 *Recommended pairing: Local Naxian white wine (Assyrtiko) or chilled Ouzo.*"
+        translation: "🇬🇷 **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** — Slow-baked lamb with herbs, garlic & Naxian potatoes.\n2. **Naxian Graviera** — PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** — Grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** — Crispy Aegean tomato fritters with fresh mint.\n\n🍷 *Recommended pairing: Local Naxian white wine (Assyrtiko) or chilled Ouzo.*"
       });
     }
 
-    const prompt = textPrompt || "Translate and explain this Greek restaurant menu in detail for a traveler. List dishes, ingredients, dietary notes, and local drink recommendations.";
-    
     let parts: any[] = [{ text: prompt }];
     if (imageBase64) {
       const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
@@ -953,10 +1034,10 @@ app.post("/api/translate-menu", async (req, res) => {
       contents: [{ role: "user", parts }]
     });
 
-    res.json({ translation: response.text });
+    res.json({ translation: transliterateGreek(response.text || "") });
   } catch (err) {
     res.json({
-      translation: "🇬🇷 **Menu Decoded**:\n- **Moussaka** (Μουσακάς): Eggplant, minced beef & creamy béchamel.\n- **Kleftiko** (Κλέφτικο): Slow-baked tender lamb with local herbs.\n- **Dakos** (Ντάκος): Barley rusk with ripe tomatoes, feta & olives."
+      translation: "🇬 **Menu Decoded**:\n- **Moussaka**: Eggplant, minced beef & creamy bechamel.\n- **Kleftiko**: Slow-baked tender lamb with local herbs.\n- **Dakos**: Barley rusk with ripe tomatoes, feta & olives."
     });
   }
 });

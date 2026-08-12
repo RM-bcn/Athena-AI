@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Camera, Languages, Sparkles, Utensils, Loader2 } from 'lucide-react';
+import { extractTextFromImage } from '../../utils/ocr';
 
 interface TranslateMenuModalProps {
   isOpen: boolean;
@@ -25,7 +26,7 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
       const data = await res.json();
       setResult(data.translation);
     } catch {
-      setResult("🇬🇷 **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** (Άρνι Κλέφτικο) — Slow-baked tender lamb with local herbs, garlic & roasted Naxian potatoes.\n2. **Naxian Graviera** (Γραβιέρα Νάξου) — PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** (Χταπόδι Ψητό) — Charcoal grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** (Τοματοκεφτέδες) — Crispy Aegean tomato fritters with fresh mint.");
+      setResult("🇬 **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** — Slow-baked tender lamb with local herbs, garlic & roasted Naxian potatoes.\n2. **Naxian Graviera** — PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** — Charcoal grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** — Crispy Aegean tomato fritters with fresh mint.");
     } finally {
       setTranslating(false);
     }
@@ -39,15 +40,27 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
       reader.onload = async (evt) => {
         const base64 = evt.target?.result as string;
         try {
+          let ocrText = '';
+          try {
+            ocrText = await extractTextFromImage(base64);
+          } catch {
+            ocrText = '';
+          }
+
           const res = await fetch('/api/translate-menu', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageBase64: base64 }),
+            body: JSON.stringify({
+              imageBase64: base64,
+              textPrompt: ocrText
+                ? `Translate this Greek menu text (read from a photo) for a traveler, explain the dishes and ingredients. Never use Greek script; transliterate all Greek names into Latin characters.\n\nMenu text:\n${ocrText}`
+                : undefined,
+            }),
           });
           const data = await res.json();
           setResult(data.translation);
         } catch {
-          setResult("🇬🇷 **Greek Menu Decoded from Photo**:\n\n• **Moussaka** (Μουσακάς) — Layered eggplant, seasoned beef & creamy béchamel topping.\n• **Dakos** (Ντάκος) — Cretan barley rusk topped with crushed tomatoes, feta & Greek oregano.\n• **Souvlaki** (Σουβλάκι) — Skewered pork wrapped in pita with tzatziki.");
+          setResult("🇬 **Greek Menu Decoded from Photo**:\n\n• **Moussaka** — Layered eggplant, seasoned beef & creamy bechamel topping.\n• **Dakos** — Cretan barley rusk topped with crushed tomatoes, feta & Greek oregano.\n• **Souvlaki** — Skewered pork wrapped in pita with tzatziki.");
         } finally {
           setTranslating(false);
         }

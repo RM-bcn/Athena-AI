@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { ActiveTab, ChatSubTab, ChatMessage, TripData, Accommodation, UserAccount, IslandStay } from './types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
-import { initialChatMessages, DEFAULT_USERS } from './data/initialData';
+import { DEFAULT_USERS } from './data/initialData';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { MyItineraryView } from './components/MyItineraryView';
@@ -106,7 +106,168 @@ export default function App() {
     }
   });
   const [chatSubTab, setChatSubTab] = useState<ChatSubTab>('current');
-  const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages);
+
+  const [sessionId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('athena_chat_session');
+      if (saved) return saved;
+    } catch {
+      return `session-${Date.now()}`;
+    }
+    const fresh = `session-${Date.now()}`;
+    try {
+      localStorage.setItem('athena_chat_session', fresh);
+    } catch {
+      return fresh;
+    }
+    return fresh;
+  });
+
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('athena_chat_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [favorites, setFavorites] = useState<ChatFavorite[]>(() => {
+    try {
+      const saved = localStorage.getItem('athena_chat_favorites');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const chatHistoryRef = useRef<ChatMessage[]>(chatHistory);
+  const favoritesRef = useRef<ChatFavorite[]>(favorites);
+  const historySyncRef = useRef<number | null>(null);
+  const favoritesSyncRef = useRef<number | null>(null);
+
+  const messages = useMemo(
+    () => chatHistory.filter((m) => m.sessionId === sessionId),
+    [chatHistory, sessionId]
+  );
+
+  const persistHistory = (list: ChatMessage[]) => {
+    try {
+      localStorage.setItem('athena_chat_history', JSON.stringify(list.slice(-200)));
+    } catch (e) {
+      console.error("Failed to save chat history to localStorage", e);
+    }
+    if (!currentUser) return;
+    if (historySyncRef.current) window.clearTimeout(historySyncRef.current);
+    historySyncRef.current = window.setTimeout(() => {
+      fetch('/api/chat/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: list.slice(-200) }),
+      }).catch((err) => console.warn("Chat history sync notice:", err));
+    }, 1500);
+  };
+
+  const persistFavorites = (list: ChatFavorite[]) => {
+    try {
+      localStorage.setItem('athena_chat_favorites', JSON.stringify(list.slice(-200)));
+    } catch (e) {
+      console.error("Failed to save favorites to localStorage", e);
+    }
+    if (!currentUser) return;
+    if (favoritesSyncRef.current) window.clearTimeout(favoritesSyncRef.current);
+    favoritesSyncRef.current = window.setTimeout(() => {
+      fetch('/api/chat/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorites: list.slice(-200) }),
+      }).catch((err) => console.warn("Favorites sync notice:", err));
+    }, 1500);
+  };
+
+  const appendHistory = (msgs: ChatMessage[]) => {
+    const next = [...chatHistoryRef.current, ...msgs];
+    chatHistoryRef.current = next;
+    setChatHistory(next);
+    persistHistory(next);
+  };
+
+  const handleToggleFavorite = (msg: ChatMessage) => {
+    const exists = favoritesRef.current.some((f) => f.id === msg.id);
+    const next = exists
+      ? favoritesRef.current.filter((f) => f.id !== msg.id)
+      : [
+          ...favoritesRef.current,
+          {
+            id: msg.id,
+            content: msg.content,
+            senderName: msg.senderName || 'Athena',
+            timestamp: msg.timestamp,
+            savedAt: new Date().toISOString(),
+            sources: msg.sources,
+          },
+        ];
+    favoritesRef.current = next;
+    setFavorites(next);
+    persistFavorites(next);
+  };
+
+  const handleRemoveFavorite = (id: string) => {
+    const next = favoritesRef.current.filter((f) => f.id !== id);
+    favoritesRef.current = next;
+    setFavorites(next);
+    persistFavorites(next);
+  };
+
+  useEffect(() => {
+    async function loadChatStores() {
+      try {
+        const [hRes, fRes] = await Promise.all([
+          fetch('/api/chat/history'),
+          fetch('/api/chat/favorites'),
+        ]);
+
+        if (hRes.ok) {
+          const data = await hRes.json();
+          if (Array.isArray(data.messages) && data.messages.length > 0) {
+            const ids = new Set(chatHistoryRef.current.map((m) => m.id));
+            const incoming = (data.messages as ChatMessage[]).filter((m) => m.id && !ids.has(m.id));
+            if (incoming.length > 0) {
+              const merged = [...chatHistoryRef.current, ...incoming];
+              chatHistoryRef.current = merged;
+              setChatHistory(merged);
+              try {
+                localStorage.setItem('athena_chat_history', JSON.stringify(merged.slice(-200)));
+              } catch {
+                // localStorage vol of niet beschikbaar
+              }
+            }
+          }
+        }
+
+        if (fRes.ok) {
+          const data = await fRes.json();
+          if (Array.isArray(data.favorites) && data.favorites.length > 0) {
+            const ids = new Set(favoritesRef.current.map((f) => f.id));
+            const incoming = (data.favorites as ChatFavorite[]).filter((f) => f.id && !ids.has(f.id));
+            if (incoming.length > 0) {
+              const merged = [...favoritesRef.current, ...incoming];
+              favoritesRef.current = merged;
+              setFavorites(merged);
+              try {
+                localStorage.setItem('athena_chat_favorites', JSON.stringify(merged.slice(-200)));
+              } catch {
+                // localStorage vol of niet beschikbaar
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load chat stores:", err);
+      }
+    }
+    loadChatStores();
+  }, []);
 
   // Modal States
   const [isNewTripOpen, setIsNewTripOpen] = useState(false);
@@ -608,6 +769,8 @@ if (loaded.stayBookingLinks) {
       senderName: sender,
       avatar: currentUser?.avatarUrl || currentUser?.avatar,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      sessionId,
+      savedAt: new Date().toISOString(),
       content: text,
       attachment: attachment
         ? {
@@ -620,7 +783,7 @@ if (loaded.stayBookingLinks) {
     };
 
     const newHistory = [...messages, userMsg];
-    setMessages(newHistory);
+    appendHistory([userMsg]);
 
     try {
       const res = await fetch('/api/chat', {
@@ -688,6 +851,8 @@ if (loaded.stayBookingLinks) {
         role: 'assistant',
         senderName: 'Athena',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sessionId,
+        savedAt: new Date().toISOString(),
         content: data.reply || `Kalimera ${sender}! High-speed ferries en de gecureerde eilandschema's voor ${currentTrip.title} zijn bijgewerkt.`,
         quickButtons: data.tripUpdate
           ? currentUser
@@ -697,17 +862,19 @@ if (loaded.stayBookingLinks) {
         sources: data.sources,
       };
 
-      setMessages((prev) => [...prev, aiMsg]);
+      appendHistory([aiMsg]);
     } catch {
       const fallbackAiMsg: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
         role: 'assistant',
         senderName: 'Athena',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sessionId,
+        savedAt: new Date().toISOString(),
         content: `Kalimera ${sender}! Ik heb je bericht of geüploade reisplan ontvangen en je dagschema bijgewerkt voor ${currentTrip.title}.`,
         quickButtons: [{ label: ' Bekijk Mijn Reis', action: '/travel' }],
       };
-      setMessages((prev) => [...prev, fallbackAiMsg]);
+      appendHistory([fallbackAiMsg]);
     }
   };
 
@@ -844,8 +1011,12 @@ if (loaded.stayBookingLinks) {
           <ChatInterfaceView
             chatSubTab={chatSubTab}
             messages={messages}
+            historyMessages={chatHistory}
+            favorites={favorites}
             onSendMessage={handleSendMessage}
             onTriggerQuickAction={handleTriggerQuickAction}
+            onToggleFavorite={handleToggleFavorite}
+            onRemoveFavorite={handleRemoveFavorite}
             currentTrip={currentTrip}
           />
         )}
