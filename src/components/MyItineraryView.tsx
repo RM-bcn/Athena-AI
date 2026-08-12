@@ -105,6 +105,11 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
     currentTrip.stays.length > 0 ? currentTrip.stays[0].id : 'stay-1'
   );
 
+  // Shared "popped out" transport selection: clicking a transport anywhere
+  // (sidebar card, day rows, route connector) highlights the same entry
+  // everywhere, mirroring how hotel/stay cards highlight when selected.
+  const [selectedTransportId, setSelectedTransportId] = useState<string | null>(null);
+
   // Edit Stay Modal state
   const [isEditStayOpen, setIsEditStayOpen] = useState(false);
   const [editingStay, setEditingStay] = useState<IslandStay | null>(null);
@@ -510,6 +515,8 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       entries={transportEntries}
                       legs={transportLegs}
                       canEdit={canEdit}
+                      selectedId={selectedTransportId}
+                      onSelect={setSelectedTransportId}
                     />
                   )}
                 </React.Fragment>
@@ -661,6 +668,8 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                           entries={transportEntries}
                           stay={stay}
                           dayIdx={dayIdx}
+                          selectedId={selectedTransportId}
+                          onSelect={setSelectedTransportId}
                         />
                       </article>
                     );
@@ -815,6 +824,8 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             onAdd={onAddTransportEntry || (() => {})}
             onUpdate={onUpdateTransportEntry || (() => {})}
             onDelete={onDeleteTransportEntry || (() => {})}
+            selectedId={selectedTransportId}
+            onSelect={setSelectedTransportId}
           />
 
           {/* Local Tips Checklist */}

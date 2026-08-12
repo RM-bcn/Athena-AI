@@ -17,6 +17,10 @@ interface TransportSidebarCardProps {
   onAdd: (entry: Omit<TransportEntry, 'id'>) => void;
   onUpdate: (entry: TransportEntry) => void;
   onDelete: (id: string) => void;
+  /** Id of the transport that is "popped out" (selected). Shared with the day
+   *  rows and route connector so clicking anywhere highlights it everywhere. */
+  selectedId?: string | null;
+  onSelect?: (id: string) => void;
 }
 
 interface FormState {
@@ -60,6 +64,8 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
   onAdd,
   onUpdate,
   onDelete,
+  selectedId,
+  onSelect,
 }) => {
   const [open, setOpen] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -187,10 +193,16 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
 
           {sorted.map((entry) => {
             const link = resolveLegId(entry, legs);
+            const isSelected = entry.id === selectedId;
             return (
               <div
                 key={entry.id}
-                className="p-3.5 bg-[#f0f4f9] rounded-xl border border-[#c0c7d3]/30 flex items-center justify-between gap-2"
+                onClick={() => onSelect?.(entry.id)}
+                className={`p-3.5 rounded-xl border flex items-center justify-between gap-2 transition-all cursor-pointer group ${
+                  isSelected
+                    ? 'bg-white border-[#005BAE] ring-2 ring-[#005BAE]/20 shadow-md scale-[1.02]'
+                    : 'bg-[#f0f4f9] border-[#c0c7d3]/30 hover:border-[#005BAE]/40'
+                }`}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -224,14 +236,20 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
                 {canEdit && (
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
-                      onClick={() => openEditForm(entry)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditForm(entry);
+                      }}
                       className="p-1.5 text-[#005BAE] hover:bg-[#e1efff] rounded-lg"
                       title="Bewerken"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => onDelete(entry.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(entry.id);
+                      }}
                       className="p-1.5 text-[#717783] hover:text-red-500 hover:bg-red-50 rounded-lg"
                       title="Verwijderen"
                     >
