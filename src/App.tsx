@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActiveTab, ChatSubTab, ChatMessage, TripData, Accommodation, UserAccount, IslandStay } from './types';
+import { useTransportEntries } from './transport/useTransportEntries';
+import type { TransportEntry } from './transport/types';
 import { initialChatMessages, DEFAULT_USERS } from './data/initialData';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
@@ -124,6 +126,16 @@ export default function App() {
     }
   });
 
+  // Booked transports (ferries, flights, transfers) — persisted to localStorage
+  // and synced to the Google Sheets database via /api/sheets/save.
+  const {
+    transportEntries,
+    addTransportEntry,
+    updateTransportEntry,
+    deleteTransportEntry,
+    setTransportEntries,
+  } = useTransportEntries();
+
   // Google Sheets Integration State
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const [isSheetsConnected, setIsSheetsConnected] = useState<boolean>(false);
@@ -148,8 +160,11 @@ export default function App() {
             if (loaded.customBookings) {
               setCustomBookings(loaded.customBookings);
             }
-            if (loaded.stayBookingLinks) {
+if (loaded.stayBookingLinks) {
               setStayBookingLinks(loaded.stayBookingLinks);
+            }
+            if (loaded.transportEntries) {
+              setTransportEntries(loaded.transportEntries as TransportEntry[]);
             }
           }
         }
@@ -183,6 +198,7 @@ export default function App() {
         trip: newTrip,
         customBookings: updatedBookings !== undefined ? updatedBookings : customBookings,
         stayBookingLinks: updatedLinks !== undefined ? updatedLinks : stayBookingLinks,
+        transportEntries,
       }),
     })
       .then((res) => res.json())
@@ -208,6 +224,7 @@ export default function App() {
           trip: currentTrip,
           customBookings,
           stayBookingLinks,
+          transportEntries,
         }),
       });
 
@@ -792,6 +809,10 @@ export default function App() {
             stayBookingLinks={stayBookingLinks}
             onLinkStayBooking={handleLinkStayBooking}
             onUnlinkStayBooking={handleUnlinkStayBooking}
+            transportEntries={transportEntries}
+            onAddTransportEntry={addTransportEntry}
+            onUpdateTransportEntry={updateTransportEntry}
+            onDeleteTransportEntry={deleteTransportEntry}
             onLoginClick={() => setActiveTab('login')}
             sheetUrl={sheetUrl}
             isSheetsConnected={isSheetsConnected}
