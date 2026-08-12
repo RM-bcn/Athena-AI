@@ -85,8 +85,8 @@ app.post("/api/sheets/save", async (req, res) => {
         error: "Google OAuth parameter GOOGLE_REFRESH_TOKEN ontbreekt. In Vercel staat deze op 'Production' maar niet op 'Preview'. Pas de Vercel Environment Variable instelling aan naar 'Production and Preview'."
       });
     }
-    const { trip, customBookings } = req.body;
-    await saveTripToSheet(trip, customBookings || []);
+    const { trip, customBookings, stayBookingLinks } = req.body;
+    await saveTripToSheet(trip, customBookings || [], stayBookingLinks || {});
     const { spreadsheetUrl } = await getOrCreateSpreadsheet();
     res.json({ success: true, spreadsheetUrl });
   } catch (err: any) {

@@ -148,6 +148,9 @@ export default function App() {
             if (loaded.customBookings) {
               setCustomBookings(loaded.customBookings);
             }
+            if (loaded.stayBookingLinks) {
+              setStayBookingLinks(loaded.stayBookingLinks);
+            }
           }
         }
       } catch (err) {
@@ -158,7 +161,11 @@ export default function App() {
   }, []);
 
   // Helper to persist trip updates to localStorage & Google Sheets
-  const updateAndSaveTrip = (newTrip: TripData, updatedBookings?: Accommodation[]) => {
+  const updateAndSaveTrip = (
+    newTrip: TripData,
+    updatedBookings?: Accommodation[],
+    updatedLinks?: Record<string, string>
+  ) => {
     setCurrentTrip(newTrip);
     try {
       localStorage.setItem('athena_trip_ATH-2026', JSON.stringify(newTrip));
@@ -175,6 +182,7 @@ export default function App() {
       body: JSON.stringify({
         trip: newTrip,
         customBookings: updatedBookings !== undefined ? updatedBookings : customBookings,
+        stayBookingLinks: updatedLinks !== undefined ? updatedLinks : stayBookingLinks,
       }),
     })
       .then((res) => res.json())
@@ -199,6 +207,7 @@ export default function App() {
         body: JSON.stringify({
           trip: currentTrip,
           customBookings,
+          stayBookingLinks,
         }),
       });
 
@@ -471,7 +480,8 @@ export default function App() {
       checkOut: booking.checkOut,
     };
 
-    setCustomBookings((prev) => [...prev, newAccom]);
+    const nextBookings = [...customBookings, newAccom];
+    setCustomBookings(nextBookings);
 
     // Auto-link: run the matcher immediately. Exactly one matching segment → link it.
     // Multiple matches are stored as suggestions (rendered via getStayLinkInfo).
@@ -502,10 +512,14 @@ export default function App() {
       );
     }
 
-    updateAndSaveTrip({
-      ...currentTrip,
-      stays: updatedStays,
-    });
+    updateAndSaveTrip(
+      {
+        ...currentTrip,
+        stays: updatedStays,
+      },
+      nextBookings,
+      updatedLinks !== null ? updatedLinks : stayBookingLinks
+    );
 
     handleSendMessage(
       `Ik heb een accommodatie toegevoegd voor ${booking.island || booking.location}: ${booking.name} (€${booking.pricePerNight || 150}/nacht, Status: ${booking.status}). Update mijn reis- en dagschema!`
@@ -513,55 +527,55 @@ export default function App() {
   };
 
   const handleDeleteCustomBooking = (id: string) => {
-    setCustomBookings((prev) => prev.filter((b) => b.id !== id));
+    const nextBookings = customBookings.filter((b) => b.id !== id);
+    setCustomBookings(nextBookings);
+
     // Remove any links that referenced the deleted booking
-    setStayBookingLinks((prev) => {
-      const next: Record<string, string> = {};
-      for (const [stayId, bookingId] of Object.entries(prev)) {
-        if (bookingId !== id) next[stayId] = bookingId;
-      }
-      try {
-        localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
-      } catch (e) {
-        console.error("Failed to save stay-booking links", e);
-      }
-      return next;
-    });
+    const nextLinks: Record<string, string> = {};
+    for (const [stayId, bookingId] of Object.entries(stayBookingLinks)) {
+      if (bookingId !== id) nextLinks[stayId] = bookingId;
+    }
+    setStayBookingLinks(nextLinks);
+    try {
+      localStorage.setItem('athena_stay_booking_links', JSON.stringify(nextLinks));
+    } catch (e) {
+      console.error("Failed to save stay-booking links", e);
+    }
+
+    updateAndSaveTrip(currentTrip, nextBookings, nextLinks);
   };
 
   const handleLinkStayBooking = (stayId: string, bookingId: string) => {
-    setStayBookingLinks((prev) => {
-      const next = { ...prev, [stayId]: bookingId };
-      try {
-        localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
-      } catch (e) {
-        console.error("Failed to save stay-booking links", e);
-      }
-      return next;
-    });
+    const next = { ...stayBookingLinks, [stayId]: bookingId };
+    setStayBookingLinks(next);
+    try {
+      localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
+    } catch (e) {
+      console.error("Failed to save stay-booking links", e);
+    }
 
     const booking = customBookings.find((b) => b.id === bookingId);
     if (booking) {
       const updatedStays = currentTrip.stays.map((s) =>
         s.id === stayId ? { ...s, accommodationName: booking.name } : s
       );
-      updateAndSaveTrip({ ...currentTrip, stays: updatedStays });
+      updateAndSaveTrip({ ...currentTrip, stays: updatedStays }, undefined, next);
     }
   };
 
   const handleUnlinkStayBooking = (stayId: string) => {
-    setStayBookingLinks((prev) => {
-      const next: Record<string, string> = {};
-      for (const [id, bookingId] of Object.entries(prev)) {
-        if (id !== stayId) next[id] = bookingId;
-      }
-      try {
-        localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
-      } catch (e) {
-        console.error("Failed to save stay-booking links", e);
-      }
-      return next;
-    });
+    const next: Record<string, string> = {};
+    for (const [id, bookingId] of Object.entries(stayBookingLinks)) {
+      if (id !== stayId) next[id] = bookingId;
+    }
+    setStayBookingLinks(next);
+    try {
+      localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
+    } catch (e) {
+      console.error("Failed to save stay-booking links", e);
+    }
+
+    updateAndSaveTrip(currentTrip, undefined, next);
   };
 
   // Send message to backend Gemini API concierge & auto-parse uploaded itineraries
@@ -706,7 +720,17 @@ export default function App() {
   };
 
   const handleCreateTrip = (newTrip: TripData) => {
-    updateAndSaveTrip(newTrip);
+    // A new trip starts with no booked accommodations or links. Reset state and
+    // persist the fresh state to the Google Sheet so the DB matches the new trip.
+    setCustomBookings([]);
+    setStayBookingLinks({});
+    try {
+      localStorage.setItem('athena_stay_booking_links', JSON.stringify({}));
+    } catch (e) {
+      console.error("Failed to clear stay-booking links", e);
+    }
+
+    updateAndSaveTrip(newTrip, [], {});
     setActiveTab('itinerary');
 
     const staySummary = newTrip.stays
