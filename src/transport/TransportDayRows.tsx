@@ -8,6 +8,9 @@ interface Props {
   entries: TransportEntry[];
   stay: IslandStay;
   dayIdx: number;
+  /** Id of the transport that is "popped out" (selected). */
+  selectedId?: string | null;
+  onSelect?: (id: string) => void;
 }
 
 /**
@@ -15,7 +18,7 @@ interface Props {
  * date matches that day. Rows are DERIVED from the TransportEntry data
  * (single source of truth) — no duplicated static text.
  */
-export const TransportDayRows: React.FC<Props> = ({ entries, stay, dayIdx }) => {
+export const TransportDayRows: React.FC<Props> = ({ entries, stay, dayIdx, selectedId, onSelect }) => {
   if (!entries.length || !stay.startDate) return null;
 
   const dayDate = (() => {
@@ -36,16 +39,27 @@ export const TransportDayRows: React.FC<Props> = ({ entries, stay, dayIdx }) => 
 
   return (
     <div className="space-y-2 text-xs font-['Inter'] text-[#404752]">
-      {dayEntries.map((entry) => (
-        <div key={entry.id} className="flex items-center gap-2">
-          <TransportIcon type={entry.type} className="w-4 h-4 text-[#005BAE]" />
-          <span>
-            {entry.departureTime ? `${entry.departureTime} ` : ''}
-            {transportTypeLabel(entry.type)} {entry.from} → {entry.to}
-            {entry.operator ? ` (${entry.operator})` : ''}
-          </span>
-        </div>
-      ))}
+      {dayEntries.map((entry) => {
+        const isSelected = entry.id === selectedId;
+        return (
+          <div
+            key={entry.id}
+            onClick={() => onSelect?.(entry.id)}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all cursor-pointer group ${
+              isSelected
+                ? 'bg-white border-[#005BAE] ring-2 ring-[#005BAE]/20 shadow-sm scale-[1.02]'
+                : 'border-transparent hover:border-[#005BAE]/30 hover:bg-white'
+            }`}
+          >
+            <TransportIcon type={entry.type} className="w-4 h-4 text-[#005BAE]" />
+            <span>
+              {entry.departureTime ? `${entry.departureTime} ` : ''}
+              {transportTypeLabel(entry.type)} {entry.from} → {entry.to}
+              {entry.operator ? ` (${entry.operator})` : ''}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 };
