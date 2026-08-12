@@ -65,6 +65,8 @@ export interface Accommodation {
   location: string;
   status: 'CONFIRMED' | 'PAST STAY' | 'PENDING';
   image: string;
+  checkIn?: string;   // YYYY-MM-DD
+  checkOut?: string;  // YYYY-MM-DD
 }
 
 export interface LocalTip {

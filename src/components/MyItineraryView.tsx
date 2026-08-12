@@ -6,6 +6,7 @@ import {
   IslandStay,
   UserAccount
 } from '../types';
+import { getStayLinkInfo, StayLinkInfo } from '../utils/accommodationMatcher';
 import {
   MAP_IMAGE,
 } from '../data/initialData';
@@ -54,6 +55,9 @@ interface MyItineraryViewProps {
   onDeleteStay: (stayId: string) => void;
   customBookings?: Accommodation[];
   onDeleteCustomBooking?: (id: string) => void;
+  stayBookingLinks?: Record<string, string>;
+  onLinkStayBooking?: (stayId: string, bookingId: string) => void;
+  onUnlinkStayBooking?: (stayId: string) => void;
   onLoginClick: () => void;
   sheetUrl?: string | null;
   isSheetsConnected?: boolean;
@@ -74,6 +78,9 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   onDeleteStay,
   customBookings = [],
   onDeleteCustomBooking,
+  stayBookingLinks = {},
+  onLinkStayBooking,
+  onUnlinkStayBooking,
   onLoginClick,
   sheetUrl,
   isSheetsConnected = false,
@@ -95,6 +102,23 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
     { id: '2', text: 'Huur een kleine quad/scooter om verborgen baaien te verkennen.', checked: true },
     { id: '3', text: 'Neem contant geld mee voor kleine traditionele taveernes in de dorpen.', checked: true },
   ]);
+
+  const getLinkInfo = (stay: IslandStay): StayLinkInfo => {
+    return getStayLinkInfo(stay, customBookings, stayBookingLinks);
+  };
+
+  const handleConfirmLink = (stayId: string, bookingId: string) => {
+    onLinkStayBooking?.(stayId, bookingId);
+  };
+
+  const handleChangeLink = (stayId: string) => {
+    onUnlinkStayBooking?.(stayId);
+    onOpenNewBooking('manual', currentTrip.stays.find(s => s.id === stayId)?.island);
+  };
+
+  const handleUnlink = (stayId: string) => {
+    onUnlinkStayBooking?.(stayId);
+  };
 
   const toggleChecklist = (id: string) => {
     setTipsChecklist(prev =>
@@ -518,13 +542,42 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                           Bewerken
                         </button>
 
-                        <button
-                          onClick={() => onOpenNewBooking('trivago', stay.island)}
-                          className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                          Koppel Hotel
-                        </button>
+                        {(() => {
+                          const linkInfo = getLinkInfo(stay);
+                          if (linkInfo.state === 'linked' && linkInfo.matchedBooking) {
+                            return (
+                              <button
+                                onClick={() => handleChangeLink(stay.id)}
+                                className="text-xs font-['Inter'] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                {linkInfo.matchedBooking.name}
+                              </button>
+                            );
+                          }
+                          if (linkInfo.state === 'suggested' && linkInfo.suggestedBooking) {
+                            const suggestedBookingId = linkInfo.suggestedBooking.id;
+                            const suggestedBookingName = linkInfo.suggestedBooking.name;
+                            return (
+                              <button
+                                onClick={() => handleConfirmLink(stay.id, suggestedBookingId)}
+                                className="text-xs font-['Inter'] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1"
+                              >
+                                <Lightbulb className="w-3.5 h-3.5" />
+                                {suggestedBookingName}?
+                              </button>
+                            );
+                          }
+                          return (
+                            <button
+                              onClick={() => onOpenNewBooking('trivago', stay.island)}
+                              className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                              Koppel Hotel
+                            </button>
+                          );
+                        })()}
                       </>
                     )}
 
@@ -616,33 +669,94 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             {accommodationsOpen && (
               <div className="p-6 pt-4 space-y-4">
                 {/* Current Trip Stays Accommodations */}
-                {currentTrip.stays.map(stay => (
-                  <div key={stay.id} className="p-3.5 bg-[#f0f4f9] rounded-xl border border-[#c0c7d3]/30 flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-['Inter'] text-xs font-bold text-[#0b1d2d]">{stay.island}</span>
-                        <span className="text-[10px] bg-[#005BAE]/10 text-[#005BAE] px-1.5 py-0.5 rounded font-bold">
-                          {stay.nights} nachten
-                        </span>
+                {currentTrip.stays.map(stay => {
+                  const linkInfo = getLinkInfo(stay);
+                  return (
+                    <div key={stay.id} className="p-3.5 bg-[#f0f4f9] rounded-xl border border-[#c0c7d3]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-['Inter'] text-xs font-bold text-[#0b1d2d]">{stay.island}</span>
+                          <span className="text-[10px] bg-[#005BAE]/10 text-[#005BAE] px-1.5 py-0.5 rounded font-bold">
+                            {stay.nights} nachten
+                          </span>
+                          {linkInfo.state === 'linked' && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Gekoppeld
+                            </span>
+                          )}
+                          {linkInfo.state === 'suggested' && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                              <Lightbulb className="w-3 h-3" />
+                              Voorgesteld
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-['Inter'] text-[11px] text-[#404752] font-semibold mt-0.5 truncate">
+                          {linkInfo.state === 'linked' && linkInfo.matchedBooking
+                            ? linkInfo.matchedBooking.name
+                            : linkInfo.state === 'suggested' && linkInfo.suggestedBooking
+                            ? linkInfo.suggestedBooking.name
+                            : stay.accommodationName || 'Boetiekhotel geselecteerd'}
+                        </p>
+                        <p className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold mt-1">
+                          {formatDateFriendly(stay.startDate)} – {formatDateFriendly(stay.endDate)}
+                        </p>
+                        {linkInfo.state === 'linked' && linkInfo.matchedBooking && (
+                          <p className="font-['Inter'] text-[10px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Gekoppeld: {linkInfo.matchedBooking.name}
+                          </p>
+                        )}
+                        {linkInfo.state === 'suggested' && linkInfo.suggestedBooking && (
+                          <p className="font-['Inter'] text-[10px] text-amber-700 font-semibold mt-1 flex items-center gap-1">
+                            <Lightbulb className="w-3 h-3" />
+                            Voorgestelde match: {linkInfo.suggestedBooking.name}
+                          </p>
+                        )}
                       </div>
-                      <p className="font-['Inter'] text-[11px] text-[#404752] font-semibold mt-0.5">
-                        {stay.accommodationName || 'Boetiekhotel geselecteerd'}
-                      </p>
-                      <p className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold mt-1">
-                        {formatDateFriendly(stay.startDate)} – {formatDateFriendly(stay.endDate)}
-                      </p>
-                    </div>
 
-                    {canEdit && (
-                      <button
-                        onClick={() => onOpenNewBooking('trivago', stay.island)}
-                        className="px-2.5 py-1 text-[11px] font-bold rounded bg-white text-[#005BAE] border border-[#005BAE]/30 hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer"
-                      >
-                        Koppelen
-                      </button>
-                    )}
-                  </div>
-                ))}
+                      {canEdit && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {linkInfo.state === 'linked' && (
+                            <button
+                              onClick={() => handleChangeLink(stay.id)}
+                              className="px-2.5 py-1 text-[11px] font-bold rounded bg-white text-[#005BAE] border border-[#005BAE]/30 hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              Wijzigen
+                            </button>
+                          )}
+                          {linkInfo.state === 'suggested' && (
+                            <>
+                              <button
+                                onClick={() => handleConfirmLink(stay.id, linkInfo.suggestedBooking!.id)}
+                                className="px-2.5 py-1 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-1"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Bevestigen
+                              </button>
+                              <button
+                                onClick={() => handleChangeLink(stay.id)}
+                                className="px-2.5 py-1 text-[11px] font-bold rounded bg-white text-[#005BAE] border border-[#005BAE]/30 hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer"
+                              >
+                                Anders koppelen
+                              </button>
+                            </>
+                          )}
+                          {linkInfo.state === 'unlinked' && (
+                            <button
+                              onClick={() => onOpenNewBooking('trivago', stay.island)}
+                              className="px-2.5 py-1 text-[11px] font-bold rounded bg-white text-[#005BAE] border border-[#005BAE]/30 hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer"
+                            >
+                              Koppelen
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
                 {/* Additional Custom Added Accommodations */}
                 {customBookings.map(b => (

@@ -18,6 +18,7 @@ import { MissedFerryModal } from './components/Modals/MissedFerryModal';
 import { TranslateMenuModal } from './components/Modals/TranslateMenuModal';
 import { AddBookingModal } from './components/Modals/AddBookingModal';
 import { ShareModal } from './components/Modals/ShareModal';
+import { getMatchingStaysForBooking } from './utils/accommodationMatcher';
 
 // Initial default trip data with detailed stays and dates
 const defaultTrip: TripData = {
@@ -114,6 +115,14 @@ export default function App() {
   const [bookingIsland, setBookingIsland] = useState<string | undefined>(undefined);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [customBookings, setCustomBookings] = useState<Accommodation[]>([]);
+  const [stayBookingLinks, setStayBookingLinks] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('athena_stay_booking_links');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
   // Google Sheets Integration State
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
@@ -449,6 +458,8 @@ export default function App() {
     island?: string;
     pricePerNight?: number;
     image?: string;
+    checkIn?: string;
+    checkOut?: string;
   }) => {
     const newAccom: Accommodation = {
       id: `booking-${Date.now()}`,
@@ -456,22 +467,45 @@ export default function App() {
       location: booking.location,
       status: booking.status,
       image: booking.image || 'https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ',
+      checkIn: booking.checkIn,
+      checkOut: booking.checkOut,
     };
 
     setCustomBookings((prev) => [...prev, newAccom]);
 
-    // If linked to an island in current trip, update stay's accommodation name
-    if (booking.island) {
-      const updatedStays = currentTrip.stays.map((s) =>
+    // Auto-link: run the matcher immediately. Exactly one matching segment → link it.
+    // Multiple matches are stored as suggestions (rendered via getStayLinkInfo).
+    const matchingStays = getMatchingStaysForBooking(newAccom, currentTrip.stays);
+    let updatedStays = currentTrip.stays;
+    let updatedLinks: Record<string, string> | null = null;
+
+    if (matchingStays.length === 1) {
+      const matchedStay = matchingStays[0].stay;
+      updatedLinks = {
+        ...stayBookingLinks,
+        [matchedStay.id]: newAccom.id,
+      };
+      updatedStays = currentTrip.stays.map((s) =>
+        s.id === matchedStay.id ? { ...s, accommodationName: newAccom.name } : s
+      );
+      setStayBookingLinks(updatedLinks);
+      try {
+        localStorage.setItem('athena_stay_booking_links', JSON.stringify(updatedLinks));
+      } catch (e) {
+        console.error("Failed to save stay-booking links", e);
+      }
+    } else if (booking.island) {
+      updatedStays = currentTrip.stays.map((s) =>
         s.island.toLowerCase() === booking.island?.toLowerCase()
           ? { ...s, accommodationName: booking.name }
           : s
       );
-      updateAndSaveTrip({
-        ...currentTrip,
-        stays: updatedStays,
-      });
     }
+
+    updateAndSaveTrip({
+      ...currentTrip,
+      stays: updatedStays,
+    });
 
     handleSendMessage(
       `Ik heb een accommodatie toegevoegd voor ${booking.island || booking.location}: ${booking.name} (€${booking.pricePerNight || 150}/nacht, Status: ${booking.status}). Update mijn reis- en dagschema!`
@@ -480,6 +514,54 @@ export default function App() {
 
   const handleDeleteCustomBooking = (id: string) => {
     setCustomBookings((prev) => prev.filter((b) => b.id !== id));
+    // Remove any links that referenced the deleted booking
+    setStayBookingLinks((prev) => {
+      const next: Record<string, string> = {};
+      for (const [stayId, bookingId] of Object.entries(prev)) {
+        if (bookingId !== id) next[stayId] = bookingId;
+      }
+      try {
+        localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
+      } catch (e) {
+        console.error("Failed to save stay-booking links", e);
+      }
+      return next;
+    });
+  };
+
+  const handleLinkStayBooking = (stayId: string, bookingId: string) => {
+    setStayBookingLinks((prev) => {
+      const next = { ...prev, [stayId]: bookingId };
+      try {
+        localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
+      } catch (e) {
+        console.error("Failed to save stay-booking links", e);
+      }
+      return next;
+    });
+
+    const booking = customBookings.find((b) => b.id === bookingId);
+    if (booking) {
+      const updatedStays = currentTrip.stays.map((s) =>
+        s.id === stayId ? { ...s, accommodationName: booking.name } : s
+      );
+      updateAndSaveTrip({ ...currentTrip, stays: updatedStays });
+    }
+  };
+
+  const handleUnlinkStayBooking = (stayId: string) => {
+    setStayBookingLinks((prev) => {
+      const next: Record<string, string> = {};
+      for (const [id, bookingId] of Object.entries(prev)) {
+        if (id !== stayId) next[id] = bookingId;
+      }
+      try {
+        localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
+      } catch (e) {
+        console.error("Failed to save stay-booking links", e);
+      }
+      return next;
+    });
   };
 
   // Send message to backend Gemini API concierge & auto-parse uploaded itineraries
@@ -683,6 +765,9 @@ export default function App() {
             onDeleteStay={handleDeleteStay}
             customBookings={customBookings}
             onDeleteCustomBooking={handleDeleteCustomBooking}
+            stayBookingLinks={stayBookingLinks}
+            onLinkStayBooking={handleLinkStayBooking}
+            onUnlinkStayBooking={handleUnlinkStayBooking}
             onLoginClick={() => setActiveTab('login')}
             sheetUrl={sheetUrl}
             isSheetsConnected={isSheetsConnected}
