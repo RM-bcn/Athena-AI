@@ -87,6 +87,8 @@ export const initialAccommodations: Accommodation[] = [
     location: 'Agios Georgios, Naxos',
     status: 'CONFIRMED',
     image: NISSAKI_HOTEL_IMAGE,
+    checkIn: '2026-08-18',
+    checkOut: '2026-08-21'
   },
   {
     id: 'milos-breeze',
@@ -94,6 +96,8 @@ export const initialAccommodations: Accommodation[] = [
     location: 'Pollonia, Milos',
     status: 'PAST STAY',
     image: MILOS_BOUTIQUE_IMAGE,
+    checkIn: '2026-08-15',
+    checkOut: '2026-08-18'
   }
 ];
 
