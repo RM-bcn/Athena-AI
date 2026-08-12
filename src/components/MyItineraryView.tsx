@@ -40,6 +40,11 @@ import {
 } from 'lucide-react';
 import { EditStayModal } from './Modals/EditStayModal';
 import { WeatherCard } from './WeatherCard';
+import { TransportSidebarCard } from '../transport/TransportSidebarCard';
+import { TransportRouteConnector } from '../transport/TransportRouteConnector';
+import { TransportDayRows } from '../transport/TransportDayRows';
+import { deriveLegs } from '../transport/transportLogic';
+import type { TransportEntry } from '../transport/types';
 
 interface MyItineraryViewProps {
   currentTrip: TripData;
@@ -58,6 +63,10 @@ interface MyItineraryViewProps {
   stayBookingLinks?: Record<string, string>;
   onLinkStayBooking?: (stayId: string, bookingId: string) => void;
   onUnlinkStayBooking?: (stayId: string) => void;
+  transportEntries?: TransportEntry[];
+  onAddTransportEntry?: (entry: Omit<TransportEntry, 'id'>) => void;
+  onUpdateTransportEntry?: (entry: TransportEntry) => void;
+  onDeleteTransportEntry?: (id: string) => void;
   onLoginClick: () => void;
   sheetUrl?: string | null;
   isSheetsConnected?: boolean;
@@ -81,6 +90,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   stayBookingLinks = {},
   onLinkStayBooking,
   onUnlinkStayBooking,
+  transportEntries = [],
+  onAddTransportEntry,
+  onUpdateTransportEntry,
+  onDeleteTransportEntry,
   onLoginClick,
   sheetUrl,
   isSheetsConnected = false,
@@ -163,6 +176,9 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   });
 
   const canEdit = !!currentUser && !isGuestMode;
+
+  // Derived transport legs between consecutive stays (single source of truth).
+  const transportLegs = deriveLegs(currentTrip.stays);
 
   return (
     <main className="md:ml-64 pt-20 md:pt-24 min-h-screen px-4 md:px-12 pb-16 bg-white font-['Plus_Jakarta_Sans']">
@@ -490,9 +506,12 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                   </div>
 
                   {index < timelineStops.length - 1 && (
-                    <div className="flex-1 min-w-[50px] h-[2px] bg-[#005BAE]/20 relative">
-                      <Ship className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 text-[#005BAE]" />
-                    </div>
+                    <TransportRouteConnector
+                      leg={transportLegs[index]}
+                      entries={transportEntries}
+                      legs={transportLegs}
+                      canEdit={canEdit}
+                    />
                   )}
                 </React.Fragment>
               ))}
@@ -637,6 +656,13 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                             Ontdek de mooiste baaien, historische straatjes en panoramische zonsondergangspunten van {stay.island}. Athena AI past de dagplanning automatisch aan je reisstijl aan.
                           </p>
                         )}
+
+                        {/* Booked transports derived from TransportEntry data */}
+                        <TransportDayRows
+                          entries={transportEntries}
+                          stay={stay}
+                          dayIdx={dayIdx}
+                        />
                       </article>
                     );
                   })}
@@ -804,6 +830,16 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
               </div>
             )}
           </div>
+
+          {/* Ferries & Transfers Panel */}
+          <TransportSidebarCard
+            entries={transportEntries}
+            stays={currentTrip.stays}
+            canEdit={canEdit}
+            onAdd={onAddTransportEntry || (() => {})}
+            onUpdate={onUpdateTransportEntry || (() => {})}
+            onDelete={onDeleteTransportEntry || (() => {})}
+          />
 
           {/* Local Tips Checklist */}
           <div className="bg-white rounded-[24px] overflow-hidden border border-[#e1efff] shadow-sm">

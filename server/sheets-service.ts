@@ -127,7 +127,7 @@ async function ensureTabsExist(sheets: any, spreadsheetId: string) {
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const existingSheetTitles = (meta.data.sheets || []).map((s: any) => s.properties.title);
     
-    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks"];
+    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks", "Transports"];
     const missingTabs = requiredTabs.filter((title) => !existingSheetTitles.includes(title));
 
     if (missingTabs.length > 0) {
@@ -243,6 +243,7 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
           { properties: { title: "Users" } },
           { properties: { title: "CustomBookings" } },
           { properties: { title: "BookingLinks" } },
+          { properties: { title: "Transports" } },
         ],
       },
     });
@@ -296,6 +297,12 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
               ["StayID", "BookingID"]
             ],
           },
+          {
+            range: "Transports!A1:K1",
+            values: [
+              ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "BookingRef", "Notes", "LinkedLegId"]
+            ],
+          },
         ],
       },
     });
@@ -312,7 +319,8 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
 export async function saveTripToSheet(
   tripData: any,
   customBookings: any[] = [],
-  stayBookingLinks: Record<string, string> = {}
+  stayBookingLinks: Record<string, string> = {},
+  transportEntries: any[] = []
 ): Promise<void> {
   const auth = getOAuthClient();
   if (!auth) throw new Error("OAuth parameters ontbreken (vereist GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN).");
@@ -445,12 +453,39 @@ export async function saveTripToSheet(
     ]);
     const bookingValues = [bookingHeaders, ...bookingRows];
 
-    // Format Booking Links rows (stayId -> bookingId)
+// Format Booking Links rows (stayId -> bookingId)
     const linkHeaders = ["StayID", "BookingID"];
     const linkRows = Object.entries(stayBookingLinks || {})
       .filter(([stayId, bookingId]) => stayId && bookingId)
       .map(([stayId, bookingId]) => [stayId, bookingId]);
     const linkValues = [linkHeaders, ...linkRows];
+
+    // Validate and format transport entries (booked ferries/flights/transfers)
+    const seenTransportIds = new Set<string>();
+    const validTransports = (transportEntries || []).filter((t: any) => {
+      if (!t.id) return false;
+      if (!t.date) return false;
+      if (seenTransportIds.has(t.id)) return false;
+      seenTransportIds.add(t.id);
+      return true;
+    });
+
+    // Format Transports rows
+    const transportHeaders = ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "BookingRef", "Notes", "LinkedLegId"];
+    const transportRows = validTransports.map((t: any) => [
+      t.id,
+      t.type || "ferry",
+      t.from || "",
+      t.to || "",
+      t.date,
+      t.departureTime || "",
+      t.arrivalTime || "",
+      t.operator || "",
+      t.bookingRef || "",
+      t.notes || "",
+      t.linkedLegId || ""
+    ]);
+    const transportValues = [transportHeaders, ...transportRows];
 
     // Overwrite values
     await sheets.spreadsheets.values.batchUpdate({
@@ -461,7 +496,8 @@ export async function saveTripToSheet(
           { range: "TripInfo!A1:G2", values: tripInfoValues },
           { range: `Stays!A1:G${Math.max(staysValues.length, 2)}`, values: staysValues },
           { range: `CustomBookings!A1:I${Math.max(bookingValues.length, 2)}`, values: bookingValues },
-          { range: `BookingLinks!A1:B${Math.max(linkValues.length, 2)}`, values: linkValues }
+          { range: `BookingLinks!A1:B${Math.max(linkValues.length, 2)}`, values: linkValues },
+          { range: `Transports!A1:K${Math.max(transportValues.length, 2)}`, values: transportValues }
         ]
       }
     });
@@ -470,7 +506,7 @@ export async function saveTripToSheet(
   }
 }
 
-export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: any[]; stayBookingLinks: Record<string, string>; sheetUrl: string }> {
+export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: any[]; stayBookingLinks: Record<string, string>; transportEntries: any[]; sheetUrl: string }> {
   const auth = getOAuthClient();
   if (!auth) throw new Error("Google auth parameters ontbreken.");
 
@@ -482,7 +518,7 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
 
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:I50", "BookingLinks!A2:B50"],
+      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:I50", "BookingLinks!A2:B50", "Transports!A2:K100"],
     });
 
     const valueRanges = res.data.valueRanges || [];
@@ -490,6 +526,7 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
     const staysRows = valueRanges[1]?.values || [];
     const bookingRows = valueRanges[2]?.values || [];
     const linkRows = valueRanges[3]?.values || [];
+    const transportRows = valueRanges[4]?.values || [];
 
     const loadedStays = staysRows
       .filter((row: any) => row && row[1]) // Must have an island name
@@ -527,14 +564,30 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
         image: row[8] || "",
       }));
 
-    const stayBookingLinks = linkRows
+const stayBookingLinks = linkRows
       .filter((row: any) => row && row[0] && row[1])
       .reduce<Record<string, string>>((acc, row: any) => {
         acc[row[0]] = row[1];
         return acc;
       }, {});
 
-    return { trip, customBookings, stayBookingLinks, sheetUrl: spreadsheetUrl };
+    const transportEntries = transportRows
+      .filter((row: any) => row && row[4]) // Must have a date
+      .map((row: any) => ({
+        id: row[0] || `transport-${Math.random()}`,
+        type: (row[1] || "ferry") as string,
+        from: row[2] || "",
+        to: row[3] || "",
+        date: row[4],
+        departureTime: row[5] || undefined,
+        arrivalTime: row[6] || undefined,
+        operator: row[7] || undefined,
+        bookingRef: row[8] || undefined,
+        notes: row[9] || undefined,
+        linkedLegId: row[10] || undefined,
+      }));
+
+    return { trip, customBookings, stayBookingLinks, transportEntries, sheetUrl: spreadsheetUrl };
   } catch (err: any) {
     throw new Error(formatGoogleError(err));
   }
