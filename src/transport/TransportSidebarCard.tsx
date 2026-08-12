@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Ship, Plus, Trash2, Edit3, X } from 'lucide-react';
 import type { IslandStay } from '../types';
 import type { TransportEntry, TransportLeg, TransportType } from './types';
@@ -73,26 +73,6 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   const legs = useMemo(() => deriveLegs(stays), [stays]);
-
-  // Open the inline form pre-filled for a leg (triggered from the route
-  // overview "+" affordance via a custom event, keeping the components
-  // decoupled from MyItineraryView).
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const leg = (e as CustomEvent<TransportLeg>).detail;
-      if (!leg) return;
-      setForm({
-        ...EMPTY_FORM,
-        from: leg.fromCity,
-        to: leg.toCity,
-        date: leg.date,
-      });
-      setEditingId(null);
-      setFormOpen(true);
-    };
-    window.addEventListener('athena:transport-form', handler);
-    return () => window.removeEventListener('athena:transport-form', handler);
-  }, []);
 
   const sorted = useMemo(
     () =>

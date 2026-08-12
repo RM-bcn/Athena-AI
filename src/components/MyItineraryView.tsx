@@ -43,7 +43,8 @@ import { TransportSidebarCard } from '../transport/TransportSidebarCard';
 import { TransportRouteConnector } from '../transport/TransportRouteConnector';
 import { TransportDayRows } from '../transport/TransportDayRows';
 import { deriveLegs } from '../transport/transportLogic';
-import type { TransportEntry } from '../transport/types';
+import { TransportBookingModal } from '../transport/TransportBookingModal';
+import type { TransportEntry, TransportLeg } from '../transport/types';
 
 interface MyItineraryViewProps {
   currentTrip: TripData;
@@ -109,6 +110,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   // (sidebar card, day rows, route connector) highlights the same entry
   // everywhere, mirroring how hotel/stay cards highlight when selected.
   const [selectedTransportId, setSelectedTransportId] = useState<string | null>(null);
+  const [transportLegToAdd, setTransportLegToAdd] = useState<TransportLeg | null>(null);
 
   // Edit Stay Modal state
   const [isEditStayOpen, setIsEditStayOpen] = useState(false);
@@ -517,6 +519,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       canEdit={canEdit}
                       selectedId={selectedTransportId}
                       onSelect={setSelectedTransportId}
+                      onAddForLeg={setTransportLegToAdd}
                     />
                   )}
                 </React.Fragment>
@@ -885,6 +888,13 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         onClose={() => setIsEditStayOpen(false)}
         stayToEdit={editingStay}
         onSaveStay={onSaveStay}
+      />
+
+      <TransportBookingModal
+        isOpen={transportLegToAdd !== null}
+        leg={transportLegToAdd}
+        onClose={() => setTransportLegToAdd(null)}
+        onAdd={(entry) => onAddTransportEntry?.(entry)}
       />
     </main>
   );

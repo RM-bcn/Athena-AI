@@ -12,6 +12,7 @@ interface Props {
   /** Id of the transport that is "popped out" (selected). */
   selectedId?: string | null;
   onSelect?: (id: string) => void;
+  onAddForLeg?: (leg: TransportLeg) => void;
 }
 
 /**
@@ -21,16 +22,17 @@ interface Props {
  * departure time and operator. Unlinked legs keep the generic icon with a
  * subtle "+" affordance that opens the add-transport form pre-filled.
  */
-export const TransportRouteConnector: React.FC<Props> = ({ leg, entries, legs, canEdit, selectedId, onSelect }) => {
+export const TransportRouteConnector: React.FC<Props> = ({
+  leg,
+  entries,
+  legs,
+  canEdit,
+  selectedId,
+  onSelect,
+  onAddForLeg,
+}) => {
   const linkedEntries = entries.filter((e) => resolveLegId(e, legs).linkedLegId === leg.id);
   const earliest = earliestEntry(linkedEntries);
-
-  const openFormForLeg = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    window.dispatchEvent(
-      new CustomEvent('athena:transport-form', { detail: leg })
-    );
-  };
 
   if (earliest) {
     const label = [
@@ -81,7 +83,7 @@ export const TransportRouteConnector: React.FC<Props> = ({ leg, entries, legs, c
     <div className="flex-1 min-w-[50px] h-[2px] bg-[#005BAE]/20 relative">
       {canEdit && (
         <button
-          onClick={openFormForLeg}
+          onClick={() => onAddForLeg?.(leg)}
           title={`Voeg transport toe: ${leg.fromCity} → ${leg.toCity}`}
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-white border border-[#005BAE]/30 text-[#005BAE] hover:bg-[#005BAE] hover:text-white transition-colors shadow-sm cursor-pointer"
         >
