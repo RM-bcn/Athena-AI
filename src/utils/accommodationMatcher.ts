@@ -116,6 +116,11 @@ export function getStayLinkInfo(
   }
 
   const matches = findMatches(stay, bookings);
+  const confirmedMatch = matches.find(match => match.booking.status === 'CONFIRMED');
+  if (confirmedMatch) {
+    return { state: 'linked', matchedBooking: confirmedMatch.booking };
+  }
+
   if (matches.length > 0) {
     return { state: 'suggested', suggestedBooking: matches[0].booking };
   }
