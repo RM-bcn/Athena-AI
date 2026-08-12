@@ -28,7 +28,6 @@ import {
   Clock,
   Edit3,
   Search,
-  Trash2,
   UserCheck,
   Eye,
   Key,
@@ -783,29 +782,6 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                     </div>
                   );
                 })}
-
-                {/* Additional Custom Added Accommodations */}
-                {customBookings.map(b => (
-                  <div key={b.id} className="p-3.5 bg-white rounded-xl border border-[#005BAE]/30 flex items-center justify-between shadow-sm">
-                    <div>
-                      <span className="font-['Inter'] text-xs font-bold text-[#0b1d2d] block">{b.name}</span>
-                      <span className="font-['Inter'] text-[11px] text-[#717783] block">{b.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-green-50 text-green-700 border border-green-200">
-                        {b.status}
-                      </span>
-                      {onDeleteCustomBooking && canEdit && (
-                        <button
-                          onClick={() => onDeleteCustomBooking(b.id)}
-                          className="text-gray-400 hover:text-red-500 p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
 
                 {/* Action Buttons */}
                 {canEdit && (
