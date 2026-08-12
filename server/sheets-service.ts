@@ -300,9 +300,9 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
             ],
           },
           {
-            range: "Transports!A1:K1",
+            range: "Transports!A1:L1",
             values: [
-              ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "BookingRef", "Notes", "LinkedLegId"]
+              ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId"]
             ],
           },
         ],
@@ -473,7 +473,7 @@ export async function saveTripToSheet(
     });
 
     // Format Transports rows
-    const transportHeaders = ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "BookingRef", "Notes", "LinkedLegId"];
+    const transportHeaders = ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId"];
     const transportRows = validTransports.map((t: any) => [
       t.id,
       t.type || "ferry",
@@ -483,6 +483,7 @@ export async function saveTripToSheet(
       t.departureTime || "",
       t.arrivalTime || "",
       t.operator || "",
+      t.vesselName || "",
       t.bookingRef || "",
       t.notes || "",
       t.linkedLegId || ""
@@ -499,7 +500,7 @@ export async function saveTripToSheet(
           { range: `Stays!A1:G${Math.max(staysValues.length, 2)}`, values: staysValues },
           { range: `CustomBookings!A1:I${Math.max(bookingValues.length, 2)}`, values: bookingValues },
           { range: `BookingLinks!A1:B${Math.max(linkValues.length, 2)}`, values: linkValues },
-          { range: `Transports!A1:K${Math.max(transportValues.length, 2)}`, values: transportValues }
+          { range: `Transports!A1:L${Math.max(transportValues.length, 2)}`, values: transportValues }
         ]
       }
     });
@@ -520,7 +521,7 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
 
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:I50", "BookingLinks!A2:B50", "Transports!A2:K100"],
+      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:I50", "BookingLinks!A2:B50", "Transports!A2:L100"],
     });
 
     const valueRanges = res.data.valueRanges || [];
@@ -584,9 +585,10 @@ const stayBookingLinks = linkRows
         departureTime: row[5] || undefined,
         arrivalTime: row[6] || undefined,
         operator: row[7] || undefined,
-        bookingRef: row[8] || undefined,
-        notes: row[9] || undefined,
-        linkedLegId: row[10] || undefined,
+        vesselName: row[8] || undefined,
+        bookingRef: row[9] || undefined,
+        notes: row[10] || undefined,
+        linkedLegId: row[11] || undefined,
       }));
 
     return { trip, customBookings, stayBookingLinks, transportEntries, sheetUrl: spreadsheetUrl };

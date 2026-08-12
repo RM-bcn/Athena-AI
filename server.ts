@@ -18,6 +18,7 @@ import { getWeather, searchWeb, findRestaurants, getCityTips } from "./server/li
 import type { ToolResult, Source } from "./server/live-providers.js";
 import { transliterateGreek } from "./server/transliterate.js";
 import { translateWithMyMemory } from "./server/translate-fallback.js";
+import { handleFerryDisruptions } from "./server/ferry-disruptions.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -184,6 +185,9 @@ app.get("/api/user", async (req, res) => {
     return res.status(500).json({ success: false, error: err?.message || "Fout bij ophalen van gebruiker." });
   }
 });
+
+// API: Blue Star Ferries "Itineraries Modifications" (scraped, no API key)
+app.get("/api/ferry/disruptions", handleFerryDisruptions);
 
 // Helper to get Gemini AI instance safely
 function getGeminiClient() {

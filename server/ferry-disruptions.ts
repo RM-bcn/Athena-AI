@@ -31,9 +31,17 @@ export interface DisruptionMatch {
   excerpt: string;
 }
 
+/** Internal representation: full article text kept for matching. */
+interface CachedNotice {
+  title: string;
+  url: string;
+  lastUpdate?: string;
+  body: string;
+}
+
 interface CachedNotices {
   at: number;
-  matches: DisruptionMatch[];
+  matches: CachedNotice[];
 }
 
 let cache: CachedNotices | null = null;
@@ -85,7 +93,7 @@ function findInfoLinks(html: string): string[] {
   return [...links].slice(0, 3);
 }
 
-function extractArticle(url: string, html: string): DisruptionMatch | null {
+function extractArticle(url: string, html: string): CachedNotice | null {
   const text = stripHtml(html);
 
   const titleMatch = text.match(/^([^\n]{5,120})\n/im);
@@ -94,10 +102,10 @@ function extractArticle(url: string, html: string): DisruptionMatch | null {
   const updateMatch = text.match(/Last Update:\s*([0-9]{2}\/[0-9]{2}\/[0-9]{4})\s*[-–]\s*([0-9]{2}:[0-9]{2})/i);
   const lastUpdate = updateMatch ? `${updateMatch[1]} ${updateMatch[2]}` : undefined;
 
-  return { title, url, lastUpdate, excerpt: text.slice(0, 400) };
+  return { title, url, lastUpdate, body: text };
 }
 
-async function fetchCurrentNotices(): Promise<DisruptionMatch[]> {
+async function fetchCurrentNotices(): Promise<CachedNotice[]> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
     return cache.matches;
   }
@@ -119,7 +127,7 @@ async function fetchCurrentNotices(): Promise<DisruptionMatch[]> {
     }
   }
 
-  const notices: DisruptionMatch[] = [];
+  const notices: CachedNotice[] = [];
   for (const url of links) {
     try {
       const html = await fetchText(url);
@@ -134,19 +142,49 @@ async function fetchCurrentNotices(): Promise<DisruptionMatch[]> {
   return notices;
 }
 
+/** Words that appear on every Blue Star page and are not ship identifiers. */
+const GENERIC_TOKENS = new Set(["blue", "star", "ferry", "ferries", "lines"]);
+
+/** Distinctive search tokens for a vessel name, e.g. "Blue Star Delos" → ["delos"]. */
+function distinctiveTokens(vessel: string): string[] {
+  return normalizeVesselName(vessel)
+    .split(" ")
+    .filter((t) => t.length >= 4 && !GENERIC_TOKENS.has(t));
+}
+
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Index of the first mention of the vessel in the article body, or -1. */
+function findBodyIndex(body: string, vessel: string): number {
+  const searches = [normalizeVesselName(vessel), ...distinctiveTokens(vessel)].filter(Boolean);
+  for (const search of searches) {
+    const re = new RegExp(escapeRegex(search), "i");
+    const match = re.exec(body);
+    if (match) return match.index;
+  }
+  return -1;
+}
+
 /** Match active notices against a vessel name (e.g. "Blue Star Delos"). */
-function matchNotices(notices: DisruptionMatch[], vessel: string): DisruptionMatch[] {
+function matchNotices(notices: CachedNotice[], vessel: string): DisruptionMatch[] {
   const normalized = normalizeVesselName(vessel);
   if (!normalized) return [];
 
-  const tokens = normalized.split(" ");
+  const tokens = distinctiveTokens(vessel);
   const results: DisruptionMatch[] = [];
   for (const notice of notices) {
-    const haystack = normalizeVesselName(`${notice.title} ${notice.excerpt}`);
-    // Require the full normalized name ("blue star delos") or a distinctive
-    // token ("delos" with length >= 4) to be present.
-    const hit = haystack.includes(normalized) || tokens.some((t) => t.length >= 4 && haystack.includes(t));
-    if (hit) results.push(notice);
+    const haystack = normalizeVesselName(notice.body);
+    const hit = haystack.includes(normalized) || tokens.some((t) => haystack.includes(t));
+    if (!hit) continue;
+
+    const pos = findBodyIndex(notice.body, vessel);
+    let excerpt = notice.body;
+    if (pos >= 0) {
+      excerpt = notice.body.slice(Math.max(0, pos - 160), pos + 360).trim();
+    }
+    results.push({ title: notice.title, url: notice.url, lastUpdate: notice.lastUpdate, excerpt });
   }
   return results;
 }
@@ -155,12 +193,12 @@ export async function handleFerryDisruptions(req: Request, res: Response): Promi
   const vessel = typeof req.query.vessel === "string" ? req.query.vessel.trim() : "";
   try {
     const notices = await fetchCurrentNotices();
-    const matches = vessel ? matchNotices(notices, vessel) : notices;
+    const matches = vessel ? matchNotices(notices, vessel) : notices.slice(0, 3);
     res.json({
       vessel,
       checkedAt: new Date().toISOString(),
       source: HOME_URL,
-      matches: matches.slice(0, 3),
+      matches,
     });
   } catch (err) {
     console.error("[ferry-disruptions] error:", (err as Error)?.message || err);
