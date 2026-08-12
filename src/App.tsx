@@ -18,6 +18,7 @@ import { MissedFerryModal } from './components/Modals/MissedFerryModal';
 import { TranslateMenuModal } from './components/Modals/TranslateMenuModal';
 import { AddBookingModal } from './components/Modals/AddBookingModal';
 import { ShareModal } from './components/Modals/ShareModal';
+import { getMatchingStaysForBooking } from './utils/accommodationMatcher';
 
 // Initial default trip data with detailed stays and dates
 const defaultTrip: TripData = {
@@ -114,6 +115,14 @@ export default function App() {
   const [bookingIsland, setBookingIsland] = useState<string | undefined>(undefined);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [customBookings, setCustomBookings] = useState<Accommodation[]>([]);
+  const [stayBookingLinks, setStayBookingLinks] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('athena_stay_booking_links');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
   // Google Sheets Integration State
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
@@ -139,6 +148,9 @@ export default function App() {
             if (loaded.customBookings) {
               setCustomBookings(loaded.customBookings);
             }
+            if (loaded.stayBookingLinks) {
+              setStayBookingLinks(loaded.stayBookingLinks);
+            }
           }
         }
       } catch (err) {
@@ -149,7 +161,11 @@ export default function App() {
   }, []);
 
   // Helper to persist trip updates to localStorage & Google Sheets
-  const updateAndSaveTrip = (newTrip: TripData, updatedBookings?: Accommodation[]) => {
+  const updateAndSaveTrip = (
+    newTrip: TripData,
+    updatedBookings?: Accommodation[],
+    updatedLinks?: Record<string, string>
+  ) => {
     setCurrentTrip(newTrip);
     try {
       localStorage.setItem('athena_trip_ATH-2026', JSON.stringify(newTrip));
@@ -166,6 +182,7 @@ export default function App() {
       body: JSON.stringify({
         trip: newTrip,
         customBookings: updatedBookings !== undefined ? updatedBookings : customBookings,
+        stayBookingLinks: updatedLinks !== undefined ? updatedLinks : stayBookingLinks,
       }),
     })
       .then((res) => res.json())
@@ -190,6 +207,7 @@ export default function App() {
         body: JSON.stringify({
           trip: currentTrip,
           customBookings,
+          stayBookingLinks,
         }),
       });
 
@@ -224,8 +242,15 @@ export default function App() {
   };
 
 
-  // Navigation Guard: guests cannot access the chat
+  // Navigation Guard: block unauthenticated users from chat and itinerary
   const handleSetActiveTab = (tab: ActiveTab) => {
+    const isAuthenticated = currentUser !== null || isGuestMode;
+
+    if (!isAuthenticated && (tab === 'chat' || tab === 'itinerary' || tab === 'quick-help' || tab === 'settings' || tab === 'profile')) {
+      setActiveTab('login');
+      return;
+    }
+
     if (tab === 'chat' && isGuestMode) return;
     setActiveTab(tab);
   };
@@ -442,6 +467,8 @@ export default function App() {
     island?: string;
     pricePerNight?: number;
     image?: string;
+    checkIn?: string;
+    checkOut?: string;
   }) => {
     const newAccom: Accommodation = {
       id: `booking-${Date.now()}`,
@@ -449,22 +476,50 @@ export default function App() {
       location: booking.location,
       status: booking.status,
       image: booking.image || 'https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ',
+      checkIn: booking.checkIn,
+      checkOut: booking.checkOut,
     };
 
-    setCustomBookings((prev) => [...prev, newAccom]);
+    const nextBookings = [...customBookings, newAccom];
+    setCustomBookings(nextBookings);
 
-    // If linked to an island in current trip, update stay's accommodation name
-    if (booking.island) {
-      const updatedStays = currentTrip.stays.map((s) =>
+    // Auto-link: run the matcher immediately. Exactly one matching segment → link it.
+    // Multiple matches are stored as suggestions (rendered via getStayLinkInfo).
+    const matchingStays = getMatchingStaysForBooking(newAccom, currentTrip.stays);
+    let updatedStays = currentTrip.stays;
+    let updatedLinks: Record<string, string> | null = null;
+
+    if (matchingStays.length === 1) {
+      const matchedStay = matchingStays[0].stay;
+      updatedLinks = {
+        ...stayBookingLinks,
+        [matchedStay.id]: newAccom.id,
+      };
+      updatedStays = currentTrip.stays.map((s) =>
+        s.id === matchedStay.id ? { ...s, accommodationName: newAccom.name } : s
+      );
+      setStayBookingLinks(updatedLinks);
+      try {
+        localStorage.setItem('athena_stay_booking_links', JSON.stringify(updatedLinks));
+      } catch (e) {
+        console.error("Failed to save stay-booking links", e);
+      }
+    } else if (booking.island) {
+      updatedStays = currentTrip.stays.map((s) =>
         s.island.toLowerCase() === booking.island?.toLowerCase()
           ? { ...s, accommodationName: booking.name }
           : s
       );
-      updateAndSaveTrip({
+    }
+
+    updateAndSaveTrip(
+      {
         ...currentTrip,
         stays: updatedStays,
-      });
-    }
+      },
+      nextBookings,
+      updatedLinks !== null ? updatedLinks : stayBookingLinks
+    );
 
     handleSendMessage(
       `Ik heb een accommodatie toegevoegd voor ${booking.island || booking.location}: ${booking.name} (€${booking.pricePerNight || 150}/nacht, Status: ${booking.status}). Update mijn reis- en dagschema!`
@@ -472,7 +527,55 @@ export default function App() {
   };
 
   const handleDeleteCustomBooking = (id: string) => {
-    setCustomBookings((prev) => prev.filter((b) => b.id !== id));
+    const nextBookings = customBookings.filter((b) => b.id !== id);
+    setCustomBookings(nextBookings);
+
+    // Remove any links that referenced the deleted booking
+    const nextLinks: Record<string, string> = {};
+    for (const [stayId, bookingId] of Object.entries(stayBookingLinks)) {
+      if (bookingId !== id) nextLinks[stayId] = bookingId;
+    }
+    setStayBookingLinks(nextLinks);
+    try {
+      localStorage.setItem('athena_stay_booking_links', JSON.stringify(nextLinks));
+    } catch (e) {
+      console.error("Failed to save stay-booking links", e);
+    }
+
+    updateAndSaveTrip(currentTrip, nextBookings, nextLinks);
+  };
+
+  const handleLinkStayBooking = (stayId: string, bookingId: string) => {
+    const next = { ...stayBookingLinks, [stayId]: bookingId };
+    setStayBookingLinks(next);
+    try {
+      localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
+    } catch (e) {
+      console.error("Failed to save stay-booking links", e);
+    }
+
+    const booking = customBookings.find((b) => b.id === bookingId);
+    if (booking) {
+      const updatedStays = currentTrip.stays.map((s) =>
+        s.id === stayId ? { ...s, accommodationName: booking.name } : s
+      );
+      updateAndSaveTrip({ ...currentTrip, stays: updatedStays }, undefined, next);
+    }
+  };
+
+  const handleUnlinkStayBooking = (stayId: string) => {
+    const next: Record<string, string> = {};
+    for (const [id, bookingId] of Object.entries(stayBookingLinks)) {
+      if (id !== stayId) next[id] = bookingId;
+    }
+    setStayBookingLinks(next);
+    try {
+      localStorage.setItem('athena_stay_booking_links', JSON.stringify(next));
+    } catch (e) {
+      console.error("Failed to save stay-booking links", e);
+    }
+
+    updateAndSaveTrip(currentTrip, undefined, next);
   };
 
   // Send message to backend Gemini API concierge & auto-parse uploaded itineraries
@@ -574,6 +677,7 @@ export default function App() {
             ? [{ label: ' Bekijk Mijn Reis', action: '/travel' }]
             : [{ label: ' Inloggen om Opslaan Goed te keuren', action: 'login' }]
           : undefined,
+        sources: data.sources,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
@@ -616,7 +720,17 @@ export default function App() {
   };
 
   const handleCreateTrip = (newTrip: TripData) => {
-    updateAndSaveTrip(newTrip);
+    // A new trip starts with no booked accommodations or links. Reset state and
+    // persist the fresh state to the Google Sheet so the DB matches the new trip.
+    setCustomBookings([]);
+    setStayBookingLinks({});
+    try {
+      localStorage.setItem('athena_stay_booking_links', JSON.stringify({}));
+    } catch (e) {
+      console.error("Failed to clear stay-booking links", e);
+    }
+
+    updateAndSaveTrip(newTrip, [], {});
     setActiveTab('itinerary');
 
     const staySummary = newTrip.stays
@@ -675,6 +789,9 @@ export default function App() {
             onDeleteStay={handleDeleteStay}
             customBookings={customBookings}
             onDeleteCustomBooking={handleDeleteCustomBooking}
+            stayBookingLinks={stayBookingLinks}
+            onLinkStayBooking={handleLinkStayBooking}
+            onUnlinkStayBooking={handleUnlinkStayBooking}
             onLoginClick={() => setActiveTab('login')}
             sheetUrl={sheetUrl}
             isSheetsConnected={isSheetsConnected}
@@ -708,6 +825,7 @@ export default function App() {
             messages={messages}
             onSendMessage={handleSendMessage}
             onTriggerQuickAction={handleTriggerQuickAction}
+            currentTrip={currentTrip}
           />
         )}
 

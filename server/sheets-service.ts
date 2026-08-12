@@ -127,7 +127,7 @@ async function ensureTabsExist(sheets: any, spreadsheetId: string) {
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const existingSheetTitles = (meta.data.sheets || []).map((s: any) => s.properties.title);
     
-    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings"];
+    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks"];
     const missingTabs = requiredTabs.filter((title) => !existingSheetTitles.includes(title));
 
     if (missingTabs.length > 0) {
@@ -242,6 +242,7 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
           { properties: { title: "Stays" } },
           { properties: { title: "Users" } },
           { properties: { title: "CustomBookings" } },
+          { properties: { title: "BookingLinks" } },
         ],
       },
     });
@@ -284,9 +285,15 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
             ],
           },
           {
-            range: "CustomBookings!A1:F1",
+            range: "CustomBookings!A1:I1",
             values: [
-              ["ID", "Name", "Location", "Status", "Island", "PricePerNight"]
+              ["ID", "Name", "Location", "Status", "Island", "PricePerNight", "CheckIn", "CheckOut", "Image"]
+            ],
+          },
+          {
+            range: "BookingLinks!A1:B1",
+            values: [
+              ["StayID", "BookingID"]
             ],
           },
         ],
@@ -302,7 +309,11 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
   }
 }
 
-export async function saveTripToSheet(tripData: any, customBookings: any[] = []): Promise<void> {
+export async function saveTripToSheet(
+  tripData: any,
+  customBookings: any[] = [],
+  stayBookingLinks: Record<string, string> = {}
+): Promise<void> {
   const auth = getOAuthClient();
   if (!auth) throw new Error("OAuth parameters ontbreken (vereist GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN).");
 
@@ -420,16 +431,26 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
     });
 
     // Format Custom Bookings rows
-    const bookingHeaders = ["ID", "Name", "Location", "Status", "Island", "PricePerNight"];
+    const bookingHeaders = ["ID", "Name", "Location", "Status", "Island", "PricePerNight", "CheckIn", "CheckOut", "Image"];
     const bookingRows = validBookings.map((b: any) => [
       b.id,
       b.name,
       b.location,
       b.status || "PENDING",
       b.island || "",
-      b.pricePerNight || ""
+      b.pricePerNight || "",
+      b.checkIn || "",
+      b.checkOut || "",
+      b.image || ""
     ]);
     const bookingValues = [bookingHeaders, ...bookingRows];
+
+    // Format Booking Links rows (stayId -> bookingId)
+    const linkHeaders = ["StayID", "BookingID"];
+    const linkRows = Object.entries(stayBookingLinks || {})
+      .filter(([stayId, bookingId]) => stayId && bookingId)
+      .map(([stayId, bookingId]) => [stayId, bookingId]);
+    const linkValues = [linkHeaders, ...linkRows];
 
     // Overwrite values
     await sheets.spreadsheets.values.batchUpdate({
@@ -439,7 +460,8 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
         data: [
           { range: "TripInfo!A1:G2", values: tripInfoValues },
           { range: `Stays!A1:G${Math.max(staysValues.length, 2)}`, values: staysValues },
-          { range: `CustomBookings!A1:F${Math.max(bookingValues.length, 2)}`, values: bookingValues }
+          { range: `CustomBookings!A1:I${Math.max(bookingValues.length, 2)}`, values: bookingValues },
+          { range: `BookingLinks!A1:B${Math.max(linkValues.length, 2)}`, values: linkValues }
         ]
       }
     });
@@ -448,7 +470,7 @@ export async function saveTripToSheet(tripData: any, customBookings: any[] = [])
   }
 }
 
-export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: any[]; sheetUrl: string }> {
+export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: any[]; stayBookingLinks: Record<string, string>; sheetUrl: string }> {
   const auth = getOAuthClient();
   if (!auth) throw new Error("Google auth parameters ontbreken.");
 
@@ -460,13 +482,14 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
 
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:F50"],
+      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:I50", "BookingLinks!A2:B50"],
     });
 
     const valueRanges = res.data.valueRanges || [];
     const tripRow = valueRanges[0]?.values?.[0];
     const staysRows = valueRanges[1]?.values || [];
     const bookingRows = valueRanges[2]?.values || [];
+    const linkRows = valueRanges[3]?.values || [];
 
     const loadedStays = staysRows
       .filter((row: any) => row && row[1]) // Must have an island name
@@ -499,9 +522,19 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
         status: row[3] || "CONFIRMED",
         island: row[4] || "",
         pricePerNight: Number(row[5]) || 150,
+        checkIn: row[6] || "",
+        checkOut: row[7] || "",
+        image: row[8] || "",
       }));
 
-    return { trip, customBookings, sheetUrl: spreadsheetUrl };
+    const stayBookingLinks = linkRows
+      .filter((row: any) => row && row[0] && row[1])
+      .reduce<Record<string, string>>((acc, row: any) => {
+        acc[row[0]] = row[1];
+        return acc;
+      }, {});
+
+    return { trip, customBookings, stayBookingLinks, sheetUrl: spreadsheetUrl };
   } catch (err: any) {
     throw new Error(formatGoogleError(err));
   }

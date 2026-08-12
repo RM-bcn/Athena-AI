@@ -65,6 +65,8 @@ export interface Accommodation {
   location: string;
   status: 'CONFIRMED' | 'PAST STAY' | 'PENDING';
   image: string;
+  checkIn?: string;   // YYYY-MM-DD
+  checkOut?: string;  // YYYY-MM-DD
 }
 
 export interface LocalTip {
@@ -99,6 +101,7 @@ export interface ChatMessage {
   content: string;
   cards?: TravelCardData[];
   quickButtons?: { label: string; action: string }[];
+  sources?: { title: string; url: string }[];
   attachment?: {
     name: string;
     type: string;

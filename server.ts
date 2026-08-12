@@ -10,6 +10,8 @@ import {
   getUserFromSheet,
 } from "./server/sheets-service.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
+import { getWeather, searchWeb, findRestaurants, getCityTips } from "./server/live-providers.js";
+import type { ToolResult, Source } from "./server/live-providers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,8 +85,8 @@ app.post("/api/sheets/save", async (req, res) => {
         error: "Google OAuth parameter GOOGLE_REFRESH_TOKEN ontbreekt. In Vercel staat deze op 'Production' maar niet op 'Preview'. Pas de Vercel Environment Variable instelling aan naar 'Production and Preview'."
       });
     }
-    const { trip, customBookings } = req.body;
-    await saveTripToSheet(trip, customBookings || []);
+    const { trip, customBookings, stayBookingLinks } = req.body;
+    await saveTripToSheet(trip, customBookings || [], stayBookingLinks || {});
     const { spreadsheetUrl } = await getOrCreateSpreadsheet();
     res.json({ success: true, spreadsheetUrl });
   } catch (err: any) {
@@ -131,13 +133,13 @@ function getGeminiClient() {
 }
 
 // Helper to call Groq API safely (Primary AI Engine with multi-model fallback)
-async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ content: string; model: string } | null> {
+async function callGroqAI(systemPrompt: string, userPrompt: string, retriesLeft = 2): Promise<{ content: string; model: string } | null> {
   const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
   if (!apiKey) {
     return null;
   }
 
-  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"];
+  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
 
   for (const model of models) {
     try {
@@ -167,6 +169,13 @@ async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ c
       } else {
         const errText = await res.text();
         console.warn(`Groq API model ${model} error (${res.status}):`, errText);
+        if (res.status === 429) {
+          if (retriesLeft <= 0) break;
+          const waitMs = parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000;
+          if (waitMs > 5000) break; // sustained limit (e.g. daily budget) — hand over to Gemini quickly
+          await sleep(waitMs);
+          return callGroqAI(systemPrompt, userPrompt, retriesLeft - 1);
+        }
       }
     } catch (err) {
       console.warn(`Groq API exception for model ${model}:`, err);
@@ -176,6 +185,37 @@ async function callGroqAI(systemPrompt: string, userPrompt: string): Promise<{ c
   return null;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function parseRetryAfterMs(errText: string, retryAfter: string | null): number | null {
+  if (retryAfter) {
+    const secs = Number(retryAfter);
+    if (Number.isFinite(secs)) return secs * 1000;
+  }
+  const m = (errText || "").match(/try again in ([\d.]+)s/);
+  if (m) return Math.ceil(Number(m[1])) * 1000;
+  return null;
+}
+
+function parseFailedGeneration(errText: string): { name: string; arguments: any } | null {
+  let gen = errText || "";
+  try {
+    const parsed = JSON.parse(errText);
+    gen = parsed?.error?.failed_generation || gen;
+  } catch {
+    // raw text fallback below
+  }
+  const m = gen.match(/<\s*function=(\w+)[\s=]*(\{[\s\S]*?\})\s*(?:>\s*)?<\s*\/\s*function\s*>/i);
+  if (!m) return null;
+  try {
+    return { name: m[1], arguments: JSON.parse(m[2]) };
+  } catch {
+    return null;
+  }
+}
+
 // API: AI Engine Status
 app.get("/api/ai/status", (req, res) => {
   const groqKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
@@ -183,6 +223,7 @@ app.get("/api/ai/status", (req, res) => {
 
   const hasGroq = !!(groqKey && groqKey !== "MY_GROQ_API_KEY");
   const hasGemini = !!(geminiKey && geminiKey !== "MY_GEMINI_API_KEY");
+  const duckduckgoEnabled = getEnvVal("DUCKDUCKGO_ENABLED", "duckduckgo_enabled") !== "false";
 
   res.json({
     activeEngine: hasGroq
@@ -192,6 +233,9 @@ app.get("/api/ai/status", (req, res) => {
       : "Athena Greek Concierge Engine",
     hasGroqKey: hasGroq,
     hasGeminiKey: hasGemini,
+    liveSearch: duckduckgoEnabled
+      ? "DuckDuckGo (gratis, geen API-sleutel nodig)"
+      : "Uitgeschakeld",
   });
 });
 
@@ -207,6 +251,338 @@ function parseAIJsonBlock(text: string): any | null {
     return null;
   }
   return null;
+}
+
+const GREEK_ISLAND_NAMES = [
+  "naxos", "milos", "koufonisia", "santorini", "mykonos", "paros", "antiparos", "ios",
+  "tinos", "syros", "sifnos", "amorgos", "folegandros", "serifos", "kimolos", "samos",
+  "crete", "kreta", "rhodes", "corfu", "zakynthos", "kefalonia", "hydra", "poros", "egina",
+];
+
+const LIVE_INFO_KEYWORDS = [
+  // Restaurants & food
+  "restaurant", "taverna", "tavern", "eten", "eet", "eetcafé", "food", "menu", "menukaart",
+  "prijs", "prijzen", "kosten", "ontbijt", "lunch", "diner", "dinner", "gyros", "souvlaki",
+  "seafood", "fish", "octopus", "wijn", "drinks", "café", "cafe", "bistro", "grieks eten",
+  // Weather
+  "weer", "weersverwachting", "temperature", "temperatuur", "regen", "zon", "wind",
+  "meltemi", "graden", "forecast", "degrees", "het weer",
+  // Events
+  "events", "evenement", "evenementen", "festival", "feest", "concert", "party",
+  "panigiri", "celebratie",
+  // Ferry & transport
+  "ferry", "ferries", "veer", "timetable", "dienstregeling", "afvaart", "schepen", "boot",
+  "catamaran", "hydrofoil", "seajets", "blue star", "haven", "port", "veerboten",
+  // Sights & activities
+  "strand", "beach", "bezienswaardigheid", "bezienswaardigheden", "sights", "attracties",
+  "hike", "wandeling", "wandelen", "beste", "best", "top", "must-see", "shop", "shopping",
+  "winkels", "markt", "activities",
+  // Practical info
+  "open", "openingsuren", "openingstijden", "geopend", "entree", "ticket", "tickets",
+  "reserveren", "reservation", "booking", "hoe laat", "wanneer", "waar", "tips",
+];
+
+function needsLiveSearch(message: string): boolean {
+  const lower = message.toLowerCase();
+  return LIVE_INFO_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+// ---------------------------------------------------------------------------
+// Groq tool-calling agent (live info tools: search_web, get_weather,
+// find_restaurants, get_city_tips) — all providers are free & keyless.
+// ---------------------------------------------------------------------------
+const TOOL_DEFINITIONS = [
+  {
+    type: "function",
+    function: {
+      name: "search_web",
+      description:
+        "Live zoekopdracht op het web (DuckDuckGo, met Wikipedia/Wikivoyage als fallback) voor actuele info en algemene vragen: prijzen, openingstijden, evenementen, ferry's, excursies, bezienswaardigheden, lokale weetjes. Gebruik NIET voor een lijst van concrete restaurants: daarvoor is find_restaurants beter (via OpenStreetMap). Geef een gerichte Nederlandse zoekopdracht, b.v. 'veerboot Naxos Koufonisia tijden'.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "De zoekopdracht, in het Nederlands, b.v. 'beste restaurants Naxos 2026'" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_weather",
+      description:
+        "Huidige weersverwachting (vandaag + 5 dagen) voor een plaats of eiland via Open-Meteo (gratis, geen sleutel). Gebruik dit wanneer de reiziger vraagt naar het weer, temperaturen, regen of wind.",
+      parameters: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "Plaats of eiland, b.v. 'Naxos, Griekenland'" },
+        },
+        required: ["location"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "find_restaurants",
+      description:
+        "Live restaurants rond een locatie opvragen via OpenStreetMap (namen, keuken, adres, openingstijden). Gebruik dit voor concrete restaurants in de buurt van een plaats.",
+      parameters: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "Plaats of eiland, b.v. 'Naxos Stad'" },
+          radius: { type: "number", description: "Zoekstraal in meters (optioneel, standaard 5000)" },
+        },
+        required: ["location"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_city_tips",
+      description:
+        "Reistips over een stad of eiland uit Wikipedia en Wikivoyage: bezienswaardigheden, wat te doen, achtergrond. Gebruik dit voor algemene vragen over een bestemming.",
+      parameters: {
+        type: "object",
+        properties: {
+          city: { type: "string", description: "Stad of eiland, b.v. 'Naxos'" },
+        },
+        required: ["city"],
+      },
+    },
+  },
+];
+
+async function executeTool(name: string, args: any): Promise<ToolResult> {
+  try {
+    switch (name) {
+      case "search_web":
+        return await searchWeb(args?.query || "");
+      case "get_weather":
+        return await getWeather(args?.location || "");
+      case "find_restaurants":
+        return await findRestaurants(args?.location || "", args?.radius);
+      case "get_city_tips":
+        return await getCityTips(args?.city || "");
+      default:
+        return { text: `Onbekende tool: ${name}` };
+    }
+  } catch (err: any) {
+    console.warn(`Tool ${name} error:`, err?.message || err);
+    return { text: `Fout bij het uitvoeren van ${name}: ${err?.message || err}` };
+  }
+}
+
+async function callGroqAgent(
+  systemPrompt: string,
+  userPrompt: string
+): Promise<{ content: string; model: string; sources: Source[]; rateLimited: boolean } | null> {
+  const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
+  if (!apiKey) return null;
+
+  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+  let hardRateLimited = false;
+
+  for (const model of models) {
+    const messages: any[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ];
+    const collectedSources: Source[] = [];
+    let rounds = 0;
+    let toolRoundsUsed = false;
+    let consecutive429 = 0;
+    try {
+      while (rounds < 4) {
+        rounds++;
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.7,
+            max_tokens: 1600,
+            tools: TOOL_DEFINITIONS,
+            tool_choice: "auto",
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn(`Groq agent model ${model} error (${res.status}):`, errText);
+          if (res.status === 429) {
+            const waitMs = parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000;
+            if (consecutive429 >= 1 || waitMs > 5000) {
+              hardRateLimited = true;
+              break; // sustained rate limit (e.g. daily budget) — hand over to Gemini quickly
+            }
+            consecutive429++;
+            await sleep(Math.min(waitMs, 4000));
+            rounds--; // retry this round after a short backoff
+            continue;
+          }
+          if (res.status === 400 && errText.includes("tool_use_failed")) {
+            const parsed = parseFailedGeneration(errText);
+            if (parsed) {
+              toolRoundsUsed = true;
+              const result = await executeTool(parsed.name, parsed.arguments);
+              if (result.sources) {
+                for (const s of result.sources) {
+                  if (!collectedSources.some((x) => x.url === s.url)) collectedSources.push(s);
+                }
+              }
+              messages.push({
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: "call_retry_0",
+                    type: "function",
+                    function: { name: parsed.name, arguments: JSON.stringify(parsed.arguments) },
+                  },
+                ],
+              });
+              messages.push({ role: "tool", tool_call_id: "call_retry_0", content: result.text });
+              continue;
+            }
+          }
+          break;
+        }
+
+        const data = await res.json();
+        const msg = data.choices?.[0]?.message;
+        const content = msg?.content || "";
+        const toolCalls = msg?.tool_calls || [];
+
+        if (toolCalls.length > 0) {
+          toolRoundsUsed = true;
+          messages.push(msg);
+          for (const tc of toolCalls) {
+            let args: any = {};
+            try {
+              args = JSON.parse(tc.function?.arguments || "{}");
+            } catch {
+              args = {};
+            }
+            const result = await executeTool(tc.function?.name, args);
+            if (result.sources) {
+              for (const s of result.sources) {
+                if (!collectedSources.some((x) => x.url === s.url)) collectedSources.push(s);
+              }
+            }
+            messages.push({ role: "tool", tool_call_id: tc.id, content: result.text });
+          }
+          continue;
+        }
+
+        // Sommige modellen (vooral Groq 8b) verwerken de functie-aanroep als raw
+        // tekst in de content: <function=name{...}</function>, in plaats van via
+        // het gestructureerde tool_calls-veld. Parse + execute die tag en blijf in
+        // de agent-loop, anders wordt de rauwe tag als eind-antwoord getoond.
+        if (!toolCalls.length && content && /<\s*function=\w+[\s=]*\{/i.test(content)) {
+          const embedded = parseFailedGeneration(content);
+          if (embedded) {
+            toolRoundsUsed = true;
+            const result = await executeTool(embedded.name, embedded.arguments);
+            if (result.sources) {
+              for (const s of result.sources) {
+                if (!collectedSources.some((x) => x.url === s.url)) collectedSources.push(s);
+              }
+            }
+            messages.push({
+              role: "assistant",
+              content: null,
+              tool_calls: [
+                {
+                  id: `call_embedded_${rounds}`,
+                  type: "function",
+                  function: { name: embedded.name, arguments: JSON.stringify(embedded.arguments) },
+                },
+              ],
+            });
+            messages.push({ role: "tool", tool_call_id: `call_embedded_${rounds}`, content: result.text });
+            continue;
+          }
+        }
+
+        if (content) {
+          return { content, model, sources: collectedSources.slice(0, 8), rateLimited: hardRateLimited };
+        }
+        return { content: "", model: "", sources: [], rateLimited: hardRateLimited };
+      }
+
+      // Tool rounds exhausted without a final answer: synthesize from the tool results.
+      if (toolRoundsUsed && collectedSources.length > 0) {
+        const finalRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.7,
+            max_tokens: 1600,
+          }),
+        });
+        if (finalRes.ok) {
+          const finalData = await finalRes.json();
+          const finalContent = finalData.choices?.[0]?.message?.content;
+          if (finalContent) {
+            return { content: finalContent, model, sources: collectedSources.slice(0, 8), rateLimited: hardRateLimited };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`Groq agent exception for model ${model}:`, err);
+    }
+  }
+  return { content: "", model: "", sources: [], rateLimited: hardRateLimited };
+}
+
+const WEATHER_KEYWORDS = [
+  "weer", "weers", "weersverwachting", "temperatuur", "temperature", "graden",
+  "degrees", "forecast", "regen", "zon", "wind", "meltemi",
+];
+
+function formatDate(dateStr: string): string {
+  const parts = (dateStr || "").split("-");
+  if (parts.length < 3) return dateStr || "?";
+  const months = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+  return `${Number(parts[2])} ${months[Number(parts[1]) - 1] || parts[1]}`;
+}
+
+async function probeFallback(message: string, context: string, defaultIsland = ""): Promise<ToolResult | null> {
+  const lower = message.toLowerCase();
+  const islandMatch = (context || "").match(/([A-Za-zÀ-ÿ'-]+):\s*\d{4}-\d{2}-\d{2}/);
+  const firstIsland = islandMatch ? islandMatch[1] : "";
+  if (WEATHER_KEYWORDS.some((k) => lower.includes(k))) {
+    const mentioned = lower.match(/\b(naxos|milos|koufonisia|santorini|mykonos|paros|antiparos|ios|tinos|syros|sifnos|amorgos|folegandros|serifos|kimolos|athene|glyfada)\b/);
+    const loc = mentioned?.[1] || firstIsland || defaultIsland || "Naxos";
+    return getWeather(loc);
+  }
+  return searchWeb(buildSearchQuery(message, context, defaultIsland));
+}
+
+function buildSearchQuery(message: string, context: string, defaultIsland = ""): string {
+  const cleaned = message
+    .replace(/^\/\w+\s*/i, "")
+    .replace(/^athena[,\s]+/i, "")
+    .trim();
+  if (!cleaned) return "Griekenland Cycladen";
+  const islandMatch = (context || "").match(/([A-Za-zÀ-ÿ'-]+):\s*\d{4}-\d{2}-\d{2}/);
+  const firstIsland = islandMatch ? islandMatch[1] : "";
+  const lower = cleaned.toLowerCase();
+  const mentionsIsland = GREEK_ISLAND_NAMES.some((n) => lower.includes(n));
+  if (!mentionsIsland && (firstIsland || defaultIsland)) return `${cleaned} ${firstIsland || defaultIsland}`;
+  return cleaned;
 }
 
 // API: General Concierge Chat & Itinerary Auto-Parser
@@ -225,7 +601,40 @@ app.post("/api/chat", async (req, res) => {
 
     const travelerName = typeof userName === "string" && userName.trim() ? userName.trim() : "Reiziger";
 
-    const systemPrompt = isTripUpdateCommand
+    const duckduckgoEnabled = getEnvVal("DUCKDUCKGO_ENABLED", "duckduckgo_enabled") !== "false";
+    const needsLive = duckduckgoEnabled && !isTripUpdateCommand && !attachment && needsLiveSearch(lastUserMsg);
+    let liveDataBlock = "";
+    let fallbackSources: Source[] = [];
+
+    // Build traveler context from Google Sheets so Athena knows where the traveler is staying
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    let tripContextBlock = "";
+    let currentIsland = "";
+    if (!isTripUpdateCommand && isGoogleAuthConfigured()) {
+      try {
+        const { trip } = await loadTripFromSheet();
+        const stays = (trip?.stays || []).sort((a: any, b: any) => (a.startDate || "").localeCompare(b.startDate || ""));
+        if (stays.length > 0) {
+          const current =
+            stays.find((s: any) => todayStr >= s.startDate && todayStr <= s.endDate) ||
+            stays.find((s: any) => s.startDate >= todayStr) ||
+            stays[0];
+          currentIsland = current?.island || "";
+          const lines = [
+            "REIZIGERCONTEXT (opgehaald uit jouw Google Sheets reisplanning — dit is de waarheid over waar de reiziger verblijft):",
+            `- Huidig/volgend verblijf: ${current.island}${current.accommodationName ? ` (${current.accommodationName})` : ""}, ${formatDate(current.startDate)} t/m ${formatDate(current.endDate)}${current.nights ? `, ${current.nights} nachten` : ""}`,
+            `- Volledige route: ${stays.map((s: any) => `${s.island} (${formatDate(s.startDate)}-${formatDate(s.endDate)})`).join(", ")}`,
+            "- Gebruik dit verblijf als uitgangspunt bij aanbevelingen (restaurants, stranden, weer, activiteiten in de buurt).",
+          ];
+          tripContextBlock = lines.join("\n");
+        }
+      } catch (tripErr: any) {
+        console.warn("Trip context load from sheet skipped:", tripErr?.message || tripErr);
+      }
+    }
+
+    let systemPrompt = isTripUpdateCommand
       ? `You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands.
 You speak warmly, eloquently, and in fluent Dutch ("Kalimera", "Yassas", local tips on ferries, tavernas, hidden beaches).
 
@@ -275,16 +684,14 @@ CRITICAL USER IDENTIFICATION RULE:
 - Only use a specific name if it appears in the conversation history or context provided.
 - Current traveler name: ${travelerName}
 
-CRITICAL ANTI-HALLUCINATION RULES FOR RESTAURANTS & RECOMMENDATIONS:
-- DO NOT invent or hallucinate specific restaurant names, menu items, prices, or locations unless they are well-known, established establishments you are confidently certain about.
-- When asked for restaurant recommendations or food tips:
-  * Acknowledge that you don't have real-time access to current menus, prices, opening hours, or availability.
-  * Suggest the USER search online for current information using Google Maps, TripAdvisor, Booking.com, or local tourism websites.
-  * Offer general guidance about typical dishes, areas known for good food, neighborhoods to explore, or what to look for in quality tavernas.
-  * Use phrases like: "Ik raad aan om online te zoeken naar actuele reviews op Google Maps of TripAdvisor" or "Voor de meest recente menu's, prijzen en openingstijden, kun je het beste direct bij het restaurant kijken of een platform zoals TripAdvisor raadplegen".
-- If unsure about specific details, be honest and transparent: "Ik heb geen live toegang tot actuele informatie, maar ik kan je wel algemene tips geven...".
-- NEVER make up specific prices, dish names, or street addresses unless you are absolutely certain from your training data about well-established venues.
-- When providing recommendations, frame them as general suggestions rather than definitive statements.
+CRITICAL RESEARCH RULES (use your live tools FIRST — never guess when you can look it up):
+- When the traveler asks about restaurants, taverna's or food: ALWAYS call find_restaurants first. It works via OpenStreetMap and also covers cities like Athene/Glyfada. Recommend the real places it returns, including their cuisine and address.
+- When the traveler asks about weather, events, ferries, sights or practical info: call the matching live tool (get_weather, search_web, get_city_tips) BEFORE answering.
+- Never invent restaurant names, prices, opening hours, ratings or locations. Only list what the tool results actually contain.
+- If find_restaurants (or any tool) returned concrete results, you MUST copy the found names (with cuisine and address) into your answer verbatim as a numbered list. NEVER say "geen restaurants gevonden" or "ik kon niets vinden" when the tool result contains places.
+- Never claim you used Google Maps, TripAdvisor, Booking.com or any other source that is not actually present in the tool results.
+- Do NOT narrate what you are about to do (e.g. "Ik zal een live zoekactie uitvoeren..."). Call the tool directly and immediately give the concrete answer.
+- If a tool returns no useful results, say that honestly, then give general (non-fabricated) guidance and suggest online search.
 
 Current traveler context: ${context || "Cyclades Hopping"}.
 Current traveler name: ${travelerName}.
@@ -313,72 +720,182 @@ Return JSON in this format:
   }
 }
 \`\`\`
-If no travel schedule update is present, reply in standard conversational Dutch without JSON.`;
+If no travel schedule update is present, reply in standard conversational Dutch without JSON.
+
+LIVE INFO TOOLS AVAILABLE (use them for any current/practical information):
+- find_restaurants(location): concrete restaurants via OpenStreetMap (namen, keuken, adres, openingstijden). GEBRUIK DEZE VOOR ALLE RESTAURANT-/TAVERNA-/EETVRAGEN — werkt ook in steden als Athene/Glyfada.
+- get_weather(location): live weersverwachting (vandaag + 5 dagen) via Open-Meteo.
+- get_city_tips(city): reistips over een bestemming via Wikipedia & Wikivoyage.
+- search_web(query): web search (DuckDuckGo, Wikipedia & Wikivoyage fallback) voor ferry's, evenementen, prijzen, openingstijden en algemene vragen (NIET voor restaurantlijsten).
+Werkwijze: roep direct het juiste gereedschap aan en geef meteen het antwoord. Gebruik uitsluitend namen/feiten uit de tool-resultaten, verzin niets en claim geen bronnen die je niet echt gebruikt hebt. Citeer de bronnen.`;
+
+    if (tripContextBlock) {
+      systemPrompt += `\n\n${tripContextBlock}`;
+    }
+
+    if (liveDataBlock) {
+      systemPrompt += `
+
+LIVE DATA RETRIEVED (this is your source of truth for THIS answer):
+${liveDataBlock}
+
+RULES WHEN LIVE DATA IS PRESENT:
+- You DO have real-time data now. Base your answer on it and cite the source URLs inline, e.g. "(bron: <url>)".
+- Do NOT invent restaurants, prices, weather forecasts, events, or ferry times that are not present in the data.
+- If the data does not fully answer the question, say so honestly and add general guidance from your own knowledge.
+- Keep your warm Athena concierge tone and reply in fluent Dutch.`;
+    }
 
     const userPromptText = userMsgList.map((m: any) => `${m.role === 'user' ? 'Traveler' : 'Athena'}: ${m.content}`).join('\n');
 
-    // 1. Primary Engine: Try Groq AI (Llama 3.3 70B & Fallbacks)
+    // 1. Primary Engine: Groq tool-calling agent (live info tools)
+    let agentRes: { content: string; model: string; sources: Source[]; rateLimited: boolean } | null = null;
+    if (needsLive) {
+      try {
+        agentRes = await callGroqAgent(systemPrompt, userPromptText);
+      } catch (agentErr) {
+        console.warn("Groq agent failed, falling back:", agentErr);
+      }
+    }
+
+    if (agentRes && agentRes.content) {
+      const parsedJson = parseAIJsonBlock(agentRes.content);
+      if (parsedJson && parsedJson.tripUpdate) {
+        return res.json({
+          reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt.",
+          tripUpdate: parsedJson.tripUpdate,
+          engine: `Groq (${agentRes.model})`,
+          sources: agentRes.sources.length ? agentRes.sources : undefined
+        });
+      }
+      return res.json({
+        reply: agentRes.content,
+        engine: `Groq (${agentRes.model})`,
+        sources: agentRes.sources.length ? agentRes.sources : undefined
+      });
+    }
+
+    // 1b. Fallback: live data probe (weather / DDG web search) when tool agent unavailable
+    if (needsLive && !liveDataBlock) {
+      try {
+        const probe = await probeFallback(lastUserMsg, context || "", currentIsland);
+        if (probe && probe.text && probe.text !== "Geen resultaten gevonden.") {
+          liveDataBlock = probe.text;
+          if (probe.sources) fallbackSources = probe.sources;
+        }
+      } catch (probeErr) {
+        console.warn("Live data probe failed:", probeErr);
+      }
+    }
+
+    // 2. Classic Groq call (skipped when the agent already hit a hard rate limit,
+    //    so we hand over to Gemini earlier instead of burning more retries/time)
     const groqUserPrompt = isTripUpdateCommand
       ? `The traveler used /tripupdate with the following new booking details:\n${tripUpdateDetails}\n\nCurrent trip context: ${context}\n\nExtract and return the full updated stays array as JSON.`
-      : `${userPromptText}${
+      : `${userPromptText}${liveDataBlock ? `\n\n${liveDataBlock}` : ''}${
           attachment?.text ? `\n\n[Bijgevoegd Document Content (${attachment.name})]:\n${attachment.text}` : ''
         }${
           attachment?.name && !attachment?.text ? `\n\n[Bijgevoegd Bestand: ${attachment.name}]` : ''
         }`;
 
-    const groqRes = await callGroqAI(systemPrompt, groqUserPrompt);
-    if (groqRes && groqRes.content) {
-      const parsedJson = parseAIJsonBlock(groqRes.content);
-      if (parsedJson && parsedJson.tripUpdate) {
+    if (!(agentRes && agentRes.rateLimited)) {
+      const groqRes = await callGroqAI(systemPrompt, groqUserPrompt);
+      if (groqRes && groqRes.content) {
+        const parsedJson = parseAIJsonBlock(groqRes.content);
+        if (parsedJson && parsedJson.tripUpdate) {
+          return res.json({
+            reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI.",
+            tripUpdate: parsedJson.tripUpdate,
+            engine: `Groq (${groqRes.model})`,
+            sources: fallbackSources.length ? fallbackSources : undefined
+          });
+        }
         return res.json({
-          reply: parsedJson.reply || "Kalimera! Je reisschema is bijgewerkt door Groq AI.",
-          tripUpdate: parsedJson.tripUpdate,
-          engine: `Groq (${groqRes.model})`
+          reply: groqRes.content,
+          engine: `Groq (${groqRes.model})`,
+          sources: fallbackSources.length ? fallbackSources : undefined
         });
       }
-      return res.json({ reply: groqRes.content, engine: `Groq (${groqRes.model})` });
     }
 
-    // 2. Secondary Engine: Try Gemini AI safely (Multimodal fallback if image attached or Groq unavailable)
+    // 2. Secondary Engine: Try Gemini AI safely (fallback when Groq is unavailable)
     try {
       const ai = getGeminiClient();
       if (ai) {
-        const parts: any[] = [{ text: `${systemPrompt}\n\nChat History:\n${userPromptText}\n\nAthena:` }];
-        
+        // Beknopte, schone prompt voor Gemini: géén tool-instructies (die zijn
+        // alleen bedoeld voor de Groq-agent), wel live-data erinline zodat het
+        // een informatief antwoord kan geven.
+        const geminiSystem =
+          `Je bent Athena, een vriendkijke AI-reisgids voor Griekenland (met name de Cycladen). ` +
+          `Beantwoord in vloeiend Nederlands, in een warme concierge-toon. ` +
+          `Als er live-gegevens hieronder staan, gebruik die dan en citeer de bronnen. ` +
+          `Verzin geen restaurants, prijzen of openingstijden die niet in de gegevens staan. ` +
+          `Blijf beknopt en behulpzaam.`;
+
+        const liveDataText = liveDataBlock ? `\n\nLIVE GEGEVENS (gebruik deze bij je antwoord):\n${liveDataBlock}` : "";
+        const parts: any[] = [
+          {
+            text:
+              `${geminiSystem}\n\n` +
+              `Gespreksgeschiedenis:\n${userPromptText}` +
+              `${liveDataText}\n\n` +
+              `Antwoord:`,
+          },
+        ];
+
         if (attachment) {
           if (attachment.base64 && attachment.type?.startsWith("image/")) {
             const cleanBase64 = attachment.base64.replace(/^data:image\/\w+;base64,/, "");
             parts.push({
               inlineData: {
                 data: cleanBase64,
-                mimeType: attachment.type
-              }
+                mimeType: attachment.type,
+              },
             });
-            parts.push({ text: `Attached Image File (${attachment.name}): Please read the text/itinerary inside this image.` });
+            parts.push({ text: `Bijgevoegd afbeeldingsbestand (${attachment.name}): lees de tekst/het reisplan op de afbeelding.` });
           } else if (attachment.text) {
-            parts.push({ text: `Attached Document Content (${attachment.name}):\n${attachment.text}` });
+            parts.push({ text: `Bijgevoegd document (${attachment.name}):\n${attachment.text}` });
           }
         }
 
         const response = await ai.models.generateContent({
           model: "gemini-3.6-flash",
-          contents: [{ role: "user", parts }]
+          contents: [{ role: "user", parts }],
         });
 
-        const rawText = response.text || "";
-        const parsedJson = parseAIJsonBlock(rawText);
+        // Robuuste tekst-extractie: response.text kan leeg zijn als Gemini
+        // bijnaam/thought-parts levert; val dan terug op candidates.
+        let rawText = response.text || "";
+        if (!rawText && response.candidates?.[0]?.content?.parts) {
+          rawText = response.candidates[0].content.parts
+            .filter((p: any) => p.text)
+            .map((p: any) => p.text)
+            .join("\n")
+            .trim();
+        }
+        if (!rawText && (response as any).functionCalls?.length) {
+          rawText = `(Gemini wilde een tool aanroepen maar die is hier niet beschikbaar.)`;
+        }
+        console.info(
+          `Gemini fallback: textLen=${rawText.length} ` +
+            `finishReason=${response.candidates?.[0]?.finishReason || "?"} ` +
+            `thoughtsTokens=${response.usageMetadata?.thoughtsTokenCount || 0}`
+        );
 
+        const parsedJson = parseAIJsonBlock(rawText);
         if (parsedJson && parsedJson.tripUpdate) {
           return res.json({
             reply: parsedJson.reply || "Kalimera! Ik heb je reisplan verwerkt en je reisschema automatisch aangepast.",
             tripUpdate: parsedJson.tripUpdate,
-            engine: "Gemini 3.6 Flash (Itinerary Parser)"
+            engine: "Gemini 3.6 Flash (Itinerary Parser)",
+            sources: fallbackSources.length ? fallbackSources : undefined,
           });
         }
 
         return res.json({
           reply: rawText || "Yassou! Hoe kan ik je verder helpen met je reis?",
-          engine: "Gemini 3.6 Flash"
+          engine: "Gemini 3.6 Flash",
+          sources: fallbackSources.length ? fallbackSources : undefined,
         });
       }
     } catch (geminiErr: any) {
@@ -389,13 +906,15 @@ If no travel schedule update is present, reply in standard conversational Dutch 
 
     if (isTripUpdateCommand) {
       reply = `Kalimera! Ik heb je /tripupdate commando ontvangen maar kon de details niet volledig verwerken. Probeer het zo: /tripupdate Santorini, 17 sept - 21 sept, 4 nachten, Hotel Anastasis Apartments`;
+    } else if (liveDataBlock) {
+      reply = liveDataBlock;
     } else if (lastUserMsg.toLowerCase().includes("ferry")) {
-      reply += "High-speed ferries (Seajets & Blue Star) memeren dagelijks aan tussen Naxos, Milos, en Koufonisia. Ik raad aan 48 uur van tevoren te boeken.";
+      reply += "High-speed ferries (Seajets & Blue Star) meren dagelijks aan tussen Naxos, Milos, en Koufonisia. Ik raad aan 48 uur van tevoren te boeken.";
     } else {
       reply += "Typ /tripupdate gevolgd door je boekingsgegevens om je reisschema direct aan te passen! Bijv: /tripupdate Santorini, 17 sept - 21 sept, Hotel Caldera View";
     }
 
-    res.json({ reply, engine: "Greek Concierge Local Fallback" });
+    res.json({ reply, engine: "Greek Concierge Local Fallback", sources: fallbackSources.length ? fallbackSources : undefined });
   } catch (error: any) {
     console.error("Chat error:", error);
     res.json({

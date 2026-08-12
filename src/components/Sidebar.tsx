@@ -31,6 +31,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (onClose) onClose();
   };
 
+  const isAuthenticated = currentUser !== null || isGuestMode;
+
   return (
     <>
       {/* Mobile Backdrop Overlay */}
@@ -94,30 +96,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Primary Action Button */}
-      <button
-        onClick={() => handleNavClick(undefined, onOpenNewTrip)}
-        className="w-full bg-[#005BAE] text-white py-3 rounded-xl font-['Inter'] font-semibold text-sm flex items-center justify-center gap-2 mb-6 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-[#005BAE]/20 cursor-pointer"
-      >
-        <Plus className="w-4 h-4" />
-        Nieuwe Reis Plannen
-      </button>
+      {/* Primary Action Button - only show for authenticated users */}
+      {isAuthenticated && (
+        <button
+          onClick={() => handleNavClick(undefined, onOpenNewTrip)}
+          className="w-full bg-[#005BAE] text-white py-3 rounded-xl font-['Inter'] font-semibold text-sm flex items-center justify-center gap-2 mb-6 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-[#005BAE]/20 cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          Nieuwe Reis Plannen
+        </button>
+      )}
 
       {/* Navigation Tabs */}
       <nav className="flex-1 space-y-2">
-        <button
-          onClick={() => handleNavClick('itinerary')}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
-            activeTab === 'itinerary'
-              ? 'bg-[#005BAE] text-white shadow-sm'
-              : 'text-[#404752] hover:bg-[#f0f4f9]'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          Mijn Itinerary
-        </button>
+        {/* Itinerary - only for authenticated */}
+        {isAuthenticated && (
+          <button
+            onClick={() => handleNavClick('itinerary')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
+              activeTab === 'itinerary'
+                ? 'bg-[#005BAE] text-white shadow-sm'
+                : 'text-[#404752] hover:bg-[#f0f4f9]'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            Mijn Itinerary
+          </button>
+        )}
 
-        {!isGuestMode && (
+        {/* Chat - only for logged-in users (not guests) */}
+        {!isGuestMode && currentUser && (
           <button
             onClick={() => handleNavClick('chat')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
@@ -131,31 +139,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
-        <button
-          onClick={() => handleNavClick('quick-help')}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
-            activeTab === 'quick-help'
-              ? 'bg-[#005BAE] text-white shadow-sm'
-              : 'text-[#404752] hover:bg-[#f0f4f9]'
-          }`}
-        >
-          <HelpCircle className="w-4 h-4" />
-          Quick Help
-        </button>
+        {/* Quick Help - only for authenticated */}
+        {isAuthenticated && (
+          <button
+            onClick={() => handleNavClick('quick-help')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
+              activeTab === 'quick-help'
+                ? 'bg-[#005BAE] text-white shadow-sm'
+                : 'text-[#404752] hover:bg-[#f0f4f9]'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4" />
+            Quick Help
+          </button>
+        )}
       </nav>
 
       {/* Footer Tabs & Account Action */}
       <div className="pt-4 border-t border-[#c0c7d3]/30 space-y-1">
-        <button
-          onClick={() => handleNavClick('settings')}
-          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-['Inter'] font-medium text-xs transition-all text-left cursor-pointer ${
-            activeTab === 'settings' ? 'bg-[#f0f4f9] text-[#005BAE]' : 'text-[#404752] hover:bg-[#f0f4f9]'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          Instellingen
-        </button>
+        {/* Settings & Profile - only for logged-in users */}
+        {currentUser && (
+          <button
+            onClick={() => handleNavClick('settings')}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-['Inter'] font-medium text-xs transition-all text-left cursor-pointer ${
+              activeTab === 'settings' ? 'bg-[#f0f4f9] text-[#005BAE]' : 'text-[#404752] hover:bg-[#f0f4f9]'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            Instellingen
+          </button>
+        )}
 
+        {/* Support - visible for all */}
         <button
           onClick={() => handleNavClick('support')}
           className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-['Inter'] font-medium text-xs transition-all text-left cursor-pointer ${
@@ -166,6 +181,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Support
         </button>
 
+        {/* Login / Logout */}
         {currentUser ? (
           <button
             onClick={() => handleNavClick(undefined, onSignOut)}

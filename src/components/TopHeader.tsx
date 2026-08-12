@@ -91,7 +91,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             </>
           ) : (
             <>
-              {!isGuestMode && (
+              {currentUser && (
                 <button
                   onClick={() => setActiveTab('chat')}
                   className="font-['Inter'] text-sm transition-colors py-1 cursor-pointer text-[#404752] hover:text-[#005BAE]"
@@ -99,22 +99,26 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   Chat Interface
                 </button>
               )}
-              <button
-                onClick={() => setActiveTab('itinerary')}
-                className={`font-['Inter'] text-sm transition-colors py-1 cursor-pointer ${
-                  activeTab === 'itinerary' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
-                }`}
-              >
-                My Itinerary
-              </button>
-              <button
-                onClick={() => setActiveTab('quick-help')}
-                className={`font-['Inter'] text-sm transition-colors py-1 cursor-pointer ${
-                  activeTab === 'quick-help' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
-                }`}
-              >
-                Quick Help
-              </button>
+              {(currentUser || isGuestMode) && (
+                <>
+                  <button
+                    onClick={() => setActiveTab('itinerary')}
+                    className={`font-['Inter'] text-sm transition-colors py-1 cursor-pointer ${
+                      activeTab === 'itinerary' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
+                    }`}
+                  >
+                    My Itinerary
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('quick-help')}
+                    className={`font-['Inter'] text-sm transition-colors py-1 cursor-pointer ${
+                      activeTab === 'quick-help' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
+                    }`}
+                  >
+                    Quick Help
+                  </button>
+                </>
+              )}
             </>
           )}
         </nav>

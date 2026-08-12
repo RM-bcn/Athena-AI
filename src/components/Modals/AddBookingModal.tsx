@@ -130,6 +130,9 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
 
   const handleSelectTrivagoHotel = (hotel: TrivagoHotel) => {
     setAddedHotelId(hotel.id);
+    const matchingStay = tripStays.find(
+      (s) => s.island.toLowerCase() === (hotel.island || '').toLowerCase()
+    );
     onAddBooking({
       name: hotel.name,
       location: `${hotel.location}`,
@@ -137,6 +140,8 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
       status: 'CONFIRMED',
       pricePerNight: hotel.pricePerNight,
       image: hotel.image,
+      checkIn: matchingStay?.startDate,
+      checkOut: matchingStay?.endDate,
     });
 
     setTimeout(() => {
