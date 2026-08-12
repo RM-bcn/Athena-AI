@@ -8,9 +8,6 @@ import {
 } from '../types';
 import { getStayLinkInfo, StayLinkInfo } from '../utils/accommodationMatcher';
 import {
-  MAP_IMAGE,
-} from '../data/initialData';
-import {
   Share2,
   Download,
   Ship,
@@ -45,6 +42,7 @@ import { TransportDayRows } from '../transport/TransportDayRows';
 import { deriveLegs } from '../transport/transportLogic';
 import { TransportBookingModal } from '../transport/TransportBookingModal';
 import type { TransportEntry, TransportLeg } from '../transport/types';
+import { RouteMapBackground } from './RouteMapBackground';
 
 interface MyItineraryViewProps {
   currentTrip: TripData;
@@ -475,11 +473,8 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       {/* Visual Map / Timeline Hybrid Area */}
       <section className="mb-12 relative">
         <div className="w-full h-72 bg-white rounded-[32px] overflow-hidden shadow-sm relative border border-[#e1efff] group">
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-            style={{ backgroundImage: `url('${MAP_IMAGE}')` }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/50 to-transparent" />
+          <RouteMapBackground stays={currentTrip.stays} activeStayId={activeIslandId} />
+          <div className="absolute inset-0 bg-gradient-to-t from-white/90 via-white/25 to-transparent" />
 
           {/* Interactive Timeline Overlay */}
           <div className="absolute inset-x-0 bottom-0 p-6">
