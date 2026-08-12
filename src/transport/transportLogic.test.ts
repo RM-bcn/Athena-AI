@@ -12,6 +12,14 @@ import {
   resolveLegId,
 } from './transportLogic';
 import { TransportEntry } from './types';
+import {
+  athensNow,
+  buildVesselFinderEmbedUrl,
+  findBlueStarVessel,
+  formatCountdown,
+  getScheduleStatus,
+  normalizeVesselName,
+} from './ferryData';
 
 let passed = 0;
 let failed = 0;
@@ -131,6 +139,60 @@ console.log('earliestEntry');
   assert(earliestEntry([a, b])?.id === 'b', 'earliest departure wins');
   assert(earliestEntry([c])?.id === 'c', 'entry without time is only option');
   assert(earliestEntry([]) === undefined, 'empty → undefined');
+}
+
+// ---------------------------------------------------------------------------
+// Ferry data: vessel matching, live embed URL, schedule status
+// ---------------------------------------------------------------------------
+console.log('ferryData');
+{
+  assert(normalizeVesselName('  Blue-Star   DELOS ') === 'blue star delos', 'normalizeVesselName collapses spaces/punctuation');
+
+  const delos = findBlueStarVessel('Blue Star Delos', 'Blue Star Ferries');
+  assert(delos?.name === 'Blue Star Delos' && delos.imo === '9565039', 'Blue Star Delos → IMO 9565039');
+  assert(findBlueStarVessel('Blue Star Delos')?.imo === '9565039', 'vessel resolves without operator too');
+  assert(findBlueStarVessel('Delos', 'Blue Star Ferries')?.imo === '9565039', 'partial name "Delos" matches');
+  assert(findBlueStarVessel('Blue Star Mykonos', 'Blue Star Ferries')?.imo === '9208679', 'Blue Star Mykonos → IMO 9208679');
+  assert(findBlueStarVessel('Blue Star Delos', 'Seajets') === null, 'non-Blue Star operator → null');
+  assert(findBlueStarVessel('', 'Blue Star Ferries') === null, 'empty vessel → null');
+  assert(findBlueStarVessel('Bogus Ship', 'Blue Star Ferries') === null, 'unknown vessel → null');
+
+  const embed = buildVesselFinderEmbedUrl('9565039');
+  assert(embed.includes('vesselfinder.com/aismap') && embed.includes('imo=9565039'), 'vessel finder embed contains IMO');
+  assert(embed.includes('track=true'), 'vessel finder embed shows track');
+
+  const ferry: TransportEntry = {
+    id: 't-f', type: 'ferry', from: 'Piraeus', to: 'Naxos',
+    date: '2026-09-19', departureTime: '07:30', arrivalTime: '11:00',
+    operator: 'Blue Star Ferries', vesselName: 'Blue Star Delos',
+  };
+
+  const upcoming = getScheduleStatus(ferry, new Date(2026, 8, 18, 12, 0));
+  assert(upcoming.phase === 'upcoming' && upcoming.label === 'Gepland', 'day before → Gepland');
+  assert(upcoming.detail.includes('07:30'), 'upcoming detail shows departure time');
+
+  const boarding = getScheduleStatus(ferry, new Date(2026, 8, 19, 7, 0));
+  assert(boarding.phase === 'boarding' && boarding.label === 'Instappen', '30 min before → Instappen');
+
+  const underway = getScheduleStatus(ferry, new Date(2026, 8, 19, 8, 0));
+  assert(underway.phase === 'underway' && underway.label === 'Onderweg', 'between dep/arr → Onderweg');
+
+  const arrived = getScheduleStatus(ferry, new Date(2026, 8, 19, 12, 0));
+  assert(arrived.phase === 'arrived' && arrived.label === 'Gearriveerd', 'after arrival → Gearriveerd');
+
+  const overnight: TransportEntry = {
+    id: 't-o', type: 'ferry', from: 'Athene', to: 'Naxos',
+    date: '2026-09-19', departureTime: '23:00', arrivalTime: '02:00',
+  };
+  const overnightStatus = getScheduleStatus(overnight, new Date(2026, 8, 19, 23, 30));
+  assert(overnightStatus.phase === 'underway', 'overnight ferry (arr < dep) → still underway next day');
+
+  const noTime: TransportEntry = { id: 't-n', type: 'ferry', from: 'a', to: 'b', date: '2026-09-19' };
+  assert(getScheduleStatus(noTime, athensNow()).phase === 'unknown', 'missing times → unknown');
+
+  assert(formatCountdown(45 * 60_000) === '45 min', 'countdown 45 min');
+  assert(formatCountdown(135 * 60_000) === '2 u 15 min', 'countdown 2 u 15 min');
+  assert(formatCountdown(3 * 24 * 60 * 60_000) === '3 dagen', 'countdown 3 dagen');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

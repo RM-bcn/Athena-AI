@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Ship, Plus, Trash2, Edit3, X } from 'lucide-react';
 import type { IslandStay } from '../types';
 import type { TransportEntry, TransportLeg, TransportType } from './types';
@@ -31,6 +31,7 @@ interface FormState {
   departureTime: string;
   arrivalTime: string;
   operator: string;
+  vessel: string;
   bookingRef: string;
   notes: string;
 }
@@ -43,6 +44,7 @@ const EMPTY_FORM: FormState = {
   departureTime: '',
   arrivalTime: '',
   operator: '',
+  vessel: '',
   bookingRef: '',
   notes: '',
 };
@@ -74,26 +76,6 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
 
   const legs = useMemo(() => deriveLegs(stays), [stays]);
 
-  // Open the inline form pre-filled for a leg (triggered from the route
-  // overview "+" affordance via a custom event, keeping the components
-  // decoupled from MyItineraryView).
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const leg = (e as CustomEvent<TransportLeg>).detail;
-      if (!leg) return;
-      setForm({
-        ...EMPTY_FORM,
-        from: leg.fromCity,
-        to: leg.toCity,
-        date: leg.date,
-      });
-      setEditingId(null);
-      setFormOpen(true);
-    };
-    window.addEventListener('athena:transport-form', handler);
-    return () => window.removeEventListener('athena:transport-form', handler);
-  }, []);
-
   const sorted = useMemo(
     () =>
       [...entries].sort((a, b) => {
@@ -118,6 +100,7 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
       departureTime: entry.departureTime || '',
       arrivalTime: entry.arrivalTime || '',
       operator: entry.operator || '',
+      vessel: entry.vesselName || '',
       bookingRef: entry.bookingRef || '',
       notes: entry.notes || '',
     });
@@ -154,6 +137,7 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
       departureTime: form.departureTime.trim() || undefined,
       arrivalTime: form.arrivalTime.trim() || undefined,
       operator: form.operator.trim() || undefined,
+      vesselName: form.vessel.trim() || undefined,
       bookingRef: form.bookingRef.trim() || undefined,
       notes: form.notes.trim() || undefined,
     };
@@ -219,6 +203,7 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
                   {entry.operator && (
                     <p className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold mt-0.5">
                       {entry.operator}
+                      {entry.vesselName ? ` · ${entry.vesselName}` : ''}
                       {entry.bookingRef ? ` · Ref: ${entry.bookingRef}` : ''}
                     </p>
                   )}
@@ -351,6 +336,12 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
                 value={form.operator}
                 onChange={(e) => setForm((f) => ({ ...f, operator: e.target.value }))}
                 placeholder="Vervoerder (bv. Blue Star Ferries)"
+                className="w-full text-xs font-['Inter'] border border-[#c0c7d3]/50 rounded-lg px-2.5 py-2 text-[#0b1d2d]"
+              />
+              <input
+                value={form.vessel}
+                onChange={(e) => setForm((f) => ({ ...f, vessel: e.target.value }))}
+                placeholder="Schip (bv. Blue Star Delos)"
                 className="w-full text-xs font-['Inter'] border border-[#c0c7d3]/50 rounded-lg px-2.5 py-2 text-[#0b1d2d]"
               />
               <input

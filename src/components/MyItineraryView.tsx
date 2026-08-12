@@ -8,9 +8,6 @@ import {
 } from '../types';
 import { getStayLinkInfo, StayLinkInfo } from '../utils/accommodationMatcher';
 import {
-  MAP_IMAGE,
-} from '../data/initialData';
-import {
   Share2,
   Download,
   Ship,
@@ -43,7 +40,9 @@ import { TransportSidebarCard } from '../transport/TransportSidebarCard';
 import { TransportRouteConnector } from '../transport/TransportRouteConnector';
 import { TransportDayRows } from '../transport/TransportDayRows';
 import { deriveLegs } from '../transport/transportLogic';
-import type { TransportEntry } from '../transport/types';
+import { TransportBookingModal } from '../transport/TransportBookingModal';
+import type { TransportEntry, TransportLeg } from '../transport/types';
+import { RouteMapBackground } from './RouteMapBackground';
 
 interface MyItineraryViewProps {
   currentTrip: TripData;
@@ -109,6 +108,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   // (sidebar card, day rows, route connector) highlights the same entry
   // everywhere, mirroring how hotel/stay cards highlight when selected.
   const [selectedTransportId, setSelectedTransportId] = useState<string | null>(null);
+  const [transportLegToAdd, setTransportLegToAdd] = useState<TransportLeg | null>(null);
 
   // Edit Stay Modal state
   const [isEditStayOpen, setIsEditStayOpen] = useState(false);
@@ -473,11 +473,8 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       {/* Visual Map / Timeline Hybrid Area */}
       <section className="mb-12 relative">
         <div className="w-full h-72 bg-white rounded-[32px] overflow-hidden shadow-sm relative border border-[#e1efff] group">
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-            style={{ backgroundImage: `url('${MAP_IMAGE}')` }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/50 to-transparent" />
+          <RouteMapBackground />
+          <div className="absolute inset-0 bg-gradient-to-t from-white/90 via-white/25 to-transparent" />
 
           {/* Interactive Timeline Overlay */}
           <div className="absolute inset-x-0 bottom-0 p-6">
@@ -517,6 +514,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       canEdit={canEdit}
                       selectedId={selectedTransportId}
                       onSelect={setSelectedTransportId}
+                      onAddForLeg={setTransportLegToAdd}
                     />
                   )}
                 </React.Fragment>
@@ -885,6 +883,13 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         onClose={() => setIsEditStayOpen(false)}
         stayToEdit={editingStay}
         onSaveStay={onSaveStay}
+      />
+
+      <TransportBookingModal
+        isOpen={transportLegToAdd !== null}
+        leg={transportLegToAdd}
+        onClose={() => setTransportLegToAdd(null)}
+        onAdd={(entry) => onAddTransportEntry?.(entry)}
       />
     </main>
   );

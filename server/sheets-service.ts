@@ -127,7 +127,7 @@ async function ensureTabsExist(sheets: any, spreadsheetId: string) {
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const existingSheetTitles = (meta.data.sheets || []).map((s: any) => s.properties.title);
     
-    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks", "Transports"];
+    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks", "Transports", "ChatHistory", "Favorites"];
     const missingTabs = requiredTabs.filter((title) => !existingSheetTitles.includes(title));
 
     if (missingTabs.length > 0) {
@@ -244,6 +244,8 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
           { properties: { title: "CustomBookings" } },
           { properties: { title: "BookingLinks" } },
           { properties: { title: "Transports" } },
+          { properties: { title: "ChatHistory" } },
+          { properties: { title: "Favorites" } },
         ],
       },
     });
@@ -298,9 +300,9 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
             ],
           },
           {
-            range: "Transports!A1:K1",
+            range: "Transports!A1:L1",
             values: [
-              ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "BookingRef", "Notes", "LinkedLegId"]
+              ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId"]
             ],
           },
         ],
@@ -471,7 +473,7 @@ export async function saveTripToSheet(
     });
 
     // Format Transports rows
-    const transportHeaders = ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "BookingRef", "Notes", "LinkedLegId"];
+    const transportHeaders = ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId"];
     const transportRows = validTransports.map((t: any) => [
       t.id,
       t.type || "ferry",
@@ -481,6 +483,7 @@ export async function saveTripToSheet(
       t.departureTime || "",
       t.arrivalTime || "",
       t.operator || "",
+      t.vesselName || "",
       t.bookingRef || "",
       t.notes || "",
       t.linkedLegId || ""
@@ -497,7 +500,7 @@ export async function saveTripToSheet(
           { range: `Stays!A1:G${Math.max(staysValues.length, 2)}`, values: staysValues },
           { range: `CustomBookings!A1:I${Math.max(bookingValues.length, 2)}`, values: bookingValues },
           { range: `BookingLinks!A1:B${Math.max(linkValues.length, 2)}`, values: linkValues },
-          { range: `Transports!A1:K${Math.max(transportValues.length, 2)}`, values: transportValues }
+          { range: `Transports!A1:L${Math.max(transportValues.length, 2)}`, values: transportValues }
         ]
       }
     });
@@ -518,7 +521,7 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
 
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:I50", "BookingLinks!A2:B50", "Transports!A2:K100"],
+      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:I50", "BookingLinks!A2:B50", "Transports!A2:L100"],
     });
 
     const valueRanges = res.data.valueRanges || [];
@@ -582,9 +585,10 @@ const stayBookingLinks = linkRows
         departureTime: row[5] || undefined,
         arrivalTime: row[6] || undefined,
         operator: row[7] || undefined,
-        bookingRef: row[8] || undefined,
-        notes: row[9] || undefined,
-        linkedLegId: row[10] || undefined,
+        vesselName: row[8] || undefined,
+        bookingRef: row[9] || undefined,
+        notes: row[10] || undefined,
+        linkedLegId: row[11] || undefined,
       }));
 
     return { trip, customBookings, stayBookingLinks, transportEntries, sheetUrl: spreadsheetUrl };
@@ -751,6 +755,165 @@ export async function getUserFromSheet(email: string, username: string): Promise
     console.warn("[Google Sheets] Could not fetch user:", err?.message || err);
     return null;
   }
+}
+
+const CHAT_HISTORY_HEADERS = ["ID", "SessionID", "Role", "SenderName", "Timestamp", "SavedAt", "Content", "Sources"];
+const FAVORITES_HEADERS = ["ID", "Content", "SenderName", "Timestamp", "SavedAt", "Sources"];
+
+export interface SheetChatMessage {
+  id: string;
+  sessionId?: string;
+  role: string;
+  senderName?: string;
+  timestamp?: string;
+  savedAt?: string;
+  content: string;
+  sources?: { title: string; url: string }[];
+}
+
+export interface SheetFavorite {
+  id: string;
+  content: string;
+  senderName?: string;
+  timestamp?: string;
+  savedAt?: string;
+  sources?: { title: string; url: string }[];
+}
+
+export async function saveChatHistoryToSheet(messages: SheetChatMessage[]): Promise<void> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google credentials ontbreken.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+
+  try {
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: "ChatHistory!A2:H1000" });
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not clear ChatHistory:", err?.message || err);
+  }
+
+  const rows = (messages || []).slice(-200).map((m) => [
+    m.id || "",
+    m.sessionId || "",
+    m.role || "user",
+    m.senderName || "",
+    m.timestamp || "",
+    m.savedAt || "",
+    m.content || "",
+    m.sources && m.sources.length ? JSON.stringify(m.sources) : "",
+  ]);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: "ChatHistory!A1",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [CHAT_HISTORY_HEADERS, ...rows] },
+  });
+}
+
+export async function loadChatHistoryFromSheet(): Promise<SheetChatMessage[]> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google credentials ontbreken.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "ChatHistory!A2:H500",
+  });
+
+  return ((res.data.values || []) as any[])
+    .filter((row) => row && row[0] && row[6])
+    .map((row) => {
+      let sources;
+      if (row[7]) {
+        try {
+          sources = JSON.parse(row[7]);
+        } catch {
+          sources = undefined;
+        }
+      }
+      return {
+        id: row[0],
+        sessionId: row[1] || "",
+        role: row[2] || "user",
+        senderName: row[3] || "",
+        timestamp: row[4] || "",
+        savedAt: row[5] || "",
+        content: row[6],
+        sources,
+      };
+    });
+}
+
+export async function saveFavoritesToSheet(favorites: SheetFavorite[]): Promise<void> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google credentials ontbreken.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+
+  try {
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: "Favorites!A2:F1000" });
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not clear Favorites:", err?.message || err);
+  }
+
+  const rows = (favorites || []).slice(-200).map((f) => [
+    f.id || "",
+    f.content || "",
+    f.senderName || "",
+    f.timestamp || "",
+    f.savedAt || "",
+    f.sources && f.sources.length ? JSON.stringify(f.sources) : "",
+  ]);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: "Favorites!A1",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [FAVORITES_HEADERS, ...rows] },
+  });
+}
+
+export async function loadFavoritesFromSheet(): Promise<SheetFavorite[]> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google credentials ontbreken.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "Favorites!A2:F500",
+  });
+
+  return ((res.data.values || []) as any[])
+    .filter((row) => row && row[0] && row[1])
+    .map((row) => {
+      let sources;
+      if (row[5]) {
+        try {
+          sources = JSON.parse(row[5]);
+        } catch {
+          sources = undefined;
+        }
+      }
+      return {
+        id: row[0],
+        content: row[1],
+        senderName: row[2] || "",
+        timestamp: row[3] || "",
+        savedAt: row[4] || "",
+        sources,
+      };
+    });
 }
 
 

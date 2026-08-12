@@ -98,6 +98,8 @@ export interface ChatMessage {
   senderName?: string;
   avatar?: string;
   timestamp: string;
+  sessionId?: string;
+  savedAt?: string;
   content: string;
   cards?: TravelCardData[];
   quickButtons?: { label: string; action: string }[];
@@ -108,6 +110,15 @@ export interface ChatMessage {
     url?: string;
     isImage?: boolean;
   };
+}
+
+export interface ChatFavorite {
+  id: string;
+  content: string;
+  senderName?: string;
+  timestamp?: string;
+  savedAt?: string;
+  sources?: { title: string; url: string }[];
 }
 
 export interface FerryAlternative {
