@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, ChatSubTab, TripData } from '../types';
-import { CHAT_BACKGROUND_IMAGE } from '../data/initialData';
+import localBackgroundImage from '../assets/images/greece_sunset_bg_1785583337875.jpg';
 import {
   Sailboat,
   Sparkles,
@@ -110,7 +110,13 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
     <div
       className="flex-1 flex flex-col md:ml-64 pt-16 md:pt-20 relative min-h-screen bg-cover bg-center"
       style={{
-        backgroundImage: `linear-gradient(to bottom, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.96)), url('${CHAT_BACKGROUND_IMAGE}')`
+        backgroundImage: [
+          'linear-gradient(180deg, rgba(236, 248, 255, 0.58) 0%, rgba(248, 251, 255, 0.78) 54%, rgba(255, 255, 255, 0.94) 100%)',
+          'linear-gradient(115deg, rgba(0, 91, 174, 0.12), rgba(226, 114, 91, 0.10))',
+          `url('${localBackgroundImage}')`,
+        ].join(', '),
+        backgroundPosition: 'center',
+        backgroundSize: 'cover',
       }}
     >
       {/* Floating Weather Card on Top Right */}
