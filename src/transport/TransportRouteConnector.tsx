@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Ship, Plus } from 'lucide-react';
 import type { TransportEntry, TransportLeg } from './types';
 import { resolveLegId, earliestEntry } from './transportLogic';
 import { TransportIcon } from './TransportIcon';
+import { TransportDetailPopup } from './TransportDetailPopup';
 
 interface Props {
   leg: TransportLeg;
@@ -31,6 +32,7 @@ export const TransportRouteConnector: React.FC<Props> = ({
   onSelect,
   onAddForLeg,
 }) => {
+  const [detailOpen, setDetailOpen] = useState(false);
   const linkedEntries = entries.filter((e) => resolveLegId(e, legs).linkedLegId === leg.id);
   const earliest = earliestEntry(linkedEntries);
 
@@ -42,17 +44,21 @@ export const TransportRouteConnector: React.FC<Props> = ({
 
     const stack = linkedEntries.slice(0, 3);
     const isSelected = linkedEntries.some((e) => e.id === selectedId);
-    const onConnectorClick = () => onSelect?.(earliest.id);
+    const onConnectorClick = () => {
+      onSelect?.(earliest.id);
+      setDetailOpen(true);
+    };
 
     return (
-      <div
-        onClick={onConnectorClick}
-        className={`flex-1 min-w-[50px] h-[2px] relative transition-all cursor-pointer ${
-          isSelected
-            ? 'bg-[#005BAE]'
-            : 'bg-[#005BAE]/20 group-hover:bg-[#005BAE]/40'
-        }`}
-      >
+      <React.Fragment>
+        <div
+          onClick={onConnectorClick}
+          className={`flex-1 min-w-[50px] h-[2px] relative transition-all cursor-pointer ${
+            isSelected
+              ? 'bg-[#005BAE]'
+              : 'bg-[#005BAE]/20 group-hover:bg-[#005BAE]/40'
+          }`}
+        >
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5">
           <div className={`flex items-center justify-center gap-0.5 bg-white rounded-full shadow px-1.5 py-0.5 border transition-all ${
             isSelected
@@ -75,7 +81,14 @@ export const TransportRouteConnector: React.FC<Props> = ({
             </span>
           )}
         </div>
-      </div>
+        </div>
+        {detailOpen && (
+          <TransportDetailPopup
+            entry={earliest}
+            onClose={() => setDetailOpen(false)}
+          />
+        )}
+      </React.Fragment>
     );
   }
 

@@ -19,6 +19,7 @@ interface FormState {
   departureTime: string;
   arrivalTime: string;
   operator: string;
+  vessel: string;
   bookingRef: string;
   notes: string;
 }
@@ -31,6 +32,7 @@ const EMPTY_FORM: FormState = {
   departureTime: '',
   arrivalTime: '',
   operator: '',
+  vessel: '',
   bookingRef: '',
   notes: '',
 };
@@ -74,6 +76,7 @@ export const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
       departureTime: form.departureTime || undefined,
       arrivalTime: form.arrivalTime || undefined,
       operator: form.operator.trim() || undefined,
+      vesselName: form.vessel.trim() || undefined,
       bookingRef: form.bookingRef.trim() || undefined,
       notes: form.notes.trim() || undefined,
     });
@@ -213,15 +216,27 @@ export const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
             </div>
             <div>
               <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
-                Boekingsreferentie
+                Schip
               </label>
               <input
-                value={form.bookingRef}
-                onChange={(event) => updateForm('bookingRef', event.target.value)}
-                placeholder="bv. ABC123"
+                value={form.vessel}
+                onChange={(event) => updateForm('vessel', event.target.value)}
+                placeholder="bv. Blue Star Delos (staat op je ticket)"
                 className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+              Boekingsreferentie
+            </label>
+            <input
+              value={form.bookingRef}
+              onChange={(event) => updateForm('bookingRef', event.target.value)}
+              placeholder="bv. ABC123"
+              className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
+            />
           </div>
 
           <div>

@@ -16,6 +16,9 @@ export interface TransportEntry {
   /** HH:mm */
   arrivalTime?: string;
   operator?: string;
+  /** Vessel name as printed on the ticket, e.g. "Blue Star Delos". Used to
+   *  resolve the public IMO number for live vessel tracking. */
+  vesselName?: string;
   bookingRef?: string;
   notes?: string;
   /** Optional explicit link to a derived leg id (override of auto-link). */
