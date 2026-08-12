@@ -473,7 +473,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       {/* Visual Map / Timeline Hybrid Area */}
       <section className="mb-12 relative">
         <div className="w-full h-72 bg-white rounded-[32px] overflow-hidden shadow-sm relative border border-[#e1efff] group">
-          <RouteMapBackground stays={currentTrip.stays} activeStayId={activeIslandId} />
+          <RouteMapBackground />
           <div className="absolute inset-0 bg-gradient-to-t from-white/90 via-white/25 to-transparent" />
 
           {/* Interactive Timeline Overlay */}
