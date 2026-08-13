@@ -350,6 +350,69 @@ if (loaded.stayBookingLinks) {
     checkAndLoadSheets();
   }, []);
 
+  // Refs mirroring the current state so the debounced sheet-sync never uses
+  // stale closures from an older render.
+  const currentTripRef = useRef(currentTrip);
+  const customBookingsRef = useRef(customBookings);
+  const stayBookingLinksRef = useRef(stayBookingLinks);
+  const transportEntriesRef = useRef(transportEntries);
+
+  useEffect(() => { currentTripRef.current = currentTrip; }, [currentTrip]);
+  useEffect(() => { customBookingsRef.current = customBookings; }, [customBookings]);
+  useEffect(() => { stayBookingLinksRef.current = stayBookingLinks; }, [stayBookingLinks]);
+  useEffect(() => { transportEntriesRef.current = transportEntries; }, [transportEntries]);
+
+  // Single debounced save path to Google Sheets. Trip edits and transport edits
+  // both funnel through here, so concurrent changes bundle into one request.
+  const sheetsSyncRef = useRef<number | null>(null);
+  const syncToSheets = (snapshot?: {
+    trip?: TripData;
+    customBookings?: Accommodation[];
+    stayBookingLinks?: Record<string, string>;
+    transportEntries?: TransportEntry[];
+  }) => {
+    // Only sync to Google Sheets if logged in as admin (not guest or unauthenticated)
+    if (!currentUser || isGuestMode) return;
+
+    const payload = {
+      trip: snapshot?.trip ?? currentTripRef.current,
+      customBookings: snapshot?.customBookings ?? customBookingsRef.current,
+      stayBookingLinks: snapshot?.stayBookingLinks ?? stayBookingLinksRef.current,
+      transportEntries: snapshot?.transportEntries ?? transportEntriesRef.current,
+    };
+
+    if (sheetsSyncRef.current) window.clearTimeout(sheetsSyncRef.current);
+    sheetsSyncRef.current = window.setTimeout(() => {
+      authFetch('/api/sheets/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then((res) => {
+          if (res.status === 401) {
+            handleSessionExpired();
+            return null;
+          }
+          return res.json();
+        })
+        .then((data) => {
+          if (data?.spreadsheetUrl) {
+            setSheetUrl(data.spreadsheetUrl);
+            setIsSheetsConnected(true);
+          }
+        })
+        .catch((err) => console.warn("Google Sheets save notice:", err));
+    }, 1500);
+  };
+
+  // Auto-sync transport changes (add/edit/delete) to the Google Sheet after a
+  // debounce, so the UI's "real-time opgeslagen" promise also holds for ferries.
+  // Guests en uitgelogden blijven uitgesloten van sheet-saves.
+  useEffect(() => {
+    syncToSheets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transportEntries]);
+
   // Helper to persist trip updates to localStorage & Google Sheets
   const updateAndSaveTrip = (
     newTrip: TripData,
@@ -365,33 +428,11 @@ if (loaded.stayBookingLinks) {
       console.error("Failed to save trip to localStorage", e);
     }
 
-    // Only sync to Google Sheets if logged in as admin (not guest or unauthenticated)
-    if (!currentUser) return;
-
-    authFetch('/api/sheets/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        trip: newTrip,
-        customBookings: updatedBookings !== undefined ? updatedBookings : customBookings,
-        stayBookingLinks: updatedLinks !== undefined ? updatedLinks : stayBookingLinks,
-        transportEntries,
-      }),
-    })
-      .then((res) => {
-        if (res.status === 401) {
-          handleSessionExpired();
-          return null;
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (data?.spreadsheetUrl) {
-          setSheetUrl(data.spreadsheetUrl);
-          setIsSheetsConnected(true);
-        }
-      })
-      .catch((err) => console.warn("Google Sheets save notice:", err));
+    syncToSheets({
+      trip: newTrip,
+      customBookings: updatedBookings !== undefined ? updatedBookings : customBookingsRef.current,
+      stayBookingLinks: updatedLinks !== undefined ? updatedLinks : stayBookingLinksRef.current,
+    });
   };
 
   const handleManualSyncSheets = async () => {
@@ -404,10 +445,10 @@ if (loaded.stayBookingLinks) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          trip: currentTrip,
-          customBookings,
-          stayBookingLinks,
-          transportEntries,
+          trip: currentTripRef.current,
+          customBookings: customBookingsRef.current,
+          stayBookingLinks: stayBookingLinksRef.current,
+          transportEntries: transportEntriesRef.current,
         }),
       });
 
