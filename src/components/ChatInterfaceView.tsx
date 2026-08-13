@@ -15,7 +15,9 @@ import {
   X,
   Star,
   History,
-  Inbox
+  Inbox,
+  ChevronDown,
+  Trash2
 } from 'lucide-react';
 import { WeatherCard } from './WeatherCard';
 import { extractTextFromImage } from '../utils/ocr';
@@ -29,6 +31,7 @@ interface ChatInterfaceViewProps {
   onTriggerQuickAction: (action: string) => void;
   onToggleFavorite: (msg: ChatMessage) => void;
   onRemoveFavorite: (id: string) => void;
+  onDeleteSession: (sessionId: string) => void;
   currentTrip: TripData;
 }
 
@@ -41,6 +44,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
   onTriggerQuickAction,
   onToggleFavorite,
   onRemoveFavorite,
+  onDeleteSession,
   currentTrip,
 }) => {
   const [inputText, setInputText] = useState('');
@@ -55,6 +59,36 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(() => {
+    const saved = new Set<string>();
+    try {
+      const raw = localStorage.getItem('athena_expanded_sessions');
+      if (raw) {
+        JSON.parse(raw).forEach((id: string) => saved.add(id));
+      }
+    } catch {
+      // localStorage niet beschikbaar
+    }
+    return saved;
+  });
+
+  const toggleSessionExpanded = (sessionId: string) => {
+    setExpandedSessions(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      try {
+        localStorage.setItem('athena_expanded_sessions', JSON.stringify(Array.from(next)));
+      } catch {
+        // localStorage vol of niet beschikbaar
+      }
+      return next;
+    });
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -462,36 +496,71 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
               </div>
             )}
 
-            {sessions.map(([sessionId, sessionMessages]) => (
-              <div key={sessionId} className="bg-white/90 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 shadow-sm p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-['Inter'] text-[10px] font-bold uppercase tracking-wider text-[#717783]">
-                    {formatSavedAt(sessionMessages[0]?.savedAt) || 'Eerdere sessie'}
-                  </span>
-                  <span className="font-['Inter'] text-[10px] text-[#c0c7d3]">
-                    {sessionMessages.length} berichten
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  {sessionMessages.map(msg => (
-                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div
-                        className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
-                          msg.role === 'user'
-                            ? 'bg-[#005BAE] text-white rounded-br-sm'
-                            : 'bg-[#f0f6ff] text-[#001a33] rounded-bl-sm border border-[#005BAE]/10'
+            {sessions.map(([sessionId, sessionMessages]) => {
+              const isExpanded = expandedSessions.has(sessionId);
+              return (
+                <div key={sessionId} className="bg-white/90 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => toggleSessionExpanded(sessionId)}
+                    className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-[#f0f4f9]/60 transition-colors cursor-pointer"
+                    title={isExpanded ? 'Verberg berichten' : 'Toon berichten'}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <ChevronDown
+                        className={`w-4 h-4 text-[#005BAE] flex-shrink-0 transition-transform duration-200 ${
+                          isExpanded ? '' : '-rotate-90'
                         }`}
-                      >
-                        <span className="block font-bold mb-0.5 opacity-70">
-                          {msg.role === 'user' ? msg.senderName || 'Jij' : 'Athena'}
+                      />
+                      <div className="min-w-0">
+                        <span className="block font-['Inter'] text-[10px] font-bold uppercase tracking-wider text-[#717783]">
+                          {formatSavedAt(sessionMessages[0]?.savedAt) || 'Eerdere sessie'}
                         </span>
-                        {msg.content}
+                        <span className="block font-['Inter'] text-xs text-[#404752] mt-0.5 truncate">
+                          {sessionMessages[0]?.content || 'Geen berichten'}
+                        </span>
                       </div>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="font-['Inter'] text-[10px] text-[#c0c7d3] whitespace-nowrap">
+                        {sessionMessages.length} berichten
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm('Weet je zeker dat je dit gesprek uit de geschiedenis wilt verwijderen?')) {
+                            onDeleteSession(sessionId);
+                          }
+                        }}
+                        className="p-1.5 text-[#c0c7d3] hover:text-red-500 rounded-full transition-colors cursor-pointer"
+                        title="Verwijder gesprek uit geschiedenis"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="space-y-3 px-5 pb-5">
+                      {sessionMessages.map(msg => (
+                        <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          <div
+                            className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
+                              msg.role === 'user'
+                                ? 'bg-[#005BAE] text-white rounded-br-sm'
+                                : 'bg-[#f0f6ff] text-[#001a33] rounded-bl-sm border border-[#005BAE]/10'
+                            }`}
+                          >
+                            <span className="block font-bold mb-0.5 opacity-70">
+                              {msg.role === 'user' ? msg.senderName || 'Jij' : 'Athena'}
+                            </span>
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -514,18 +583,20 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
             )}
 
             {favorites.map(fav => (
-              <div key={fav.id} className="bg-white/90 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 shadow-sm p-5 space-y-3">
+              <div
+                key={fav.id}
+                onClick={() => onRemoveFavorite(fav.id)}
+                className="bg-white/90 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 shadow-sm p-5 space-y-3 hover:border-red-400/60 hover:shadow-md transition-all cursor-pointer group/fav"
+                title="Klik om uit favorieten te verwijderen"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-['Inter'] text-[10px] font-bold uppercase tracking-wider text-[#717783]">
                     {formatSavedAt(fav.savedAt)} · Athena
                   </span>
-                  <button
-                    onClick={() => onRemoveFavorite(fav.id)}
-                    className="p-1.5 text-[#c0c7d3] hover:text-red-500 rounded-full transition-colors cursor-pointer"
-                    title="Verwijder favoriet"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <span className="flex items-center gap-1.5 text-[#c0c7d3] group-hover/fav:text-red-500 text-[11px] font-['Inter'] font-semibold transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                    Verwijderen
+                  </span>
                 </div>
                 <p className="font-['Inter'] text-sm text-[#001a33] leading-relaxed whitespace-pre-line">
                   {fav.content}
@@ -538,6 +609,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                         href={src.url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="text-xs font-['Inter'] text-[#005BAE] hover:underline truncate"
                       >
                         {src.title || src.url}

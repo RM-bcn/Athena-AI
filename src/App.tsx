@@ -219,6 +219,13 @@ export default function App() {
     persistFavorites(next);
   };
 
+  const handleDeleteSession = (sessionId: string) => {
+    const next = chatHistoryRef.current.filter((m) => m.sessionId !== sessionId);
+    chatHistoryRef.current = next;
+    setChatHistory(next);
+    persistHistory(next);
+  };
+
   useEffect(() => {
     async function loadChatStores() {
       try {
@@ -1017,6 +1024,7 @@ if (loaded.stayBookingLinks) {
             onTriggerQuickAction={handleTriggerQuickAction}
             onToggleFavorite={handleToggleFavorite}
             onRemoveFavorite={handleRemoveFavorite}
+            onDeleteSession={handleDeleteSession}
             currentTrip={currentTrip}
           />
         )}
