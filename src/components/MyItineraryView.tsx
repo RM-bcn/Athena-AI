@@ -36,6 +36,7 @@ import {
   Lock
 } from 'lucide-react';
 import { EditStayModal } from './Modals/EditStayModal';
+import { DayPlanEditorModal } from './Modals/DayPlanEditorModal';
 import { WeatherCard } from './WeatherCard';
 import { TransportSidebarCard } from '../transport/TransportSidebarCard';
 import { TransportRouteConnector } from '../transport/TransportRouteConnector';
@@ -74,6 +75,7 @@ interface MyItineraryViewProps {
   dayPlanGenerating?: Record<string, boolean>;
   dayPlanErrors?: Record<string, string>;
   onGenerateDayPlan?: (stay: IslandStay) => Promise<{ success: boolean; error?: string }>;
+  onSaveDayPlans?: (stayId: string, plans: DayPlan[]) => void;
 }
 
 export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
@@ -105,6 +107,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   dayPlanGenerating = {},
   dayPlanErrors = {},
   onGenerateDayPlan,
+  onSaveDayPlans,
 }) => {
 
   const [accommodationsOpen, setAccommodationsOpen] = useState(true);
@@ -122,6 +125,9 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   // Edit Stay Modal state
   const [isEditStayOpen, setIsEditStayOpen] = useState(false);
   const [editingStay, setEditingStay] = useState<IslandStay | null>(null);
+
+  // Day Plan Editor Modal state
+  const [dayPlanEditorStay, setDayPlanEditorStay] = useState<IslandStay | null>(null);
 
   const [tipsChecklist, setTipsChecklist] = useState([
     { id: '1', text: 'Boek veerboottickets minimaal 48 uur van tevoren in het hoogseizoen.', checked: true },
@@ -651,6 +657,17 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                         {dayPlanGenerating[`${tripCode}:${stay.id}`] ? 'Bezig met genereren...' : 'Regenereer dagplanning'}
                       </button>
                     )}
+
+                    {onSaveDayPlans && (
+                      <button
+                        onClick={() => setDayPlanEditorStay(stay)}
+                        className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-white border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                        title="Bewerk de dagplanning voor dit verblijf"
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                        Dagplanning bewerken
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -688,34 +705,20 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                           </div>
                         </div>
 
-                        {plan ? (
+                        {plan && plan.items && plan.items.length > 0 ? (
                           <div className="space-y-2.5 text-xs font-['Inter'] text-[#404752]">
-                            {plan.activities.length > 0 && (
-                              <ul className="space-y-1.5">
-                                {plan.activities.map((activity, i) => (
-                                  <li key={i} className="flex items-start gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
-                                    <span>{activity}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                            {plan.dining && (
-                              <div className="flex items-start gap-2">
-                                <Utensils className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
-                                <span>{plan.dining}</span>
+                            {plan.items.map((item) => (
+                              <div key={item.id} className="flex items-start gap-2">
+                                {item.type === 'dining' ? (
+                                  <Utensils className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
+                                ) : item.type === 'tip' ? (
+                                  <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                ) : (
+                                  <CheckCircle2 className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
+                                )}
+                                <span className="whitespace-pre-line">{item.text}</span>
                               </div>
-                            )}
-                            {plan.tips.length > 0 && (
-                              <div className="pt-2 mt-1 border-t border-[#c0c7d3]/20 space-y-1.5">
-                                {plan.tips.map((tip, i) => (
-                                  <div key={i} className="flex items-start gap-2">
-                                    <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                                    <span>{tip}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            ))}
                           </div>
                         ) : dayIdx === 0 ? (
                           <div className="space-y-2 text-xs font-['Inter'] text-[#404752]">
@@ -967,6 +970,19 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         leg={transportLegToAdd}
         onClose={() => setTransportLegToAdd(null)}
         onAdd={(entry) => onAddTransportEntry?.(entry)}
+      />
+
+      <DayPlanEditorModal
+        isOpen={dayPlanEditorStay !== null}
+        onClose={() => setDayPlanEditorStay(null)}
+        stay={dayPlanEditorStay || currentTrip.stays[0]}
+        plans={dayPlanEditorStay ? dayPlans[`${tripCode}:${dayPlanEditorStay.id}`] || [] : []}
+        onSave={(plans) => {
+          if (dayPlanEditorStay) onSaveDayPlans?.(dayPlanEditorStay.id, plans);
+        }}
+        onGenerate={onGenerateDayPlan || (() => Promise.resolve({ success: false }))}
+        generating={dayPlanEditorStay ? !!dayPlanGenerating[`${tripCode}:${dayPlanEditorStay.id}`] : false}
+        error={dayPlanEditorStay ? dayPlanErrors[`${tripCode}:${dayPlanEditorStay.id}`] : ''}
       />
     </main>
   );
