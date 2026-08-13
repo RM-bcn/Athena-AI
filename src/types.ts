@@ -136,3 +136,14 @@ export interface FerryResolution {
   recommendedHotel: string;
   advice: string;
 }
+
+export interface ResetRequestResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export interface ResetPasswordResponse {
+  success: boolean;
+  error?: string;
+}

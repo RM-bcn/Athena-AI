@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createHmac, timingSafeEqual } from "crypto";
-import { compare } from "bcryptjs";
+import { compare, hash, genSalt } from "bcryptjs";
 import { GoogleGenAI } from "@google/genai";
 import {
   isGoogleAuthConfigured,
@@ -281,15 +281,20 @@ function getSessionSecret(): string {
 }
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dagen
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minuten
 
-function signToken(email: string): { token: string; expiresAt: number } {
-  const expiresAt = Date.now() + SESSION_TTL_MS;
-  const payload = Buffer.from(JSON.stringify({ email, exp: expiresAt }), "utf8").toString("base64url");
-  const signature = createHmac("sha256", getSessionSecret()).update(payload).digest("base64url");
-  return { token: `${payload}.${signature}`, expiresAt };
+// Eenmalige reset-tokens: na succesvol gebruik ongeldig gemarkeerd. De set is
+// in-memory en dus stateless; door de korte TTL blijft hij vanzelf leeglopen.
+const consumedResetTokens = new Set<string>();
+
+// Gedeelde HMAC-signed payload: payloadBase64.signature met { exp, typ, ... }.
+function signSignedPayload(payload: Record<string, unknown>): string {
+  const payloadB64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signature = createHmac("sha256", getSessionSecret()).update(payloadB64).digest("base64url");
+  return `${payloadB64}.${signature}`;
 }
 
-function verifyToken(token: string): { email: string } | null {
+function verifySignedPayload(token: string, expectedType?: string): Record<string, any> | null {
   if (!token) return null;
   const [payloadB64, signature] = token.split(".");
   if (!payloadB64 || !signature) return null;
@@ -312,8 +317,36 @@ function verifyToken(token: string): { email: string } | null {
   } catch {
     return null;
   }
-  if (typeof parsed.email !== "string" || typeof parsed.exp !== "number") return null;
+  if (typeof parsed.exp !== "number") return null;
+  if (expectedType && parsed.typ !== expectedType) return null;
   if (Date.now() > parsed.exp) return null;
+  return parsed;
+}
+
+function signToken(email: string): { token: string; expiresAt: number } {
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  const token = signSignedPayload({ email, typ: "session", exp: expiresAt });
+  return { token, expiresAt };
+}
+
+function verifyToken(token: string): { email: string } | null {
+  const parsed = verifySignedPayload(token);
+  if (!parsed || typeof parsed.email !== "string") return null;
+  // Backward compatible: tokens van vóór het type-veld hebben geen "typ".
+  if (parsed.typ !== undefined && parsed.typ !== "session") return null;
+  return { email: parsed.email };
+}
+
+function signResetToken(email: string): { token: string; expiresAt: number } {
+  const expiresAt = Date.now() + RESET_TOKEN_TTL_MS;
+  const token = signSignedPayload({ email, typ: "reset", exp: expiresAt });
+  return { token, expiresAt };
+}
+
+function verifyResetToken(token: string): { email: string } | null {
+  const parsed = verifySignedPayload(token, "reset");
+  if (!parsed || typeof parsed.email !== "string") return null;
+  if (consumedResetTokens.has(token)) return null;
   return { email: parsed.email };
 }
 
@@ -398,6 +431,135 @@ app.post("/api/login", async (req, res) => {
     return res.json({ success: true, user: safeUser, token, expiresAt });
   } catch (err: any) {
     console.error("[Login] Error:", err?.message || err);
+    return res.status(500).json({ success: false, error: "Er is een onverwachte serverfout opgetreden." });
+  }
+});
+
+// API: Wachtwoord reset — e-mail met eenmalige, kortlevende reset-link.
+const GENERIC_RESET_MESSAGE = "Als dit e-mailadres bij ons bekend is, ontvang je instructies.";
+
+async function sendPasswordResetEmail(toEmail: string, resetLink: string): Promise<boolean> {
+  const apiKey = getEnvVal("RESEND_API_KEY", "resend_api_key");
+  if (!apiKey || apiKey === "MY_RESEND_API_KEY") {
+    console.log("[Reset] Reset link:", resetLink);
+    return false;
+  }
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: getEnvVal("RESEND_FROM", "resend_from") || "Athena AI <onboarding@resend.dev>",
+        to: [toEmail],
+        subject: "Athena AI — Stel je wachtwoord opnieuw in",
+        html:
+          `<p>Hallo,</p>` +
+          `<p>Je hebt gevraagd om je wachtwoord voor Athena AI opnieuw in te stellen.</p>` +
+          `<p><a href="${resetLink}">Stel je wachtwoord opnieuw in</a></p>` +
+          `<p>Deze link is 60 minuten geldig. Werkt de link niet? Kopieer hem dan in je browser:</p>` +
+          `<p>${resetLink}</p>` +
+          `<p>Als je dit niet hebt aangevraagd, kun je deze e-mail negeren.</p>`,
+      }),
+    });
+    return res.ok;
+  } catch (err: any) {
+    console.error("[Reset] Email send error:", err?.message || err);
+    return false;
+  }
+}
+
+app.post("/api/auth/reset-request", async (req, res) => {
+  try {
+    const { usernameOrEmail } = req.body || {};
+    const identifier = typeof usernameOrEmail === "string" ? usernameOrEmail.trim() : "";
+    if (!identifier) {
+      return res.status(400).json({ success: false, error: "E-mailadres of gebruikersnaam is verplicht." });
+    }
+
+    let user: any = null;
+    if (isGoogleAuthConfigured()) {
+      try {
+        user = await getUserFromSheet(identifier, identifier);
+      } catch (err: any) {
+        console.warn("[Reset] Sheets lookup skipped:", err?.message || err);
+      }
+    }
+
+    const seedUser = SEED_USERS.find(
+      (u) =>
+        u.username.toLowerCase() === identifier.toLowerCase() ||
+        u.email.toLowerCase() === identifier.toLowerCase()
+    );
+
+    const email = (user?.email || seedUser?.email || "").trim();
+    if (email) {
+      try {
+        const { token } = signResetToken(email);
+        const appUrl = (getEnvVal("APP_URL", "app_url") || "http://localhost:3000").replace(/\/+$/, "");
+        const resetLink = `${appUrl}/?reset=${encodeURIComponent(token)}`;
+        await sendPasswordResetEmail(email, resetLink);
+      } catch (err: any) {
+        console.warn("[Reset] Reset link creation failed:", err?.message || err);
+      }
+    }
+
+    return res.json({ success: true, message: GENERIC_RESET_MESSAGE });
+  } catch (err: any) {
+    console.error("[Reset] Request error:", err?.message || err);
+    return res.status(500).json({ success: false, error: "Er is een onverwachte serverfout opgetreden." });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body || {};
+    const resetToken = typeof token === "string" ? token.trim() : "";
+    const password = typeof newPassword === "string" ? newPassword : "";
+
+    const payload = verifyResetToken(resetToken);
+    if (!payload) {
+      return res.status(400).json({ success: false, error: "Link is ongeldig of verlopen. Vraag een nieuwe reset-link aan." });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, error: "Nieuw wachtwoord moet minimaal 8 tekens bevatten." });
+    }
+
+    const email = payload.email;
+    let updated = false;
+
+    if (isGoogleAuthConfigured()) {
+      try {
+        const salt = await genSalt(10);
+        const passwordHash = await hash(password, salt);
+        const updatedUser = await updateUserProfileInSheet({ email }, { passwordHash });
+        updated = Boolean(updatedUser);
+      } catch (err: any) {
+        console.warn("[Reset] Sheets update skipped:", err?.message || err);
+      }
+    }
+
+    // Dev-fallback: zonder Sheets wordt de SEED_USER-hash in-memory bijgewerkt
+    // zodat de flow lokaal testbaar blijft.
+    if (!updated) {
+      const seedUser = SEED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+      if (seedUser) {
+        const salt = await genSalt(10);
+        seedUser.passwordHash = await hash(password, salt);
+        updated = true;
+      }
+    }
+
+    if (!updated) {
+      return res.status(500).json({ success: false, error: "Wachtwoord kon niet worden gewijzigd. Probeer het opnieuw." });
+    }
+
+    consumedResetTokens.add(resetToken);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("[Reset] Password error:", err?.message || err);
     return res.status(500).json({ success: false, error: "Er is een onverwachte serverfout opgetreden." });
   }
 });
