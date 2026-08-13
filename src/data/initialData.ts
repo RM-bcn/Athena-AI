@@ -22,7 +22,6 @@ export const DEFAULT_USERS = [
   {
     username: 'dennisvr',
     email: 'dennis.van.rooden@gmail.com',
-    password: 'Athene2026!',
     name: 'Dennis van Rooden',
     nickname: 'Dennis',
     avatar: USER_AVATAR,
@@ -33,7 +32,6 @@ export const DEFAULT_USERS = [
   {
     username: 'Joyce',
     email: 'Joyceockeloen@gmail.com',
-    password: 'JoyceO',
     name: 'Joyce Ockeloen',
     nickname: 'Joyce',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',

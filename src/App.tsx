@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
-import { DEFAULT_USERS } from './data/initialData';
+import { getActiveUser, isGuestMode as readGuestMode, saveLogin, updateActiveUser, clearSession, ACTIVE_USER_KEY, GUEST_MODE_KEY } from './utils/authStorage';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { MyItineraryView } from './components/MyItineraryView';
@@ -63,23 +63,10 @@ const defaultTrip: TripData = {
 
 export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  // Authentication & Guest State initialized from LocalStorage
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    try {
-      const saved = localStorage.getItem('athena_active_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  // Authentication & Guest State initialized from storage
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getActiveUser());
 
-  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('athena_guest_mode') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => readGuestMode());
 
   const [tripCode, setTripCode] = useState<string>('ATH-2026');
 
@@ -95,9 +82,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     try {
-      const savedUser = localStorage.getItem('athena_active_user');
-      const savedGuest = localStorage.getItem('athena_guest_mode');
-      if (savedUser || savedGuest === 'true') {
+      if (getActiveUser() || readGuestMode()) {
         return 'itinerary';
       }
       return 'login';
@@ -441,12 +426,12 @@ if (loaded.stayBookingLinks) {
   };
 
   // Auth Handlers
-  const handleLoginSuccess = (user: UserAccount) => {
+  const handleLoginSuccess = (user: UserAccount, rememberMe = true) => {
     setCurrentUser(user);
     setIsGuestMode(false);
+    saveLogin(user, undefined, rememberMe);
     try {
-      localStorage.setItem('athena_active_user', JSON.stringify(user));
-      localStorage.removeItem('athena_guest_mode');
+      localStorage.removeItem(GUEST_MODE_KEY);
     } catch (e) {
       console.error(e);
     }
@@ -470,11 +455,7 @@ if (loaded.stayBookingLinks) {
             tripCode: sheetUser.tripCode || user.tripCode,
           };
           setCurrentUser(merged);
-          try {
-            localStorage.setItem('athena_active_user', JSON.stringify(merged));
-          } catch (e) {
-            console.error(e);
-          }
+          updateActiveUser(merged);
         }
       })
       .catch((err) => console.warn("Could not restore profile from sheet:", err));
@@ -485,8 +466,9 @@ if (loaded.stayBookingLinks) {
     setIsGuestMode(true);
     setCurrentUser(null);
     try {
-      localStorage.setItem('athena_guest_mode', 'true');
-      localStorage.removeItem('athena_active_user');
+      localStorage.setItem(GUEST_MODE_KEY, 'true');
+      localStorage.removeItem(ACTIVE_USER_KEY);
+      sessionStorage.removeItem(ACTIVE_USER_KEY);
     } catch (e) {
       console.error(e);
     }
@@ -496,12 +478,7 @@ if (loaded.stayBookingLinks) {
   const handleSignOut = () => {
     setCurrentUser(null);
     setIsGuestMode(false);
-    try {
-      localStorage.removeItem('athena_active_user');
-      localStorage.removeItem('athena_guest_mode');
-    } catch (e) {
-      console.error(e);
-    }
+    clearSession();
     setActiveTab('login');
   };
 
@@ -539,11 +516,7 @@ if (loaded.stayBookingLinks) {
       if (data.user) {
         const updatedUser: UserAccount = { ...currentUser, ...data.user };
         setCurrentUser(updatedUser);
-        try {
-          localStorage.setItem('athena_active_user', JSON.stringify(updatedUser));
-        } catch (e) {
-          console.error("Failed to save user to localStorage", e);
-        }
+        updateActiveUser(updatedUser);
       }
 
       return { success: true };

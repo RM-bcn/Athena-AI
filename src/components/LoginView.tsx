@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import greeceSunsetBg from '../assets/images/greece_sunset_bg_1785583337875.jpg';
-import { LOGIN_HERO_IMAGE, DEFAULT_USERS } from '../data/initialData';
+import { LOGIN_HERO_IMAGE } from '../data/initialData';
 import { UserAccount } from '../types';
+import { saveAuthToken } from '../utils/authStorage';
 import { Key, ArrowRight, LogIn, Info, Sparkles, User, Lock, AlertCircle, HelpCircle, CheckCircle2, X } from 'lucide-react';
 
 interface LoginViewProps {
   onAccessTripCode: (code: string) => void;
-  onLoginSuccess: (user: UserAccount) => void;
+  onLoginSuccess: (user: UserAccount, rememberMe?: boolean) => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
@@ -18,11 +19,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   // Forgot Password modal state
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [resetIdentifier, setResetIdentifier] = useState('');
-  const [newPasswordInput, setNewPasswordInput] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
   const [resetErrorMsg, setResetErrorMsg] = useState('');
 
@@ -35,7 +36,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -44,26 +45,30 @@ export const LoginView: React.FC<LoginViewProps> = ({
       return;
     }
 
-    const inputLower = usernameOrEmail.trim().toLowerCase();
-    const foundUser = DEFAULT_USERS.find(
-      (u) =>
-        (u.username.toLowerCase() === inputLower || u.email.toLowerCase() === inputLower) &&
-        u.password === password
-    );
-
-    if (foundUser) {
-      onLoginSuccess({
-        username: foundUser.username,
-        email: foundUser.email,
-        name: foundUser.name,
-        nickname: foundUser.nickname,
-        avatar: foundUser.avatar,
-        avatarUrl: foundUser.avatarUrl,
-        role: foundUser.role,
-        tripCode: foundUser.tripCode,
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernameOrEmail: usernameOrEmail.trim(), password }),
       });
-    } else {
-      setErrorMsg('Ongeldige gebruikersnaam of wachtwoord. Controleer je gegevens.');
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        setErrorMsg(data.error || 'Ongeldige gebruikersnaam of wachtwoord.');
+        return;
+      }
+
+      const user = data.user as UserAccount;
+      if (data.token) {
+        saveAuthToken(data.token as string, rememberMe);
+      }
+      onLoginSuccess(user, rememberMe);
+    } catch (err) {
+      setErrorMsg('Er is een netwerkfout opgetreden. Probeer het later opnieuw.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -72,26 +77,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setResetErrorMsg('');
     setResetSuccessMsg('');
 
-    const input = resetIdentifier.trim().toLowerCase();
+    const input = resetIdentifier.trim();
     if (!input) {
       setResetErrorMsg('Vul a.u.b. je e-mailadres of gebruikersnaam in.');
       return;
     }
 
-    const foundUser = DEFAULT_USERS.find(
-      (u) => u.username.toLowerCase() === input || u.email.toLowerCase() === input
-    );
-
-    if (foundUser) {
-      if (newPasswordInput.trim()) {
-        foundUser.password = newPasswordInput.trim();
-        setResetSuccessMsg(`✅ Wachtwoord succesvol gewijzigd voor ${foundUser.name}! Je kunt nu inloggen met je nieuwe wachtwoord.`);
-      } else {
-        setResetSuccessMsg(`✅ Instructies en een herstellink zijn verzonden naar ${foundUser.email}! (Het ingestelde wachtwoord voor ${foundUser.username} is: ${foundUser.password})`);
-      }
-    } else {
-      setResetSuccessMsg(`✅ Als dit e-mailadres (${resetIdentifier}) bij ons bekend is, zijn er herstel-instructies verstuurd.`);
-    }
+    // TODO: echte reset-mail komt in een latere stap; nu bewust generiek en niets versturen.
+    setResetSuccessMsg('Als dit e-mailadres of deze gebruikersnaam bij ons bekend is, ontvang je instructies.');
   };
 
   return (
@@ -243,10 +236,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
                 <button
                   type="submit"
-                  className="w-full h-14 bg-[#E2725B] text-white font-['Plus_Jakarta_Sans'] font-semibold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  disabled={submitting}
+                  className="w-full h-14 bg-[#E2725B] text-white font-['Plus_Jakarta_Sans'] font-semibold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait"
                 >
                   <LogIn className="w-5 h-5" />
-                  Inloggen op Athena AI
+                  {submitting ? 'Bezig met inloggen...' : 'Inloggen op Athena AI'}
                 </button>
               </form>
             </div>
@@ -326,19 +320,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   value={resetIdentifier}
                   onChange={(e) => setResetIdentifier(e.target.value)}
                   placeholder="bijv. dennisvr of dennis.van.rooden@gmail.com"
-                  className="w-full h-11 px-3 bg-[#F0F4F9] border border-gray-300 rounded-xl text-xs font-['Inter'] focus:ring-2 focus:ring-[#005BAE] focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#0B1D2D] mb-1">
-                  Nieuw Wachtwoord (Optioneel direct instellen)
-                </label>
-                <input
-                  type="password"
-                  value={newPasswordInput}
-                  onChange={(e) => setNewPasswordInput(e.target.value)}
-                  placeholder="Voer nieuw wachtwoord in"
                   className="w-full h-11 px-3 bg-[#F0F4F9] border border-gray-300 rounded-xl text-xs font-['Inter'] focus:ring-2 focus:ring-[#005BAE] focus:outline-none"
                 />
               </div>

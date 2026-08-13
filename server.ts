@@ -1,6 +1,8 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createHmac } from "crypto";
+import { compare } from "bcryptjs";
 import { GoogleGenAI } from "@google/genai";
 import {
   isGoogleAuthConfigured,
@@ -8,12 +10,14 @@ import {
   saveTripToSheet,
   loadTripFromSheet,
   getUserFromSheet,
+  updateUserProfileInSheet,
   saveChatHistoryToSheet,
   loadChatHistoryFromSheet,
   saveFavoritesToSheet,
   loadFavoritesFromSheet,
 } from "./server/sheets-service.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
+import { SEED_USERS } from "./server/seed-users.js";
 import { getWeather, searchWeb, findRestaurants, getCityTips } from "./server/live-providers.js";
 import type { ToolResult, Source } from "./server/live-providers.js";
 import { transliterateGreek } from "./server/transliterate.js";
@@ -230,6 +234,96 @@ app.get("/api/user", async (req, res) => {
   } catch (err: any) {
     console.error("[User] Fetch error:", err?.message || err);
     return res.status(500).json({ success: false, error: err?.message || "Fout bij ophalen van gebruiker." });
+  }
+});
+
+// Auth: HMAC-signed session token. Endpoint protection with the token lands in step 02.
+function getSessionSecret(): string {
+  const fromEnv = process.env.SESSION_SECRET;
+  if (fromEnv && fromEnv.trim() && fromEnv !== "MY_SESSION_SECRET") {
+    return fromEnv.trim();
+  }
+  return "athena-ai-local-dev-secret";
+}
+
+function signAuthToken(email: string): { token: string; expiresAt: number } {
+  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  const payload = Buffer.from(`${email}:${expiresAt}`, "utf8").toString("base64url");
+  const signature = createHmac("sha256", getSessionSecret()).update(payload).digest("hex");
+  return { token: `${payload}.${signature}`, expiresAt };
+}
+
+const GENERIC_LOGIN_ERROR = "Ongeldige gebruikersnaam of wachtwoord.";
+
+// API: Server-side login with bcrypt verification
+// (Google Sheets Users tab, met SEED_USERS-fallback als Sheets niet is geconfigureerd)
+app.post("/api/login", async (req, res) => {
+  try {
+    const { usernameOrEmail, password } = req.body || {};
+    const identifier = typeof usernameOrEmail === "string" ? usernameOrEmail.trim() : "";
+    const candidatePassword = typeof password === "string" ? password : "";
+
+    if (!identifier || !candidatePassword) {
+      return res.status(400).json({ success: false, error: "Gebruikersnaam en wachtwoord zijn verplicht." });
+    }
+
+    let user: any = null;
+    if (isGoogleAuthConfigured()) {
+      try {
+        user = await getUserFromSheet(identifier, identifier);
+      } catch (err: any) {
+        console.warn("[Login] Sheets lookup skipped:", err?.message || err);
+      }
+    }
+
+    const seedUser = SEED_USERS.find(
+      (u) =>
+        u.username.toLowerCase() === identifier.toLowerCase() ||
+        u.email.toLowerCase() === identifier.toLowerCase()
+    );
+
+    if (user?.passwordHash) {
+      const valid = await compare(candidatePassword, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ success: false, error: GENERIC_LOGIN_ERROR });
+      }
+    } else {
+      if (!seedUser) {
+        return res.status(401).json({ success: false, error: GENERIC_LOGIN_ERROR });
+      }
+      const valid = await compare(candidatePassword, seedUser.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ success: false, error: GENERIC_LOGIN_ERROR });
+      }
+      if (user && !user.passwordHash) {
+        try {
+          await updateUserProfileInSheet(
+            { email: user.email || "", username: user.username || "" },
+            { passwordHash: seedUser.passwordHash }
+          );
+          user = await getUserFromSheet(identifier, identifier);
+        } catch (err: any) {
+          console.warn("[Login] Hash migration to sheet skipped:", err?.message || err);
+        }
+      }
+    }
+
+    const { token, expiresAt } = signAuthToken(identifier);
+    const safeUser = {
+      username: user?.username || seedUser?.username || "",
+      email: user?.email || seedUser?.email || "",
+      name: user?.name || seedUser?.name || "",
+      nickname: user?.nickname || seedUser?.nickname || "",
+      avatar: seedUser?.avatar || "",
+      avatarUrl: user?.avatarUrl || seedUser?.avatarUrl || "",
+      role: user?.role || seedUser?.role || "member",
+      tripCode: user?.tripCode || seedUser?.tripCode || "ATH-2026",
+      updatedAt: user?.updatedAt || "",
+    };
+    return res.json({ success: true, user: safeUser, token, expiresAt });
+  } catch (err: any) {
+    console.error("[Login] Error:", err?.message || err);
+    return res.status(500).json({ success: false, error: "Er is een onverwachte serverfout opgetreden." });
   }
 });
 
