@@ -45,6 +45,29 @@ execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
 - UI-teksten: Nederlands (dit wordt stapsgewijs consistent gemaakt in step 06).
 - Geen comments toevoegen tenzij gevraagd. Volg bestaande codeconventies per bestand.
 
+## Status & openstaande zaken (bijgewerkt 13 aug 2026)
+
+- **Step 07 (wachtwoordreset via e-mail) is live** maar verstuurt nog géén e-mail:
+  er is nog géén `RESEND_API_KEY` (geen domein geverifieerd). Zonder key logt de
+  server de reset-link naar de serverconsole (`[Reset] Reset link: ...`) en verstuurt
+  hij niets — dat is bewust (dev-modus), geen bug.
+- **Testaccount** (seed-user, o.a. om "Wachtwoord vergeten?" te testen):
+  gebruikersnaam `testaccount`, e-mail `dennis.van.rooden+testaccount@gmail.com`,
+  wachtwoord `test`. Zie `server/seed-users.ts`.
+- **Om de reset-mail werkend te krijgen** (toekomstig werk):
+  1. Resend-account + API-key: https://resend.com/api-keys
+  2. `RESEND_API_KEY` zetten in `.env.local` (lokaal) én als Vercel env-var
+     (Production/Preview).
+  3. Domein verifiëren in Resend + `RESEND_FROM` zetten (bijv.
+     `Athena AI <noreply@<domein>>`). Zonder geverifieerd domein accepteert Resend
+     alleen `onboarding@resend.dev` en stuurt het alleen naar het e-mailadres van
+     het Resend-account zelf.
+  4. `APP_URL` zetten op de live URL (fallback: `http://localhost:3000`).
+  - Fouten van Resend zijn zichtbaar als `[Reset] Resend error: <status> <body>`.
+  - `.env` en `.env.local` worden sinds een fix bij serverstart door `server.ts`
+    geladen (dotenv). Op Vercel bestaan die bestanden niet; daar injecteert het
+    platform de env-vars zelf.
+
 ## Overige afspraken
 
 - Google Sheets heeft tabbladen: TripInfo, Stays, Users, CustomBookings, BookingLinks,
