@@ -1,3 +1,5 @@
+import "dotenv/config";
+import { config as loadEnv } from "dotenv";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -24,6 +26,11 @@ import type { ToolResult, Source } from "./server/live-providers.js";
 import { transliterateGreek } from "./server/transliterate.js";
 import { translateWithMyMemory } from "./server/translate-fallback.js";
 import { handleFerryDisruptions } from "./server/ferry-disruptions.js";
+
+// Laad omgevingsvariabelen uit .env en .env.local (voor lokale dev). Op Vercel
+// worden de variabelen door het platform geïnjecteerd en bestaan de bestanden niet.
+loadEnv();
+loadEnv({ path: ".env.local" });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -464,7 +471,12 @@ async function sendPasswordResetEmail(toEmail: string, resetLink: string): Promi
           `<p>Als je dit niet hebt aangevraagd, kun je deze e-mail negeren.</p>`,
       }),
     });
-    return res.ok;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Reset] Resend error:", res.status, errText);
+      return false;
+    }
+    return true;
   } catch (err: any) {
     console.error("[Reset] Email send error:", err?.message || err);
     return false;
