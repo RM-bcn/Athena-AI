@@ -1,36 +1,31 @@
 # Athena-AI — Routekaart & werkwijze (steps)
 
-Overzicht van de 6 geplande stappen naar aanleiding van de review van augustus 2026.
-Elke stap heeft een eigen plan-bestand dat door een agent uitgevoerd kan worden.
+Overzicht van de geplande stappen voor Athena AI. Uitgevoerde stappen staan
+gearchiveerd in [done/](done/). Elke openstaande stap heeft een eigen plan-bestand
+dat door een agent uitgevoerd kan worden.
 
-## Belangrijk: eerst voorbereiden (stap 0)
+## Afgerond (stap 0 + 01–06)
 
-`main` loopt momenteel **49 commits achter** op `feature/chat-upgrade` (de actuele,
-werkende code). Voordat je aan step 01 begint:
+- [x] Stap 0 — main bijwerken + branch-/stash-opruiming
+- [x] Step 01 — server-side login (bcrypt, token) → [done](done/step-01-server-auth-login.md)
+- [x] Step 02 — endpoint-bescherming (`requireAuth`) → [done](done/step-02-bescherm-endpoints.md)
+- [x] Step 03 — eerlijke features (MissedFerry, AI Hotel Suggesties, tel:-links, print) → [done](done/step-03-eerlijke-features.md)
+- [x] Step 04 — reiscode-validatie + share-link (`?code=...`) → [done](done/step-04-reiscode-sharelink.md)
+- [x] Step 05 — transport-sync naar Sheets, nieuwe chat-sessie, DAG-nummering → [done](done/step-05-sync-sessies-dagplanning.md)
+- [x] Step 06 — Nederlandse UI-teksten, conditionele banners → [done](done/step-06-taal-en-teksten.md)
 
-1. Open een PR `feature/chat-upgrade` → `main` en merge die na review.
-2. Verwijder na de merge de oude feature-branches (lokaal + remote):
-   `chat-optimalisatie`, `feature/chat-background-refresh`, `feature/duckduckgo-live-search`,
-   `feature/ferries-transfers`, `feature/ferries-transfers-confirmed`, `feature/ferries-transports`,
-   `feature/login-screen`, `feature/profile-management`, `feature/smart-accommodation-linking`,
-   `feature/transport-upgrade`, `mobile-optimalisatie`, `test-readme`,
-   `google-drive-integration-issue-48088`, `google-sheets-database-integration-ec0a3`,
-   `greek-sunset-hero-image-107f8`, `oke-wat-nu-0eaad`, `athena-ai-repository-pull-885bc`.
-3. Ruim de 3 achtergebleven stashes op (`git stash list`): alleen bewaren wat nog nodig is.
-
-## De 6 stappen (sequentieel uitvoeren, 01 → 06)
+## Vervolgstappen (openstaand, sequentieel 07 → 09)
 
 | Step | Plan-bestand | Kort doel |
 |------|--------------|-----------|
-| 01 | [step-01-server-auth-login.md](step-01-server-auth-login.md) | Echte server-side login met bcrypt; wachtwoorden uit de bundle |
-| 02 | [step-02-bescherm-endpoints.md](step-02-bescherm-endpoints.md) | Auth-check (token) op alle wijzigende API-endpoints |
-| 03 | [step-03-eerlijke-features.md](step-03-eerlijke-features.md) | Nep-features eerlijk maken (MissedFerry, Trivago, alerts, export) |
-| 04 | [step-04-reiscode-sharelink.md](step-04-reiscode-sharelink.md) | Reiscode-validatie + werkende share-link (`?code=...`) |
-| 05 | [step-05-sync-sessies-dagplanning.md](step-05-sync-sessies-dagplanning.md) | Transport-sync naar Sheets, nieuwe chat-sessie, DAG-nummering fix |
-| 06 | [step-06-taal-en-teksten.md](step-06-taal-en-teksten.md) | Nederlandse UI-teksten, conditionele banners, kleine fixes |
+| 07 | [step-07-wachtwoordreset-email.md](step-07-wachtwoordreset-email.md) | Echte wachtwoordreset via e-mail (reset-token + link) |
+| 08 | [step-08-ai-dagplanning.md](step-08-ai-dagplanning.md) | AI-gegenereerde dagplanning per verblijfsdag in de itinerary |
+| 09 | [step-09-rollen-rechten.md](step-09-rollen-rechten.md) | Rollen & rechten owner vs member server-side én client-side |
 
 Waarom sequentieel: de stappen raken deels dezelfde bestanden (`server.ts`, `App.tsx`,
-`LoginView.tsx`, `MyItineraryView.tsx`). Parallel werken geeft merge-conflicten.
+`MyItineraryView.tsx`, `LoginView.tsx`). Parallel werken geeft merge-conflicten.
+Uitzondering: niet-opeenvolgende stappen (bv. 07 samen met 08) mogen parallel mits
+ze geen gemeenschappelijke bestanden raken — check de "Betrokken bestanden"-secties.
 
 ## Werkwijze per stap (voor jou als gebruiker)
 
@@ -48,13 +43,3 @@ Waarom sequentieel: de stappen raken deels dezelfde bestanden (`server.ts`, `App
 - PR-beschrijving: wat/waarom, verwijzing naar het plan-bestand, afgevinkte
   acceptatiecriteria.
 - Niet zelf mergen; nooit secrets committen; UI-teksten in het Nederlands.
-
-## Status
-
-- [x] Stap 0 — main bijwerken vanaf `feature/chat-upgrade` + branch-opruiming
-- [ ] Step 01 — server-side login
-- [ ] Step 02 — endpoint-bescherming
-- [ ] Step 03 — eerlijke features
-- [ ] Step 04 — reiscode + share-link
-- [ ] Step 05 — sync, chat-sessies, dagnummering
-- [ ] Step 06 — taal & teksten
