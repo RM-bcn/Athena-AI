@@ -11,7 +11,12 @@ interface ShareModalProps {
 export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, tripCode = 'ATH-2026' }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://athena-ai.studio/trip/ATH-2026';
+  const shareUrl = (() => {
+    if (typeof window === 'undefined') return `https://athena-ai.studio/?code=${tripCode}`;
+    const url = new URL(window.location.href);
+    url.searchParams.set('code', tripCode);
+    return url.toString();
+  })();
 
   if (!isOpen) return null;
 
@@ -43,7 +48,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, tripCod
           </div>
           <div>
             <h2 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[#001a33]">Reiscode & Delen</h2>
-            <p className="font-['Inter'] text-xs text-[#717783]">Deel reis ATH-2026 met Dennis, Joyce en je vrienden</p>
+            <p className="font-['Inter'] text-xs text-[#717783]">Deel reis {tripCode} met Dennis, Joyce en je vrienden</p>
           </div>
         </div>
 
@@ -63,7 +68,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, tripCod
             className="w-full py-2.5 bg-[#005BAE] text-white font-bold text-xs rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
           >
             {copiedCode ? <Check className="w-4 h-4 text-green-300" /> : <Copy className="w-4 h-4" />}
-            {copiedCode ? 'Reiscode Gekopieerd!' : 'Kopieer Reiscode ATH-2026'}
+            {copiedCode ? 'Reiscode Gekopieerd!' : `Kopieer Reiscode ${tripCode}`}
           </button>
         </div>
 
