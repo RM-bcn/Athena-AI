@@ -284,7 +284,7 @@ export default function App() {
   const [isMissedFerryOpen, setIsMissedFerryOpen] = useState(false);
   const [isTranslateMenuOpen, setIsTranslateMenuOpen] = useState(false);
   const [isAddBookingOpen, setIsAddBookingOpen] = useState(false);
-  const [bookingMode, setBookingMode] = useState<'manual' | 'trivago'>('manual');
+  const [bookingMode, setBookingMode] = useState<'manual' | 'ai'>('manual');
   const [bookingIsland, setBookingIsland] = useState<string | undefined>(undefined);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [customBookings, setCustomBookings] = useState<Accommodation[]>([]);
@@ -647,7 +647,7 @@ if (loaded.stayBookingLinks) {
     updateAndSaveTrip(newTripObj);
   };
 
-  const handleOpenAddBooking = (mode: 'manual' | 'trivago' = 'manual', island?: string) => {
+  const handleOpenAddBooking = (mode: 'manual' | 'ai' = 'manual', island?: string) => {
     if (isGuestMode) {
       alert("⚠️ Je bent ingelogd als Gast. Log in als Dennis of Joyce om accommodaties toe te voegen!");
       setActiveTab('login');
@@ -905,6 +905,29 @@ if (loaded.stayBookingLinks) {
     if (message) handleSendMessage(message);
   };
 
+  const handleFindSecludedBeaches = () => {
+    const fallback = () =>
+      openChat(
+        "Athena, where are the quietest secluded beaches near me? I couldn't fetch your location automatically — please ask where I am right now, then suggest hidden coves close by."
+      );
+
+    if (!("geolocation" in navigator)) {
+      fallback();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        openChat(
+          `Athena, I'm at (${latitude.toFixed(4)}, ${longitude.toFixed(4)}). Where are the quietest secluded beaches within easy reach of my current location?`
+        );
+      },
+      fallback,
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
   const handleTriggerQuickAction = (action: string) => {
     if (action === 'Ferry Status' || action.includes('ferry')) {
       setIsMissedFerryOpen(true);
@@ -1014,12 +1037,8 @@ if (loaded.stayBookingLinks) {
             onOpenTavernas={() => {
               openChat("Athena, can you recommend authentic local tavernas in Naxos and Milos within walking distance?");
             }}
-            onOpenBeaches={() => {
-              openChat("Athena, where are the quietest secluded beaches in Koufonisia and Naxos?");
-            }}
+            onOpenBeaches={handleFindSecludedBeaches}
             onOpenChat={openChat}
-            onTriggerEmergency={() => alert("🚨 Emergency Service: Calling 112 (European Emergency Services in Greece)...")}
-            onCallTaxi={() => alert("🚕 Taxi Desk: Contacting Naxos & Milos Port Radio Taxi Service (+30 22850 22444)...")}
             onFindPharmacy={() => {
               openChat("Athena, where is the nearest open pharmacy in Naxos Chora?");
             }}
@@ -1086,8 +1105,10 @@ if (loaded.stayBookingLinks) {
       <MissedFerryModal
         isOpen={isMissedFerryOpen}
         onClose={() => setIsMissedFerryOpen(false)}
-        onBookAlternative={(op) => {
-          handleSendMessage(`I booked the alternative ferry departure with ${op}. Please update my itinerary!`);
+        onRequestHelp={(op) => {
+          handleSendMessage(
+            `We hebben waarschijnlijk de veerboot gemist. Athena, zoek de eerstvolgende alternatieve vertrekken vanaf ${currentTrip.stays[0]?.island || 'ons huidige eiland'} en geef opties. We keken net naar de ${op}.`
+          );
         }}
       />
 

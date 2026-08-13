@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { IslandStay } from '../../types';
 
-export interface TrivagoHotel {
+export interface AIHotel {
   id: string;
   name: string;
   location: string;
@@ -46,7 +46,7 @@ interface AddBookingModalProps {
     image?: string;
   }) => void;
   tripStays?: IslandStay[];
-  initialMode?: 'manual' | 'trivago';
+  initialMode?: 'manual' | 'ai';
   initialIsland?: string;
 }
 
@@ -58,7 +58,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
   initialMode = 'manual',
   initialIsland,
 }) => {
-  const [activeTab, setActiveTab] = useState<'manual' | 'trivago'>(initialMode);
+  const [activeTab, setActiveTab] = useState<'manual' | 'ai'>(initialMode);
   
   // Manual Form State
   const [name, setName] = useState('');
@@ -69,11 +69,11 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
 
-  // Trivago Search State
+  // AI Suggesties Search State
   const [searchIsland, setSearchIsland] = useState<string>(initialIsland || (tripStays[0]?.island || 'Naxos'));
   const [styleFilter, setStyleFilter] = useState<string>('Boutique');
-  const [trivagoHotels, setTrivagoHotels] = useState<TrivagoHotel[]>([]);
-  const [isLoadingTrivago, setIsLoadingTrivago] = useState(false);
+  const [aiHotels, setAIHotels] = useState<AIHotel[]>([]);
+  const [isLoadingHotels, setIsLoadingHotels] = useState(false);
   const [addedHotelId, setAddedHotelId] = useState<string | null>(null);
 
   // Synchronize when modal opens
@@ -84,14 +84,14 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
         setSelectedIsland(initialIsland);
         setSearchIsland(initialIsland);
       }
-      if (activeTab === 'trivago' || initialMode === 'trivago') {
-        fetchTrivagoHotels(initialIsland || searchIsland);
+      if (activeTab === 'ai' || initialMode === 'ai') {
+        fetchAIHotels(initialIsland || searchIsland);
       }
     }
   }, [isOpen, initialMode, initialIsland]);
 
-  const fetchTrivagoHotels = async (targetIsland: string) => {
-    setIsLoadingTrivago(true);
+  const fetchAIHotels = async (targetIsland: string) => {
+    setIsLoadingHotels(true);
     try {
       const res = await fetch('/api/suggest-hotels', {
         method: 'POST',
@@ -99,11 +99,11 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
         body: JSON.stringify({ island: targetIsland, style: styleFilter }),
       });
       const data = await res.json();
-      setTrivagoHotels(data.hotels || []);
+      setAIHotels(data.hotels || []);
     } catch {
-      setTrivagoHotels([]);
+      setAIHotels([]);
     } finally {
-      setIsLoadingTrivago(false);
+      setIsLoadingHotels(false);
     }
   };
 
@@ -128,7 +128,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
     onClose();
   };
 
-  const handleSelectTrivagoHotel = (hotel: TrivagoHotel) => {
+  const handleSelectHotel = (hotel: AIHotel) => {
     setAddedHotelId(hotel.id);
     const matchingStay = tripStays.find(
       (s) => s.island.toLowerCase() === (hotel.island || '').toLowerCase()
@@ -194,19 +194,19 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
             <button
               type="button"
               onClick={() => {
-                setActiveTab('trivago');
-                if (trivagoHotels.length === 0) {
-                  fetchTrivagoHotels(searchIsland);
+                setActiveTab('ai');
+                if (aiHotels.length === 0) {
+                  fetchAIHotels(searchIsland);
                 }
               }}
               className={`flex-1 py-2.5 rounded-xl font-['Inter'] font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'trivago'
+                activeTab === 'ai'
                   ? 'bg-[#005BAE] text-white shadow-sm'
                   : 'text-[#717783] hover:text-[#005BAE]'
               }`}
             >
               <Sparkles className="w-4 h-4 text-amber-300" />
-              2. Trivago Hotel Suggesties (AI Live Finder)
+              2. AI Hotel Suggesties
             </button>
           </div>
         </div>
@@ -331,11 +331,11 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
             <div className="pt-4 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => setActiveTab('trivago')}
+                onClick={() => setActiveTab('ai')}
                 className="text-[#005BAE] font-['Inter'] text-xs font-semibold hover:underline flex items-center gap-1"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                Liever Trivago suggesties bekijken?
+                Liever AI Hotel Suggesties bekijken?
               </button>
 
               <button
@@ -349,9 +349,17 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
           </form>
         )}
 
-        {/* TAB 2: TRIVAGO AI LIVE SUGGESTIONS */}
-        {activeTab === 'trivago' && (
+        {/* TAB 2: AI HOTEL SUGGESTIES */}
+        {activeTab === 'ai' && (
           <div className="space-y-4">
+            {/* Disclaimer */}
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl">
+              <p className="font-['Inter'] text-[11px] text-amber-900 leading-relaxed">
+                <strong>Let op:</strong> Voorbeeldsuggesties van Athena AI — controleer zelf
+                beschikbaarheid, prijzen en reviews op de boekingssite.
+              </p>
+            </div>
+
             {/* Search Controls */}
             <div className="p-4 bg-[#f0f4f9] rounded-2xl border border-[#005BAE]/20 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -364,7 +372,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
                     value={searchIsland}
                     onChange={(e) => {
                       setSearchIsland(e.target.value);
-                      fetchTrivagoHotels(e.target.value);
+                      fetchAIHotels(e.target.value);
                     }}
                     className="bg-white border border-[#c0c7d3]/50 rounded-lg px-3 py-1 font-['Inter'] text-xs font-bold text-[#001a33] focus:outline-none"
                   >
@@ -385,7 +393,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
                     type="button"
                     onClick={() => {
                       setStyleFilter(style);
-                      fetchTrivagoHotels(searchIsland);
+                      fetchAIHotels(searchIsland);
                     }}
                     className={`px-3 py-1 rounded-full text-xs font-['Inter'] transition-colors cursor-pointer ${
                       styleFilter === style
@@ -400,16 +408,16 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
             </div>
 
             {/* Hotel Cards List */}
-            {isLoadingTrivago ? (
+            {isLoadingHotels ? (
               <div className="py-12 flex flex-col items-center justify-center gap-3 text-[#005BAE]">
                 <Loader2 className="w-8 h-8 animate-spin" />
                 <p className="font-['Inter'] text-xs font-semibold">
-                  Trivago hoteldeals en AI suggesties inladen voor {searchIsland}...
+                  AI hotelsuggesties inladen voor {searchIsland}...
                 </p>
               </div>
             ) : (
               <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
-                {trivagoHotels.map((hotel) => {
+                {aiHotels.map((hotel) => {
                   const isAdded = addedHotelId === hotel.id;
                   return (
                     <div
@@ -478,7 +486,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
 
                           <button
                             type="button"
-                            onClick={() => handleSelectTrivagoHotel(hotel)}
+                            onClick={() => handleSelectHotel(hotel)}
                             disabled={isAdded}
                             className={`px-4 py-2 rounded-xl font-['Inter'] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                               isAdded

@@ -9,7 +9,7 @@ import {
   Camera,
   ArrowRight,
   Sun,
-  PhoneCall,
+  MapPin,
   AlertTriangle,
   Cross,
   MessageSquare
@@ -21,8 +21,6 @@ interface QuickHelpViewProps {
   onOpenTavernas: () => void;
   onOpenBeaches: () => void;
   onOpenChat: () => void;
-  onTriggerEmergency: () => void;
-  onCallTaxi: () => void;
   onFindPharmacy: () => void;
   isGuestMode?: boolean;
 }
@@ -33,8 +31,6 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
   onOpenTavernas,
   onOpenBeaches,
   onOpenChat,
-  onTriggerEmergency,
-  onCallTaxi,
   onFindPharmacy,
   isGuestMode = false,
 }) => {
@@ -43,9 +39,14 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      setLocalTime(`${h}:${m}`);
+      setLocalTime(
+        now.toLocaleTimeString('nl-NL', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/Athens',
+          hour12: false,
+        })
+      );
     };
     updateTime();
     const timer = setInterval(updateTime, 10000);
@@ -210,27 +211,35 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
                 <Sun className="w-5 h-5 animate-spin" style={{ animationDuration: '15s' }} />
               </div>
               <div>
-                <p className="font-['Inter'] text-xs font-semibold text-[#404752]">Local Time in Cyclades</p>
+                <p className="font-['Inter'] text-xs font-semibold text-[#404752]">Tijd op de Cycladen</p>
                 <p className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[#005BAE]">{localTime}</p>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={onCallTaxi}
-                className="px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/30 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+              <a
+                href="https://www.google.com/maps/search/taxi+near+me"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/30 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex flex-col items-center leading-tight shadow-sm"
               >
-                <PhoneCall className="w-3.5 h-3.5" />
-                Call Taxi
-              </button>
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" />
+                  Zoek taxi in de buurt
+                </span>
+                <span className="text-[10px] font-normal opacity-70">via Google Maps</span>
+              </a>
 
-              <button
-                onClick={onTriggerEmergency}
-                className="px-4 py-2 bg-[#ba1a1a] text-white border border-[#ba1a1a]/30 rounded-full font-['Inter'] text-xs font-bold hover:brightness-110 transition-colors cursor-pointer flex items-center gap-1.5 shadow-md"
+              <a
+                href="tel:112"
+                className="px-4 py-2 bg-[#ba1a1a] text-white border border-[#ba1a1a]/30 rounded-full font-['Inter'] text-xs font-bold hover:brightness-110 transition-colors cursor-pointer flex flex-col items-center leading-tight shadow-md"
               >
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Emergency (112)
-              </button>
+                <span className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Bel nu 112
+                </span>
+                <span className="text-[10px] font-normal opacity-80">Europees alarmnummer in Griekenland</span>
+              </a>
 
               <button
                 onClick={onFindPharmacy}
