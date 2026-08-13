@@ -17,7 +17,8 @@ import {
   History,
   Inbox,
   ChevronDown,
-  Trash2
+  Trash2,
+  MessageSquarePlus
 } from 'lucide-react';
 import { WeatherCard } from './WeatherCard';
 import { extractTextFromImage } from '../utils/ocr';
@@ -33,6 +34,7 @@ interface ChatInterfaceViewProps {
   onToggleFavorite: (msg: ChatMessage) => void;
   onRemoveFavorite: (id: string) => void;
   onDeleteSession: (sessionId: string) => void;
+  onStartNewSession: () => void;
   currentTrip: TripData;
 }
 
@@ -47,6 +49,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
   onToggleFavorite,
   onRemoveFavorite,
   onDeleteSession,
+  onStartNewSession,
   currentTrip,
 }) => {
   const [inputText, setInputText] = useState('');
@@ -381,6 +384,15 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
         <>
           <div className="flex-1 flex flex-col pt-16 md:pt-24 px-4 md:px-12 pb-40 md:pb-44 overflow-y-auto">
             <div className="max-w-3xl mx-auto w-full space-y-8 py-6">
+              {messages.length === 0 && (
+                <div className="p-10 bg-white/80 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 text-center">
+                  <Sailboat className="w-10 h-10 text-[#c0c7d3] mx-auto mb-3" />
+                  <p className="font-['Inter'] text-sm text-[#404752]">
+                    Start een nieuw gesprek met Athena of bekijk je geschiedenis.
+                  </p>
+                </div>
+              )}
+
               {messages.map(renderMessage)}
 
               {isSending && (
@@ -405,6 +417,15 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
           >
             <div className="max-w-3xl mx-auto">
               <div className="flex gap-2 mb-3 md:mb-4 overflow-x-auto pb-1 no-scrollbar">
+                <button
+                  onClick={onStartNewSession}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
+                  title="Start een nieuw gesprek"
+                >
+                  <MessageSquarePlus className="w-4 h-4" />
+                  Nieuw gesprek
+                </button>
+
                 <button
                   onClick={() => onTriggerQuickAction('/plan')}
                   className="flex items-center gap-2 px-4 py-2 bg-[#005BAE] text-white rounded-full font-['Inter'] text-xs font-medium hover:brightness-110 transition-colors whitespace-nowrap shadow-sm cursor-pointer"

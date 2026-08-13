@@ -179,6 +179,15 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
     };
   });
 
+  // Correct global day numbering: each stay starts after the cumulative nights
+  // of all previous stays (so 2-3-2 nachten telt als 1-2, 3-5, 6-7).
+  let dayCursor = 0;
+  const stayStartDays = currentTrip.stays.map((stay) => {
+    const start = dayCursor;
+    dayCursor += stay.nights;
+    return start;
+  });
+
   const canEdit = !!currentUser && !isGuestMode;
 
   // Derived transport legs between consecutive stays (single source of truth).
@@ -619,7 +628,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                 {/* Day Cards for this Stay */}
                 <div className="space-y-4">
                   {Array.from({ length: stay.nights }).map((_, dayIdx) => {
-                    const globalDayNum = stayIdx * 3 + dayIdx + 1;
+                    const globalDayNum = stayStartDays[stayIdx] + dayIdx + 1;
                     return (
                       <article
                         key={dayIdx}
