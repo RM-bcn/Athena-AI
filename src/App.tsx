@@ -928,6 +928,29 @@ if (loaded.stayBookingLinks) {
     );
   };
 
+  const handleFindTaverna = () => {
+    const fallback = () =>
+      openChat(
+        "Athena, where can I find authentic local tavernas near me? I couldn't fetch your location automatically — please ask where I am right now, then recommend tavernas within walking distance."
+      );
+
+    if (!("geolocation" in navigator)) {
+      fallback();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        openChat(
+          `Athena, I'm at (${latitude.toFixed(4)}, ${longitude.toFixed(4)}). Where are the most authentic local tavernas within walking distance of my current location?`
+        );
+      },
+      fallback,
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
   const handleTriggerQuickAction = (action: string) => {
     if (action === 'Ferry Status' || action.includes('ferry')) {
       setIsMissedFerryOpen(true);
@@ -1034,9 +1057,7 @@ if (loaded.stayBookingLinks) {
           <QuickHelpView
             onOpenMissedFerry={() => setIsMissedFerryOpen(true)}
             onOpenTranslateMenu={() => setIsTranslateMenuOpen(true)}
-            onOpenTavernas={() => {
-              openChat("Athena, can you recommend authentic local tavernas in Naxos and Milos within walking distance?");
-            }}
+            onOpenTavernas={handleFindTaverna}
             onOpenBeaches={handleFindSecludedBeaches}
             onOpenChat={openChat}
             onFindPharmacy={() => {
@@ -1105,9 +1126,12 @@ if (loaded.stayBookingLinks) {
       <MissedFerryModal
         isOpen={isMissedFerryOpen}
         onClose={() => setIsMissedFerryOpen(false)}
-        onRequestHelp={(op) => {
+        bookedFerries={transportEntries}
+        onRequestHelp={(sel) => {
+          const route = sel.from && sel.to ? `${sel.from} → ${sel.to}` : 'dezelfde route';
+          const when = [sel.date, sel.time].filter(Boolean).join(' om ');
           handleSendMessage(
-            `We hebben waarschijnlijk de veerboot gemist. Athena, zoek de eerstvolgende alternatieve vertrekken vanaf ${currentTrip.stays[0]?.island || 'ons huidige eiland'} en geef opties. We keken net naar de ${op}.`
+            `We hebben de veerboot gemist: ${sel.label}${when ? ` (gepland ${when})` : ''}. Athena, zoek de eerstvolgende alternatieve vertrekken op de route ${route} en geef opties zodat we op een andere veerboot kunnen.`
           );
         }}
       />
