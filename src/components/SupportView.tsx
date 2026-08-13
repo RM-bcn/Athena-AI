@@ -7,13 +7,13 @@ export const SupportView: React.FC = () => {
       <div className="max-w-4xl mx-auto space-y-8">
         <div>
           <span className="font-['Inter'] text-xs font-semibold text-[#005BAE] uppercase tracking-widest block mb-1">
-            Concierge Assistance
+            Concierge Assistentie
           </span>
           <h1 className="font-['Plus_Jakarta_Sans'] text-4xl font-bold text-[#0b1d2d]">
-            24/7 Support & Port Assistance
+            24/7 Support &amp; Havenassistentie
           </h1>
           <p className="text-[#404752] font-['Inter'] text-sm mt-1">
-            Need urgent help on island transport, hotel re-booking, or medical aid in Greece?
+            Dringend hulp nodig met eilandvervoer, een hotelwijziging of medische bijstand in Griekenland?
           </p>
         </div>
 
@@ -22,8 +22,8 @@ export const SupportView: React.FC = () => {
             <div className="w-10 h-10 rounded-full bg-[#f0f4f9] text-[#005BAE] flex items-center justify-center mb-4">
               <PhoneCall className="w-5 h-5" />
             </div>
-            <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d]">Port & Ferry Line</h3>
-            <p className="font-['Inter'] text-xs text-[#717783] mt-1 mb-4">Direct contact for Aegean ferry dispatch desks</p>
+            <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d]">Haven &amp; Veerdienst</h3>
+            <p className="font-['Inter'] text-xs text-[#717783] mt-1 mb-4">Direct contact met de afvaartdesks van de Egeïsche veerboten</p>
             <a href="tel:+302104100000" className="text-[#005BAE] font-['Inter'] text-sm font-bold flex items-center gap-1 hover:underline">
               +30 210 410 0000 <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -33,8 +33,8 @@ export const SupportView: React.FC = () => {
             <div className="w-10 h-10 rounded-full bg-[#f0f4f9] text-[#005BAE] flex items-center justify-center mb-4">
               <Mail className="w-5 h-5" />
             </div>
-            <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d]">Concierge Desk</h3>
-            <p className="font-['Inter'] text-xs text-[#717783] mt-1 mb-4">Priority support for itinerary adjustments</p>
+            <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d]">Concierge Balie</h3>
+            <p className="font-['Inter'] text-xs text-[#717783] mt-1 mb-4">Prioritaire ondersteuning voor reisplanaanpassingen</p>
             <a href="mailto:concierge@athena-ai.studio" className="text-[#005BAE] font-['Inter'] text-sm font-bold flex items-center gap-1 hover:underline">
               concierge@athena-ai.studio <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -44,10 +44,10 @@ export const SupportView: React.FC = () => {
             <div className="w-10 h-10 rounded-full bg-red-100 text-[#ba1a1a] flex items-center justify-center mb-4">
               <LifeBuoy className="w-5 h-5" />
             </div>
-            <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d]">Greece Emergency</h3>
-            <p className="font-['Inter'] text-xs text-[#717783] mt-1 mb-4">European emergency number (Ambulance, Coastguard, Police)</p>
+            <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d]">Noodgevallen Griekenland</h3>
+            <p className="font-['Inter'] text-xs text-[#717783] mt-1 mb-4">Europees alarmnummer (ambulance, kustwacht, politie)</p>
             <a href="tel:112" className="text-[#ba1a1a] font-['Inter'] text-sm font-bold flex items-center gap-1 hover:underline">
-              Dial 112 <ExternalLink className="w-3.5 h-3.5" />
+              Bel 112 <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
         </div>
