@@ -69,12 +69,16 @@ export default function App() {
 
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => readGuestMode());
 
-  const [tripCode, setTripCode] = useState<string>('ATH-2026');
+  const [tripCode, setTripCode] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'ATH-2026';
+    const urlCode = new URLSearchParams(window.location.search).get('code');
+    return urlCode && urlCode.trim() ? urlCode.trim().toUpperCase() : 'ATH-2026';
+  });
 
   // Shared Trip State (persisted so Dennis & Joyce both see live edits)
   const [currentTrip, setCurrentTrip] = useState<TripData>(() => {
     try {
-      const savedTrip = localStorage.getItem('athena_trip_ATH-2026');
+      const savedTrip = localStorage.getItem(`athena_trip_${tripCode}`);
       return savedTrip ? JSON.parse(savedTrip) : defaultTrip;
     } catch {
       return defaultTrip;
@@ -350,11 +354,13 @@ if (loaded.stayBookingLinks) {
   const updateAndSaveTrip = (
     newTrip: TripData,
     updatedBookings?: Accommodation[],
-    updatedLinks?: Record<string, string>
+    updatedLinks?: Record<string, string>,
+    storageCode?: string
   ) => {
     setCurrentTrip(newTrip);
+    const code = storageCode || tripCode;
     try {
-      localStorage.setItem('athena_trip_ATH-2026', JSON.stringify(newTrip));
+      localStorage.setItem(`athena_trip_${code}`, JSON.stringify(newTrip));
     } catch (e) {
       console.error("Failed to save trip to localStorage", e);
     }
@@ -490,7 +496,18 @@ if (loaded.stayBookingLinks) {
       .catch((err) => console.warn("Could not restore profile from sheet:", err));
   };
 
-  const handleAccessTripCode = (code: string) => {
+  const handleAccessTripCode = async (code: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`/api/trips/validate?code=${encodeURIComponent(code)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!data.valid) {
+        return { success: false, error: 'Deze reiscode bestaat niet. Controleer de code of vraag de organisator.' };
+      }
+    } catch (e) {
+      console.error(e);
+      return { success: false, error: 'Kan reiscode niet controleren, probeer opnieuw.' };
+    }
+
     setTripCode(code);
     setIsGuestMode(true);
     setCurrentUser(null);
@@ -502,7 +519,19 @@ if (loaded.stayBookingLinks) {
       console.error(e);
     }
     setActiveTab('itinerary');
+    return { success: true };
   };
+
+  // Auto-open guest mode when the app is opened with a share-link ?code=...
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (!code || !code.trim()) return;
+    if (getActiveUser()) return;
+    handleAccessTripCode(code.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSignOut = () => {
     setCurrentUser(null);
@@ -1003,7 +1032,8 @@ if (loaded.stayBookingLinks) {
       console.error("Failed to clear stay-booking links", e);
     }
 
-    updateAndSaveTrip(newTrip, [], {});
+    setTripCode(newTrip.id);
+    updateAndSaveTrip(newTrip, [], {}, newTrip.id);
     setActiveTab('itinerary');
 
     const staySummary = newTrip.stays

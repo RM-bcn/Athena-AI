@@ -509,6 +509,37 @@ export async function saveTripToSheet(
   }
 }
 
+// Read the known trip codes from the TripInfo tab (column G: TripCode).
+// Returns an empty array when Google Sheets is not configured or no codes are seeded.
+export async function getTripCodeFromSheet(): Promise<string[]> {
+  const auth = getOAuthClient();
+  if (!auth) return [];
+
+  try {
+    const { spreadsheetId } = await getOrCreateSpreadsheet();
+    const sheets = google.sheets({ version: "v4", auth });
+
+    await ensureTabsExist(sheets, spreadsheetId);
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "TripInfo!A:G",
+    });
+
+    const rows = res.data.values || [];
+    const codes: string[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const code = row && row[6] ? String(row[6]).trim() : "";
+      if (code) codes.push(code);
+    }
+    return codes;
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not read trip codes:", err?.message || err);
+    return [];
+  }
+}
+
 export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: any[]; stayBookingLinks: Record<string, string>; transportEntries: any[]; sheetUrl: string }> {
   const auth = getOAuthClient();
   if (!auth) throw new Error("Google auth parameters ontbreken.");

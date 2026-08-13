@@ -6,7 +6,7 @@ import { saveAuthToken } from '../utils/authStorage';
 import { Key, ArrowRight, LogIn, Info, Sparkles, User, Lock, AlertCircle, HelpCircle, CheckCircle2, X } from 'lucide-react';
 
 interface LoginViewProps {
-  onAccessTripCode: (code: string) => void;
+  onAccessTripCode: (code: string) => Promise<{ success: boolean; error?: string }>;
   onLoginSuccess: (user: UserAccount, rememberMe?: boolean) => void;
 }
 
@@ -27,12 +27,24 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
   const [resetErrorMsg, setResetErrorMsg] = useState('');
 
-  const handleCodeSubmit = (e: React.FormEvent) => {
+  const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.trim()) {
-      onAccessTripCode(code.trim());
-    } else {
+    if (!code.trim()) {
       setErrorMsg('Voer a.u.b. een geldige reiscode in om de reis te volgen.');
+      return;
+    }
+
+    setErrorMsg('');
+    setSubmitting(true);
+    try {
+      const result = await onAccessTripCode(code.trim());
+      if (!result.success && result.error) {
+        setErrorMsg(result.error);
+      }
+    } catch (err) {
+      setErrorMsg('Kan reiscode niet controleren, probeer opnieuw.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -143,17 +155,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     id="travel-code"
                     type="text"
                     value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    onChange={(e) => {
+                      setCode(e.target.value.toUpperCase());
+                      if (errorMsg) setErrorMsg('');
+                    }}
                     placeholder="Voer reiscode in (bijv. ATH-2026)"
                     className="w-full pl-12 pr-4 py-4 bg-[#F0F4F9] border border-[#0B1D2D]/10 rounded-xl font-['Plus_Jakarta_Sans'] text-base font-semibold text-[#0B1D2D] focus:ring-2 focus:ring-[#005BAE] focus:outline-none uppercase tracking-widest transition-all"
                   />
                 </div>
 
+                {errorMsg && (
+                  <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/40 text-red-600 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full bg-[#005BAE] text-white font-['Plus_Jakarta_Sans'] font-semibold py-4 rounded-xl hover:bg-[#0B1D2D] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={submitting}
+                  className="w-full bg-[#005BAE] text-white font-['Plus_Jakarta_Sans'] font-semibold py-4 rounded-xl hover:bg-[#0B1D2D] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                 >
-                  <span>Reis Openen (Gast)</span>
+                  <span>{submitting ? 'Reiscode controleren...' : 'Reis Openen (Gast)'}</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
               </form>
