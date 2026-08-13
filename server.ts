@@ -105,6 +105,53 @@ app.post("/api/sheets/save", async (req, res) => {
   }
 });
 
+// API: Live weather via Open-Meteo (reuses getWeather provider)
+app.get("/api/weather", async (req, res) => {
+  try {
+    const city = String(req.query.city || "Athens");
+    const result = await getWeather(city);
+
+    const lines = result.text.split("\n");
+    const tempLine = lines.find((l) => l.startsWith("- "));
+    const descLine = lines.find((l) => l.startsWith("Weer in"));
+
+    let temperature: number | null = null;
+    if (tempLine) {
+      const m = tempLine.match(/(-?\d+)/);
+      if (m) temperature = parseInt(m[1], 10);
+    }
+
+    let condition = "";
+    if (descLine) {
+      const before = descLine.split("(")[0];
+      condition = before.replace("Weer in ", "").trim();
+    }
+
+    // Sunrise/sunset from the first forecast day ("Vandaag: zonsopgang HH:MM, zonsondergang HH:MM")
+    const sunLine = lines.find((l) => l.startsWith("- Vandaag:"));
+    let sunrise = "";
+    let sunset = "";
+    if (sunLine) {
+      const sr = sunLine.match(/zonsopgang\s+(\d{2}:\d{2})/);
+      const ss = sunLine.match(/zonsondergang\s+(\d{2}:\d{2})/);
+      if (sr) sunrise = sr[1];
+      if (ss) sunset = ss[1];
+    }
+
+    res.json({
+      location: result.sources?.[0]?.title?.replace("Open-Meteo weersverwachting ", "") || city,
+      temperature,
+      condition,
+      sunrise,
+      sunset,
+      sources: result.sources || [],
+    });
+  } catch (err: any) {
+    console.error("Weather API error:", err?.message || err);
+    res.status(500).json({ error: "Weer niet beschikbaar" });
+  }
+});
+
 // API: Chat History (Google Sheets backed; client keeps localStorage fallback)
 app.get("/api/chat/history", async (req, res) => {
   try {
