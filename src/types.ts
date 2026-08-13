@@ -46,12 +46,23 @@ export interface ActivityChip {
   label: string;
 }
 
+export type DayPlanItemType = 'activity' | 'dining' | 'tip';
+
+export interface DayPlanItem {
+  id: string;
+  type: DayPlanItemType;
+  text: string;
+}
+
 export interface DayPlan {
   day: number;            // lokale dag-index in de stop (0 = aankomstdag)
   title: string;
-  activities: string[];   // 3-5 punten, concreet per eiland
-  dining: string;
-  tips: string[];         // praktische tips (tijdig boeken, cash, etc.)
+  items: DayPlanItem[];
+  // Legacy/compat: de server kan deze ook teruggeven; de client normaliseert
+  // deze velden bij het laden naar items.
+  activities?: string[];
+  dining?: string;
+  tips?: string[];
 }
 
 export interface DailyItinerary {
