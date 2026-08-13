@@ -33,4 +33,15 @@ export const SEED_USERS: SeedUser[] = [
     tripCode: "ATH-2026",
     passwordHash: "$2b$10$13xY6iA/94De1uSl2orhseWSRufRx0LLhIj7iq2gpLhdkymza26P6",
   },
+  {
+    username: "testaccount",
+    email: "dennis.van.rooden+testaccount@gmail.com",
+    name: "Test Account",
+    nickname: "Test",
+    avatar: "",
+    avatarUrl: "",
+    role: "member",
+    tripCode: "ATH-2026",
+    passwordHash: "$2b$10$oN4/94N/2ZUNXvNkDH7FoOgHDEvKHuHNMb39J8Sz5veup2INUVH56",
+  },
 ];
