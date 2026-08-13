@@ -125,7 +125,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </h1>
             </div>
             <p className="max-w-xl text-amber-100/90 font-['Plus_Jakarta_Sans'] text-sm md:text-base leading-relaxed drop-shadow">
-              Welkom bij de eilandhoppen-odyssee van Dennis &amp; Joyce — Milos, Naxos &amp; Koufonisia. Log in als beheerder om de reis en boekingen aan te passen, of volg alles live met een reiscode.
+              Welkom bij je Griekse eilandhoppen-odyssee. Log in als beheerder om de reis en boekingen aan te passen, of volg alles live met een reiscode.
             </p>
           </div>
         </header>
