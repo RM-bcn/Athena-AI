@@ -46,6 +46,14 @@ export interface ActivityChip {
   label: string;
 }
 
+export interface DayPlan {
+  day: number;            // lokale dag-index in de stop (0 = aankomstdag)
+  title: string;
+  activities: string[];   // 3-5 punten, concreet per eiland
+  dining: string;
+  tips: string[];         // praktische tips (tijdig boeken, cash, etc.)
+}
+
 export interface DailyItinerary {
   dayNumber: number;
   title: string;
