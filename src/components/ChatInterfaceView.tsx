@@ -24,6 +24,7 @@ import { extractTextFromImage } from '../utils/ocr';
 
 interface ChatInterfaceViewProps {
   chatSubTab: ChatSubTab;
+  setChatSubTab: (subTab: ChatSubTab) => void;
   messages: ChatMessage[];
   historyMessages: ChatMessage[];
   favorites: ChatFavorite[];
@@ -37,6 +38,7 @@ interface ChatInterfaceViewProps {
 
 export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
   chatSubTab,
+  setChatSubTab,
   messages,
   historyMessages,
   favorites,
@@ -182,14 +184,14 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
   const renderMessage = (msg: ChatMessage) => (
     <div
       key={msg.id}
-      className={`flex gap-4 group ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+      className={`flex gap-2.5 md:gap-4 group ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
     >
       {msg.role === 'assistant' ? (
-        <div className="w-10 h-10 rounded-full bg-[#005BAE] flex-shrink-0 flex items-center justify-center text-white mt-1 shadow-md">
-          <Sailboat className="w-5 h-5" />
+        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#005BAE] flex-shrink-0 flex items-center justify-center text-white mt-1 shadow-md">
+          <Sailboat className="w-4 h-4 md:w-5 md:h-5" />
         </div>
       ) : (
-        <div className="w-10 h-10 rounded-full bg-[#f0f4f9] flex-shrink-0 overflow-hidden mt-1 shadow-sm border border-[#005BAE]/20">
+        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#f0f4f9] flex-shrink-0 overflow-hidden mt-1 shadow-sm border border-[#005BAE]/20">
           <img
             src={msg.avatar || 'https://lh3.googleusercontent.com/aida-public/AB6AXuD0ruwA2ULiUXslSNEkdMRmxxDJZdyJ3o9diwVU8Zr5YC_87GWALt7tpdexyLGagepnOhOpbaMGsZPUPt0AJ9zeMzT-nUfcqne6y9eLajmKKjVY8RqY414wGfnr0N4r1JhkBh5OJhoHsDiJpTj5ONzHIb-beF-telmiq3OUvjxEOfINr1HLXbJhO_TEPtKOXiIVyG9qX5J2w-nuAXjOjdVjRRdJ1K85u0tChf-zGRBpD13KWAeGwQ'}
             alt={msg.senderName || 'User'}
@@ -200,11 +202,11 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
       <div
         className={`flex flex-col gap-2 ${
-          msg.role === 'user' ? 'items-end max-w-[80%]' : 'max-w-[88%]'
+          msg.role === 'user' ? 'items-end max-w-[85%] md:max-w-[80%]' : 'max-w-[88%] md:max-w-[88%]'
         }`}
       >
         <div
-          className={`p-5 rounded-3xl shadow-sm border ${
+          className={`p-4 md:p-5 rounded-3xl shadow-sm border ${
             msg.role === 'user'
               ? 'bg-[#005BAE] text-white rounded-br-sm border-[#005BAE]'
               : 'bg-white text-[#001a33] rounded-bl-sm border-[#f0f4f9]'
@@ -353,9 +355,31 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
     >
       <WeatherCard trip={currentTrip} variant="floating" />
 
+      <div className="md:hidden fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-b border-[#f0f4f9] px-2 py-2">
+        <div className="flex gap-1.5 rounded-2xl bg-[#f0f4f9] p-1">
+          {([
+            { key: 'current', label: 'Chat' },
+            { key: 'history', label: 'Geschiedenis' },
+            { key: 'favorites', label: 'Favorieten' },
+          ] as { key: ChatSubTab; label: string }[]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setChatSubTab(key)}
+              className={`flex-1 py-2 rounded-xl font-['Inter'] text-xs font-semibold transition-all cursor-pointer ${
+                chatSubTab === key
+                  ? 'bg-[#005BAE] text-white shadow-sm'
+                  : 'text-[#404752] hover:text-[#005BAE]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {chatSubTab === 'current' && (
         <>
-          <div className="flex-1 flex flex-col pt-24 px-4 md:px-12 pb-24 md:pb-44 overflow-y-auto">
+          <div className="flex-1 flex flex-col pt-16 md:pt-24 px-4 md:px-12 pb-40 md:pb-44 overflow-y-auto">
             <div className="max-w-3xl mx-auto w-full space-y-8 py-6">
               {messages.map(renderMessage)}
 
@@ -375,9 +399,12 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
             </div>
           </div>
 
-          <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 md:p-8 bg-gradient-to-t from-white via-white/90 to-transparent z-40">
+          <div
+            className="fixed bottom-0 left-0 md:left-64 right-0 p-3 md:p-8 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-8 bg-gradient-to-t from-white via-white/90 to-transparent z-40"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
             <div className="max-w-3xl mx-auto">
-              <div className="flex gap-2 mb-4 overflow-x-auto pb-1 no-scrollbar">
+              <div className="flex gap-2 mb-3 md:mb-4 overflow-x-auto pb-1 no-scrollbar">
                 <button
                   onClick={() => onTriggerQuickAction('/plan')}
                   className="flex items-center gap-2 px-4 py-2 bg-[#005BAE] text-white rounded-full font-['Inter'] text-xs font-medium hover:brightness-110 transition-colors whitespace-nowrap shadow-sm cursor-pointer"
@@ -480,7 +507,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
       )}
 
       {chatSubTab === 'history' && (
-        <div className="flex-1 flex flex-col pt-24 px-4 md:px-12 pb-16 overflow-y-auto">
+        <div className="flex-1 flex flex-col pt-16 md:pt-24 px-4 md:px-12 pb-16 overflow-y-auto">
           <div className="max-w-3xl mx-auto w-full space-y-6 py-6">
             <div className="flex items-center gap-2 text-[#005BAE]">
               <History className="w-5 h-5" />
@@ -500,8 +527,16 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
               const isExpanded = expandedSessions.has(sessionId);
               return (
                 <div key={sessionId} className="bg-white/90 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 shadow-sm overflow-hidden">
-                  <button
+                  <div
                     onClick={() => toggleSessionExpanded(sessionId)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleSessionExpanded(sessionId);
+                      }
+                    }}
                     className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-[#f0f4f9]/60 transition-colors cursor-pointer"
                     title={isExpanded ? 'Verberg berichten' : 'Toon berichten'}
                   >
@@ -537,7 +572,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </button>
+                  </div>
                   {isExpanded && (
                     <div className="space-y-3 px-5 pb-5">
                       {sessionMessages.map(msg => (
@@ -566,7 +601,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
       )}
 
       {chatSubTab === 'favorites' && (
-        <div className="flex-1 flex flex-col pt-24 px-4 md:px-12 pb-16 overflow-y-auto">
+        <div className="flex-1 flex flex-col pt-16 md:pt-24 px-4 md:px-12 pb-16 overflow-y-auto">
           <div className="max-w-3xl mx-auto w-full space-y-6 py-6">
             <div className="flex items-center gap-2 text-[#005BAE]">
               <Star className="w-5 h-5" />
@@ -585,7 +620,11 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
             {favorites.map(fav => (
               <div
                 key={fav.id}
-                onClick={() => onRemoveFavorite(fav.id)}
+                onClick={() => {
+                  if (window.confirm('Weet je zeker dat je dit antwoord uit je favorieten wilt verwijderen?')) {
+                    onRemoveFavorite(fav.id);
+                  }
+                }}
                 className="bg-white/90 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 shadow-sm p-5 space-y-3 hover:border-red-400/60 hover:shadow-md transition-all cursor-pointer group/fav"
                 title="Klik om uit favorieten te verwijderen"
               >

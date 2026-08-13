@@ -38,65 +38,72 @@ const getCurrentStay = (stays: IslandStay[]): IslandStay | null => {
 };
 
 const getWeatherForTrip = (trip: TripData): { weather: LocationWeather; isCurrentLocation: boolean; locationNote?: string } => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
   if (!trip.stays || trip.stays.length === 0) {
     return { weather: DEFAULT_WEATHER, isCurrentLocation: false };
   }
 
-  const tripStart = parseDate(trip.startDate);
-  const tripEnd = parseDate(trip.endDate);
+  const tripStart = new Date(trip.startDate);
   tripStart.setHours(0, 0, 0, 0);
+  const tripEnd = new Date(trip.endDate);
   tripEnd.setHours(0, 0, 0, 0);
 
-  const currentStay = getCurrentStay(trip.stays);
+  // Before the trip starts → show default (Athens) weather with a note
+  if (now < tripStart) {
+    return {
+      weather: DEFAULT_WEATHER,
+      isCurrentLocation: false,
+      locationNote: `Reis begint ${trip.startDate}`,
+    };
+  }
+
+  // After the trip ends → show default Athens weather
+  if (now > tripEnd) {
+    return {
+      weather: DEFAULT_WEATHER,
+      isCurrentLocation: false,
+      locationNote: `Reis afgelopen sinds ${trip.endDate}`,
+    };
+  }
+
+  // Find the stay that contains today’s date
+  const currentStay = trip.stays.find((s) => {
+    const sStart = new Date(s.startDate);
+    sStart.setHours(0, 0, 0, 0);
+    const sEnd = new Date(s.endDate);
+    sEnd.setHours(0, 0, 0, 0);
+    return now >= sStart && now <= sEnd;
+  });
 
   if (currentStay) {
-    const start = parseDate(currentStay.startDate);
-    start.setHours(0, 0, 0, 0);
-
-    if (today.getTime() === start.getTime()) {
-      return {
-        weather: getWeatherForLocation(currentStay.island),
-        isCurrentLocation: true,
-        locationNote: `Aankomst dag op ${currentStay.island}`,
-      };
-    }
+    const weather = getWeatherForLocation(currentStay.island);
     return {
-      weather: getWeatherForLocation(currentStay.island),
+      weather,
       isCurrentLocation: true,
+      locationNote: `Aankomst dag op ${currentStay.island}`,
     };
   }
 
-  if (today < tripStart) {
-    return {
-      weather: DEFAULT_WEATHER,
-      isCurrentLocation: false,
-      locationNote: 'Voor aanvang reis',
-    };
-  }
-
-  if (today > tripEnd) {
-    return {
-      weather: DEFAULT_WEATHER,
-      isCurrentLocation: false,
-      locationNote: 'Reis afgelopen',
-    };
-  }
-
-  const upcoming = trip.stays
-    .filter((s) => parseDate(s.startDate) > today)
-    .sort((a, b) => parseDate(a.startDate).getTime() - parseDate(b.startDate).getTime());
-
+  // Today is inside the trip window but no current stay (gap between stays)
+  // Show the next upcoming stay’s weather
+  const upcoming = trip.stays.filter((s) => {
+    const sStart = new Date(s.startDate);
+    sStart.setHours(0, 0, 0, 0);
+    return now < sStart;
+  });
   if (upcoming.length > 0) {
+    const next = upcoming[0];
+    const weather = getWeatherForLocation(next.island);
     return {
-      weather: getWeatherForLocation(upcoming[0].island),
+      weather,
       isCurrentLocation: false,
-      locationNote: `Volgende: ${upcoming[0].island}`,
+      locationNote: `Volgende: ${next.island}`,
     };
   }
 
+  // Final fallback: Athens
   return { weather: DEFAULT_WEATHER, isCurrentLocation: false };
 };
 
