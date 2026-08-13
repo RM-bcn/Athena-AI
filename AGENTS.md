@@ -17,6 +17,10 @@ npm run test           # unit tests (transportLogic)
 npm run build          # productie build (vite + esbuild server)
 ```
 
+Windows-opmerking: PowerShell (5.1) blokkeert `npm.ps1` vanwege de
+execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
+`npm` zelf faalt met een SecurityError, is `npm.cmd` de workaround.
+
 ## Git-workflow (verplicht voor elke taak)
 
 1. Begin ALTIJD vanaf een bijgewerkte `main`: `git checkout main && git pull`.
