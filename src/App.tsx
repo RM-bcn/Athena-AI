@@ -97,7 +97,7 @@ export default function App() {
   });
   const [chatSubTab, setChatSubTab] = useState<ChatSubTab>('current');
 
-  const [sessionId] = useState<string>(() => {
+  const [sessionId, setSessionId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('athena_chat_session');
       if (saved) return saved;
@@ -112,6 +112,17 @@ export default function App() {
     }
     return fresh;
   });
+
+  const handleStartNewSession = () => {
+    const fresh = `session-${Date.now()}`;
+    try {
+      localStorage.setItem('athena_chat_session', fresh);
+    } catch {
+      // localStorage niet beschikbaar
+    }
+    setSessionId(fresh);
+    setChatSubTab('current');
+  };
 
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
     try {
@@ -1171,6 +1182,7 @@ if (loaded.stayBookingLinks) {
             onToggleFavorite={handleToggleFavorite}
             onRemoveFavorite={handleRemoveFavorite}
             onDeleteSession={handleDeleteSession}
+            onStartNewSession={handleStartNewSession}
             currentTrip={currentTrip}
           />
         )}
