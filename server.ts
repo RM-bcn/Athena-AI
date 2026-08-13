@@ -1356,7 +1356,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             pricePerNight: 150,
             tag: "Zonsondergang Uitzicht",
             amenities: ["Portara Uitzicht", "Design Suites", "Kitchenette", "Gratis Koffie & Wijn"],
-            distanceToBeach: "300m van de Hawen",
+            distanceToBeach: "300m van de Haven",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBGnyljvgfgiAVVRcJsYIcvifjq5T0nmamAn0qRt33WTfpzv5ju6GPyGWy0ZmBTYxxpJFoU8dv-_FrnICwIfpG_kIkMzQur1PJ3ZygJG2zIUlVNPLicldpkmEvo4WRFwKlN824h5GES-iLH0AlTHAWdMR8MhufUpaTa76Lnih1OmcVhpNzHzauFFr9gbsru5EdfkK1NqfbwiOws7DKzynf8g1305DY74ER2oW2VC_QWrzQaM9SBEPeFfA"
           }
         ],
@@ -1372,7 +1372,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             pricePerNight: 175,
             tag: "Top Suggestie • Cycladisch Design",
             amenities: ["Zwembad", "Biologisch Ontbijt", "Gratis Fietsverhuur", "Rustige Tuin"],
-            distanceToBeach: "150m van de Hawen & Ammos Strand",
+            distanceToBeach: "150m van de Haven & Ammos Strand",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCX9IVh2F1IBAIsKj7jOD861n8sugmHDcElOR3VKlyaBLHMKRkHMtcpApETSM6CS45kARGz9dXLjdJ9suE50sTHDIcVcCsQ2OywJv15Y137fWCYEo0JeGArizL5wilGyNJwmhe_yeOqm83XRgO7IW5wVs7eZ-sVqkfzO80SLcYrpQ6s3L0oMOF9-E1zN3kSTh-PqREp5WC6d8OTrD6rtJ3XTS18aOgZzWGxiCipBwErygHLPtoKWvEl3w"
           },
           {

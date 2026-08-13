@@ -29,7 +29,7 @@ const defaultTrip: TripData = {
   title: 'Cyclades Island Hopping Odyssey',
   startDate: '2026-08-15',
   endDate: '2026-08-23',
-  durationDays: 8,
+  durationDays: 9,
   style: 'Eilandhoppen met Dennis & Joyce',
   stays: [
     {
