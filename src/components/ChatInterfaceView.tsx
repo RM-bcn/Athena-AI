@@ -585,7 +585,11 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
             {favorites.map(fav => (
               <div
                 key={fav.id}
-                onClick={() => onRemoveFavorite(fav.id)}
+                onClick={() => {
+                  if (window.confirm('Weet je zeker dat je dit antwoord uit je favorieten wilt verwijderen?')) {
+                    onRemoveFavorite(fav.id);
+                  }
+                }}
                 className="bg-white/90 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 shadow-sm p-5 space-y-3 hover:border-red-400/60 hover:shadow-md transition-all cursor-pointer group/fav"
                 title="Klik om uit favorieten te verwijderen"
               >
