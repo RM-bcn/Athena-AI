@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay } from './types';
+import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
 import { getActiveUser, isGuestMode as readGuestMode, saveLogin, updateActiveUser, clearSession, ACTIVE_USER_KEY, GUEST_MODE_KEY } from './utils/authStorage';
@@ -325,6 +325,64 @@ export default function App() {
       return {};
     }
   });
+
+  // AI day plans per stay, keyed by `${tripCode}:${stayId}` and persisted to
+  // localStorage so a generated planning survives a refresh.
+  const [dayPlans, setDayPlans] = useState<Record<string, DayPlan[]>>(() => {
+    try {
+      const saved = localStorage.getItem(`athena_dayplans_${tripCode}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [dayPlanGenerating, setDayPlanGenerating] = useState<Record<string, boolean>>({});
+  const [dayPlanErrors, setDayPlanErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`athena_dayplans_${tripCode}`, JSON.stringify(dayPlans));
+    } catch (e) {
+      console.error("Failed to save day plans to localStorage", e);
+    }
+  }, [dayPlans, tripCode]);
+
+  const generateDayPlan = async (stay: IslandStay): Promise<{ success: boolean; error?: string }> => {
+    const key = `${tripCode}:${stay.id}`;
+    setDayPlanGenerating((prev) => ({ ...prev, [key]: true }));
+    setDayPlanErrors((prev) => ({ ...prev, [key]: '' }));
+    try {
+      const res = await fetch('/api/dayplan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          island: stay.island,
+          startDate: stay.startDate,
+          endDate: stay.endDate,
+          nights: stay.nights,
+          accommodationName: stay.accommodationName,
+          style: currentTrip.style,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.plans) && data.plans.length > 0) {
+        setDayPlans((prev) => ({ ...prev, [key]: data.plans as DayPlan[] }));
+        return { success: true };
+      }
+      const message =
+        typeof data.error === 'string' && data.error.trim()
+          ? data.error
+          : 'De dagplanning kon niet worden opgehaald. Probeer het later opnieuw.';
+      setDayPlanErrors((prev) => ({ ...prev, [key]: message }));
+      return { success: false, error: message };
+    } catch (err: any) {
+      const message = 'Netwerkfout: de dagplanning kon niet worden gegenereerd.';
+      setDayPlanErrors((prev) => ({ ...prev, [key]: message }));
+      return { success: false, error: message };
+    } finally {
+      setDayPlanGenerating((prev) => ({ ...prev, [key]: false }));
+    }
+  };
 
   // Booked transports (ferries, flights, transfers) — persisted to localStorage
   // and synced to the Google Sheets database via /api/sheets/save.
@@ -1169,6 +1227,10 @@ if (loaded.stayBookingLinks) {
             sheetUrl={sheetUrl}
             isSheetsConnected={isSheetsConnected}
             onSyncSheets={handleManualSyncSheets}
+            dayPlans={dayPlans}
+            dayPlanGenerating={dayPlanGenerating}
+            dayPlanErrors={dayPlanErrors}
+            onGenerateDayPlan={generateDayPlan}
           />
         )}
 

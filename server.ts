@@ -1373,6 +1373,83 @@ RULES WHEN LIVE DATA IS PRESENT:
   }
 });
 
+// API: AI Day Plan per stay (Groq primary, Gemini fallback). Reuses the same
+// AI keys as /api/chat; returns a JSON array of per-day plans or { error } so
+// the client can gracefully fall back to the static day cards.
+app.post("/api/dayplan", async (req, res) => {
+  try {
+    const { island, startDate, endDate, nights, accommodationName, style } = req.body || {};
+    const curIsland = typeof island === "string" && island.trim() ? island.trim() : "Naxos";
+    const nightCount = Math.max(1, Number(nights) || 1);
+    const dates = `${formatDate(startDate)} t/m ${formatDate(endDate)}`;
+
+    const systemPrompt =
+      "You are Athena AI, an elite Mediterranean Travel Concierge specializing in the Greek Cyclades Islands. " +
+      "You create detailed, realistic daily plans for travelers.\n" +
+      "CRITICAL RULES:\n" +
+      "- NEVER output Greek script; always transliterate Greek names into Latin characters.\n" +
+      "- Always answer in fluent Dutch.\n" +
+      "- Never invent restaurant names or attractions; use well-known real places on the island.\n" +
+      "- Keep tips practical (book early, take cash, swim shoes, etc.).\n" +
+      "Return ONLY a valid JSON array (no markdown, no extra text) with exactly the number of days given, " +
+      'each item as: {"day": <0-based day index>, "title": "korte Nederlandse titel", ' +
+      '"activities": ["3-5 concrete Nederlandse activiteiten"], "dining": "korte Nederlandse eet-tip", ' +
+      '"tips": ["2-4 praktische Nederlandse tips"]}.';
+
+    const userPrompt =
+      `Maak een dagplanning voor ${nightCount} nacht${nightCount === 1 ? "" : "en"} op ${curIsland} ` +
+      `(verblijf: ${dates}, accommodatie: ${accommodationName || "onbekend"}). ` +
+      `Reisstijl: ${style || "cultuur, strand en gastronomie"}. ` +
+      `Dag 0 is de aankomstdag en de laatste dag is de vertrekdag. Geef voor elke dag een eigen titel, ` +
+      `3-5 activiteiten, een eet-tip en 2-4 praktische tips. Geef als antwoord alleen de JSON-array van ${nightCount} objecten.`;
+
+    const normalizePlans = (raw: any): any[] | null => {
+      if (!Array.isArray(raw) || raw.length === 0) return null;
+      const sorted = [...raw].sort((a: any, b: any) => (Number(a.day) || 0) - (Number(b.day) || 0));
+      return sorted.map((p: any, i: number) => ({
+        day: i,
+        title: typeof p?.title === "string" ? p.title : `Dag ${i + 1} op ${curIsland}`,
+        activities: Array.isArray(p?.activities) ? p.activities.map(String) : [],
+        dining: typeof p?.dining === "string" ? p.dining : "",
+        tips: Array.isArray(p?.tips) ? p.tips.map(String) : [],
+      }));
+    };
+
+    const groqRes = await callGroqAI(systemPrompt, userPrompt);
+    if (groqRes && groqRes.content) {
+      const plans = normalizePlans(parseAIJsonBlock(groqRes.content));
+      if (plans) {
+        return res.json({ plans, engine: `Groq (${groqRes.model})` });
+      }
+    }
+
+    const ai = getGeminiClient();
+    if (ai) {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+      });
+      let rawText = response.text || "";
+      if (!rawText && response.candidates?.[0]?.content?.parts) {
+        rawText = response.candidates[0].content.parts
+          .filter((p: any) => p.text)
+          .map((p: any) => p.text)
+          .join("\n")
+          .trim();
+      }
+      const plans = normalizePlans(parseAIJsonBlock(rawText));
+      if (plans) {
+        return res.json({ plans, engine: "Gemini 3.6 Flash" });
+      }
+    }
+
+    return res.json({ error: "AI dagplanning is momenteel niet beschikbaar. Probeer het later opnieuw." });
+  } catch (err: any) {
+    console.error("Day plan error:", err?.message || err);
+    res.json({ error: "Fout bij het genereren van de dagplanning." });
+  }
+});
+
 // API: Translate Greek Menu / Photo OCR
 app.post("/api/translate-menu", async (req, res) => {
   try {
