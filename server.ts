@@ -1239,7 +1239,7 @@ app.post("/api/translate-menu", async (req, res) => {
   }
 });
 
-// API: Trivago-Style AI Hotel Search & Suggestions
+// API: AI Hotel Search & Suggestions
 app.post("/api/suggest-hotels", async (req, res) => {
   try {
     const { island, style } = req.body;
@@ -1259,7 +1259,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Buitengewoon",
             reviewsCount: 420,
             pricePerNight: 195,
-            tag: "Trivago Best Deal • Infinity Pool",
+            tag: "AI Suggestie • Infinity Pool",
             amenities: ["Infinity Pool", "Panoramisch Zeezicht", "Ontbijt inbegrepen", "Cocktailbar"],
             distanceToBeach: "100m van Pollonia baai",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAOZr5gGB1weJa8rMWnTL0uY6A01WC5nthIOndYdcCtpttUQLwLh5AakhZXjrKuZAd-FlZxvC9U4iOG6J1e4uXAU0Oor1utW2UD2XdtLlyTYdPEvvsyc5BoKJauF55-AlZneX0ckYM1_LET_RPpwUyIa5WmgE0C6LF_12sbGkfLudDNSzsfAwn0fDiT4AYFxNTCRK6DUsyqEuIZGC4SIRD3jSYmMlEkbJkF-osO32NfbUjKSaFLZfFLeA"
@@ -1303,7 +1303,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Buitengewoon",
             reviewsCount: 512,
             pricePerNight: 165,
-            tag: "Trivago Top Keuze • Aan het Strand",
+            tag: "Top Suggestie • Aan het Strand",
             amenities: ["Zwembad", "Gastronomisch Ontbijt", "Loopafstand van Chora Centrum", "Balkon met zeezicht"],
             distanceToBeach: "20m van het strand",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ"
@@ -1347,7 +1347,7 @@ app.post("/api/suggest-hotels", async (req, res) => {
             ratingLabel: "Buitengewoon",
             reviewsCount: 230,
             pricePerNight: 175,
-            tag: "Trivago Top Tip • Cycladisch Design",
+            tag: "Top Suggestie • Cycladisch Design",
             amenities: ["Zwembad", "Biologisch Ontbijt", "Gratis Fietsverhuur", "Rustige Tuin"],
             distanceToBeach: "150m van de Hawen & Ammos Strand",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCX9IVh2F1IBAIsKj7jOD861n8sugmHDcElOR3VKlyaBLHMKRkHMtcpApETSM6CS45kARGz9dXLjdJ9suE50sTHDIcVcCsQ2OywJv15Y137fWCYEo0JeGArizL5wilGyNJwmhe_yeOqm83XRgO7IW5wVs7eZ-sVqkfzO80SLcYrpQ6s3L0oMOF9-E1zN3kSTh-PqREp5WC6d8OTrD6rtJ3XTS18aOgZzWGxiCipBwErygHLPtoKWvEl3w"
@@ -1373,9 +1373,9 @@ app.post("/api/suggest-hotels", async (req, res) => {
       return res.json({ hotels: results });
     }
 
-    const prompt = `Act as a Trivago-style hotel search engine for the Greek island of ${curIsland} (style preference: ${style || "all"}). 
+    const prompt = `Act as an AI hotel search engine for the Greek island of ${curIsland} (style preference: ${style || "all"}). 
 Generate 3 realistic, highly-rated boutique hotels or resorts on ${curIsland}. 
-Return valid JSON array of objects with keys: id, name, location, island, rating (number like 9.4), ratingLabel (e.g. "Buitengewoon" or "Uitstekend"), reviewsCount (number), pricePerNight (number in EUR), tag (e.g. "Trivago Deal • Zeezicht"), amenities (array of string in Dutch), distanceToBeach (string in Dutch).`;
+Return valid JSON array of objects with keys: id, name, location, island, rating (number like 9.4), ratingLabel (e.g. "Buitengewoon" or "Uitstekend"), reviewsCount (number), pricePerNight (number in EUR), tag (e.g. "AI Suggestie • Zeezicht"), amenities (array of string in Dutch), distanceToBeach (string in Dutch).`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.6-flash",
@@ -1405,7 +1405,7 @@ Return valid JSON array of objects with keys: id, name, location, island, rating
             ratingLabel: "Buitengewoon",
             reviewsCount: 280,
             pricePerNight: 175,
-            tag: "Trivago Best Deal • Zeezicht",
+            tag: "AI Suggestie • Zeezicht",
             amenities: ["Zwembad", "Ontbijt inbegrepen", "Zeezicht", "Gratis Wifi"],
             distanceToBeach: "50m van het strand",
             image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ"

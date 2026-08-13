@@ -50,7 +50,7 @@ interface MyItineraryViewProps {
   isGuestMode: boolean;
   tripCode: string;
   onOpenChat: () => void;
-  onOpenNewBooking: (mode?: 'manual' | 'trivago', island?: string) => void;
+  onOpenNewBooking: (mode?: 'manual' | 'ai', island?: string) => void;
   onShare: () => void;
   onExportPDF: () => void;
   onOpenNewTripModal: () => void;
@@ -363,7 +363,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
               className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl font-['Inter'] text-sm shadow-lg active:scale-95 transition-all cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              Export PDF
+              Afdrukken / PDF
             </button>
           </div>
         </div>
@@ -388,11 +388,11 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                 Eiland Stop Toevoegen
               </button>
               <button
-                onClick={() => onOpenNewBooking('trivago')}
+                onClick={() => onOpenNewBooking('ai')}
                 className="text-white font-['Inter'] text-xs font-semibold bg-[#005BAE] px-3 py-1.5 rounded-lg hover:brightness-110 transition-colors cursor-pointer flex items-center gap-1"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                Trivago Hotel Finder
+                AI Hotel Suggesties
               </button>
             </div>
           )}
@@ -454,10 +454,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onOpenNewBooking('trivago', stay.island);
+                        onOpenNewBooking('ai', stay.island);
                       }}
                       className="text-[10px] font-bold text-[#005BAE] hover:underline flex items-center gap-0.5"
-                      title="Zoek hotel suggestie via Trivago AI"
+                      title="Zoek AI hotelsuggesties"
                     >
                       <Search className="w-2.5 h-2.5" />
                       Zoek
@@ -593,7 +593,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                           }
                           return (
                             <button
-                              onClick={() => onOpenNewBooking('trivago', stay.island)}
+                              onClick={() => onOpenNewBooking('ai', stay.island)}
                               className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
                             >
                               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -778,7 +778,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                           )}
                           {linkInfo.state === 'unlinked' && (
                             <button
-                              onClick={() => onOpenNewBooking('trivago', stay.island)}
+                              onClick={() => onOpenNewBooking('ai', stay.island)}
                               className="px-2.5 py-1 text-[11px] font-bold rounded bg-white text-[#005BAE] border border-[#005BAE]/30 hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer"
                             >
                               Koppelen
@@ -802,11 +802,11 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                     </button>
 
                     <button
-                      onClick={() => onOpenNewBooking('trivago')}
+                      onClick={() => onOpenNewBooking('ai')}
                       className="w-full py-2.5 bg-[#005BAE] text-white rounded-xl font-['Inter'] text-xs font-semibold hover:brightness-110 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <Sparkles className="w-4 h-4 text-amber-300" />
-                      Zoek Hotel Suggesties (Trivago Style)
+                      Zoek AI Hotel Suggesties
                     </button>
                   </div>
                 )}
