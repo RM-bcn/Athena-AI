@@ -190,6 +190,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
 
   const canEdit = !!currentUser && !isGuestMode;
 
+  // Derived trip length: total nights across all stays + 1 (single source of truth).
+  const totalNights = currentTrip.stays.reduce((acc, s) => acc + (s.nights || 0), 0);
+  const durationDays = totalNights + 1;
+
   // Derived transport legs between consecutive stays (single source of truth).
   const transportLegs = deriveLegs(currentTrip.stays);
 
@@ -275,12 +279,16 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                 <p className="text-xs font-bold text-emerald-900">
                   Google Sheets Database
                 </p>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white">
-                  {isSheetsConnected ? 'Actief & Gekoppeld' : 'Google Workspace Sync'}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${
+                  isSheetsConnected ? 'bg-emerald-600' : 'bg-slate-500'
+                }`}>
+                  {isSheetsConnected ? 'Actief & Gekoppeld' : 'Niet gekoppeld'}
                 </span>
               </div>
               <p className="text-[11px] text-emerald-800 font-['Inter'] mt-0.5">
-                Alle wijzigingen in je reisschema, verblijven en boekingen worden realtime opgeslagen in je Google Sheet document.
+                {isSheetsConnected
+                  ? 'Wijzigingen worden opgeslagen in je Google Sheet.'
+                  : 'Wijzigingen worden nu alleen lokaal bewaard. Koppel Google Sheets om de reis te synchroniseren en te delen.'}
               </p>
             </div>
           </div>
@@ -333,7 +341,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <span className="font-['Inter'] text-xs font-bold text-amber-300 uppercase tracking-widest bg-amber-500/20 backdrop-blur-md px-3.5 py-1 rounded-full border border-amber-400/30 flex items-center gap-1.5 shadow-sm">
                 <Sun className="w-3.5 h-3.5 text-amber-300" />
-                {currentTrip.durationDays} Dagen Odyssey • {currentTrip.style}
+                {durationDays} Dagen Odyssey • {currentTrip.style}
               </span>
               <span className="font-['Inter'] text-xs font-bold text-white bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30 flex items-center gap-1.5">
                 <Key className="w-3.5 h-3.5 text-amber-300" />
@@ -365,7 +373,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
               className="flex items-center gap-2 px-5 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 rounded-xl font-['Inter'] font-semibold text-sm transition-all cursor-pointer shadow-sm"
             >
               <Share2 className="w-4 h-4 text-amber-300" />
-              Share Code
+              Deelcode
             </button>
             <button
               onClick={onExportPDF}

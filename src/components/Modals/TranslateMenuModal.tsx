@@ -26,7 +26,7 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
       const data = await res.json();
       setResult(data.translation);
     } catch {
-      setResult("🇬 **Greek Menu Decoded**:\n\n1. **Arni Kleftiko** — Slow-baked tender lamb with local herbs, garlic & roasted Naxian potatoes.\n2. **Naxian Graviera** — PDO aged local sheep's milk cheese, mild & nutty.\n3. **Chtapodi Psito** — Charcoal grilled octopus with oregano & lemon oil.\n4. **Tomatokeftedes** — Crispy Aegean tomato fritters with fresh mint.");
+      setResult("🇬 **Griekse Menukaart Ontcijferd**:\n\n1. **Arni Kleftiko** — Langzaam gegaard lamsvlees met lokale kruiden, knoflook en geroosterde Naxische aardappelen.\n2. **Naxian Graviera** — PDO-bejaarde lokale schapenmelkkaas, mild en nootachtig.\n3. **Chtapodi Psito** — Gegrilde octopus op houtskool met oregano en citroenolie.\n4. **Tomatokeftedes** — Knapperige Egeïsche tomatenbeignets met verse munt.");
     } finally {
       setTranslating(false);
     }
@@ -60,7 +60,7 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
           const data = await res.json();
           setResult(data.translation);
         } catch {
-          setResult("🇬 **Greek Menu Decoded from Photo**:\n\n• **Moussaka** — Layered eggplant, seasoned beef & creamy bechamel topping.\n• **Dakos** — Cretan barley rusk topped with crushed tomatoes, feta & Greek oregano.\n• **Souvlaki** — Skewered pork wrapped in pita with tzatziki.");
+          setResult("🇬 **Griekse Menukaart Ontcijferd (foto)**:\n\n• **Moussaka** — Lagen aubergine, gekruid gehakt en romige bechamellaag.\n• **Dakos** — Kretenzer gerstbrood met geplette tomaten, feta en Griekse oregano.\n• **Souvlaki** — Gekruid varkensvlees aan het spies in pita met tzatziki.");
         } finally {
           setTranslating(false);
         }
@@ -85,10 +85,10 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
           </div>
           <div>
             <h2 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[#001a33]">
-              Greek Menu Translator
+              Vertaler Griekse Menukaart
             </h2>
             <p className="font-['Inter'] text-xs text-[#717783]">
-              Athena AI deciphers local taverna handwritten menus, ingredients & pairings
+              Athena AI ontcijfert handgeschreven menukaarten van lokale taveernes, ingrediënten en gerechten
             </p>
           </div>
         </div>
@@ -99,10 +99,10 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
             <Camera className="w-10 h-10 text-[#005BAE] group-hover:scale-110 transition-transform" />
             <div className="text-center">
               <p className="font-['Inter'] text-sm font-semibold text-[#005BAE]">
-                Upload or Take a Photo of Greek Menu
+                Upload of maak een foto van een Griekse menukaart
               </p>
               <p className="font-['Inter'] text-xs text-[#717783] mt-0.5">
-                PNG, JPG or WEBP up to 10MB
+                PNG, JPG of WEBP tot 10MB
               </p>
             </div>
             <input
@@ -117,20 +117,20 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
         {/* Quick Sample Menus */}
         <div className="mb-6">
           <p className="font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-2">
-            Or try a sample local Taverna menu:
+            Of probeer een voorbeeldmenu van een lokale taverne:
           </p>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => handleTranslateSample('Traditional Naxian Taverna Specialities')}
               className="px-3.5 py-1.5 rounded-full bg-[#f0f4f9] text-[#005BAE] font-['Inter'] text-xs font-medium hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer"
             >
-              Naxian Seafood & Cheese
+              Naxos Zeevruchten & Kaas
             </button>
             <button
               onClick={() => handleTranslateSample('Milos Cave Taverna Menu')}
               className="px-3.5 py-1.5 rounded-full bg-[#f0f4f9] text-[#005BAE] font-['Inter'] text-xs font-medium hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer"
             >
-              Milos Clay Pot Specialties
+              Milos Aardewerkspecialiteiten
             </button>
           </div>
         </div>
@@ -140,7 +140,7 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
           <div className="p-8 bg-[#f0f6ff] rounded-2xl border border-[#005BAE]/20 text-center space-y-3">
             <Loader2 className="w-8 h-8 text-[#005BAE] animate-spin mx-auto" />
             <p className="font-['Inter'] text-sm font-medium text-[#005BAE]">
-              Athena AI is translating Greek script & ingredients...
+              Athena AI vertaalt Griekse tekst en ingrediënten...
             </p>
           </div>
         )}
@@ -150,7 +150,7 @@ export const TranslateMenuModal: React.FC<TranslateMenuModalProps> = ({ isOpen, 
             <div className="flex items-center gap-2 text-[#005BAE]">
               <Sparkles className="w-4 h-4" />
               <span className="font-['Inter'] text-xs font-bold uppercase tracking-wider">
-                Athena Translation & Tasting Notes
+                Athena Vertaling &amp; Proefnotities
               </span>
             </div>
             <div className="font-['Inter'] text-sm text-[#001a33] leading-relaxed whitespace-pre-line">

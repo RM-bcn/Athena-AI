@@ -203,7 +203,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   Beheerders Inloggen
                 </h2>
                 <p className="text-[#d2e4fb] font-['Plus_Jakarta_Sans'] text-sm leading-relaxed">
-                  Log in als accountbeheerder om reisschema's te bewerken, locaties te beheren en te synchroniseren.
+                  Log in om reisschema's te bewerken, boekingen toe te voegen en wijzigingen te synchroniseren.
                 </p>
               </div>
 

@@ -321,9 +321,9 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
                   onChange={(e) => setStatus(e.target.value as any)}
                   className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-3 py-2 font-['Inter'] text-xs text-[#001a33] focus:outline-none focus:border-[#005BAE]"
                 >
-                  <option value="CONFIRMED">BEVESTIGD (Confirmed)</option>
-                  <option value="PENDING">IN OVERWEGING (Pending)</option>
-                  <option value="PAST STAY">AFGELOPEN STAY (Past)</option>
+                  <option value="CONFIRMED">BEVESTIGD</option>
+                  <option value="PENDING">IN OVERWEGING</option>
+                  <option value="PAST STAY">AFGELOPEN VERBLIJF</option>
                 </select>
               </div>
             </div>
@@ -502,7 +502,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
                             ) : (
                               <>
                                 <Plus className="w-3.5 h-3.5" />
-                                In itinerary opnemen
+                                In reisschema opnemen
                               </>
                             )}
                           </button>

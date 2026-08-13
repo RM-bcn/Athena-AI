@@ -19,7 +19,7 @@ interface MissedFerryModalProps {
 
 const EXAMPLE_OPTIONS = [
   {
-    type: 'High-speed Hydrofoil',
+    type: 'Snelle Hydrofoil',
     operator: 'Seajets WorldChampion Jet',
     departure: '14:15',
     arrival: '15:05',
@@ -27,7 +27,7 @@ const EXAMPLE_OPTIONS = [
     notes: 'Voorbeeld: direct vanaf Milos Port Gate 3. Laat Athena de actuele beschikbaarheid opzoeken.'
   },
   {
-    type: 'Conventional Passenger Ferry',
+    type: 'Gewone Passagiersveerboot',
     operator: 'Blue Star Delos',
     departure: '17:30',
     arrival: '18:45',
@@ -209,7 +209,7 @@ export const MissedFerryModal: React.FC<MissedFerryModalProps> = ({
               <MapPin className="w-5 h-5 text-[#005BAE]" />
               <div>
                 <p className="font-['Inter'] text-xs font-bold text-[#001a33]">Tijdelijke slaapplek nodig?</p>
-                <p className="font-['Inter'] text-xs text-[#717783]">Porto Naxos Hotel (5 min walk from port)</p>
+                <p className="font-['Inter'] text-xs text-[#717783]">Porto Naxos Hotel (5 min lopen van de haven)</p>
               </div>
             </div>
             <span className="text-[11px] text-[#717783] italic flex items-center gap-1">

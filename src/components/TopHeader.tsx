@@ -44,13 +44,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
         <span className="font-['Plus_Jakarta_Sans'] text-lg md:text-2xl font-bold text-[#005BAE] truncate">
           {activeTab === 'chat'
-            ? 'Chat Interface'
+            ? 'Chat'
             : activeTab === 'itinerary'
-            ? 'Athena AI'
+            ? 'Mijn Reis'
             : activeTab === 'quick-help'
-            ? 'Athena AI'
+            ? 'Directe Hulp'
             : activeTab === 'login'
-            ? 'Athena Access'
+            ? 'Inloggen'
+            : activeTab === 'settings'
+            ? 'Instellingen'
+            : activeTab === 'profile'
+            ? 'Mijn Profiel'
+            : activeTab === 'support'
+            ? 'Support'
+            : activeTab === 'not-found'
+            ? 'Niet gevonden'
             : 'Athena AI'}
         </span>
 
@@ -66,7 +74,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     : 'text-[#404752] hover:text-[#005BAE]'
                 }`}
               >
-                Current Chat
+                Chat
               </button>
               <button
                 onClick={() => setChatSubTab && setChatSubTab('history')}
@@ -76,7 +84,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     : 'text-[#404752] hover:text-[#005BAE]'
                 }`}
               >
-                History
+                Geschiedenis
               </button>
               <button
                 onClick={() => setChatSubTab && setChatSubTab('favorites')}
@@ -86,7 +94,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     : 'text-[#404752] hover:text-[#005BAE]'
                 }`}
               >
-                Favorites
+                Favorieten
               </button>
             </>
           ) : (
@@ -96,7 +104,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   onClick={() => setActiveTab('chat')}
                   className="font-['Inter'] text-sm transition-colors py-1 cursor-pointer text-[#404752] hover:text-[#005BAE]"
                 >
-                  Chat Interface
+                  Chat
                 </button>
               )}
               {(currentUser || isGuestMode) && (
@@ -107,7 +115,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                       activeTab === 'itinerary' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
                     }`}
                   >
-                    My Itinerary
+                    Mijn Reis
                   </button>
                   <button
                     onClick={() => setActiveTab('quick-help')}
@@ -115,7 +123,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                       activeTab === 'quick-help' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
                     }`}
                   >
-                    Quick Help
+                    Directe Hulp
                   </button>
                 </>
               )}
@@ -126,7 +134,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       <div className="flex items-center gap-4">
         {activeTab === 'chat' && (
-          <button className="p-2 rounded-full hover:bg-[#f0f4f9] text-[#404752] transition-colors cursor-pointer" title="Search messages">
+          <button className="p-2 rounded-full hover:bg-[#f0f4f9] text-[#404752] transition-colors cursor-pointer" title="Berichten zoeken">
             <Search className="w-5 h-5" />
           </button>
         )}
@@ -140,7 +148,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             >
               <div className="text-right hidden sm:block">
                 <span className="font-['Inter'] text-xs font-bold text-[#0b1d2d] block">{currentUser.name}</span>
-                <span className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold block">Co-Organizer • {tripCode}</span>
+                <span className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold block">Mede-organisator • {tripCode}</span>
               </div>
               <div className="w-9 h-9 rounded-full border-2 border-[#005BAE] overflow-hidden flex-shrink-0 bg-[#d2e4ff]">
                 <img

@@ -61,7 +61,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, tripCod
             <span className="text-3xl font-extrabold text-[#005BAE] tracking-widest font-mono">{tripCode}</span>
           </div>
           <p className="text-xs text-[#404752] max-w-xs mx-auto mb-3">
-            Vrienden en gasten kunnen deze code invoeren op het inlogscherm bij <strong>"Follow a Journey"</strong> om de reis direct live te volgen.
+            Vrienden en gasten kunnen deze code invoeren op het inlogscherm bij <strong>"Reis Volgen via Reiscode"</strong> om de reis direct live te volgen.
           </p>
           <button
             onClick={handleCopyCode}
