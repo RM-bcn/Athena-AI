@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { compare } from "bcryptjs";
 import { GoogleGenAI } from "@google/genai";
 import {
@@ -88,7 +88,7 @@ app.get("/api/sheets/load", async (req, res) => {
 });
 
 // API: Save Trip to Google Sheets
-app.post("/api/sheets/save", async (req, res) => {
+app.post("/api/sheets/save", requireAuth, async (req, res) => {
   try {
     if (!isGoogleAuthConfigured()) {
       return res.json({
@@ -170,7 +170,7 @@ app.get("/api/chat/history", async (req, res) => {
   }
 });
 
-app.post("/api/chat/history", async (req, res) => {
+app.post("/api/chat/history", requireAuth, async (req, res) => {
   try {
     if (!isGoogleAuthConfigured()) {
       return res.json({ success: false, error: "Google Sheets niet geconfigureerd." });
@@ -198,7 +198,7 @@ app.get("/api/chat/favorites", async (req, res) => {
   }
 });
 
-app.post("/api/chat/favorites", async (req, res) => {
+app.post("/api/chat/favorites", requireAuth, async (req, res) => {
   try {
     if (!isGoogleAuthConfigured()) {
       return res.json({ success: false, error: "Google Sheets niet geconfigureerd." });
@@ -213,7 +213,18 @@ app.post("/api/chat/favorites", async (req, res) => {
 });
 
 // API: Update User Profile (nickname, avatar, password)
-app.post("/api/profile/update", handleProfileUpdate);
+app.post("/api/profile/update", requireAuth, (req, res) => {
+  const authIdentity = ((req as any).authEmail || "").trim().toLowerCase();
+  const bodyEmail = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const bodyUsername = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
+  const isOwner =
+    (bodyEmail !== "" && bodyEmail === authIdentity) ||
+    (bodyUsername !== "" && bodyUsername === authIdentity);
+  if (!isOwner) {
+    return res.status(403).json({ success: false, error: "Je kunt alleen je eigen profiel bewerken." });
+  }
+  return handleProfileUpdate(req, res);
+});
 
 // API: Get current user profile from Google Sheets (used after login to restore avatar/nickname)
 app.get("/api/user", async (req, res) => {
@@ -237,7 +248,7 @@ app.get("/api/user", async (req, res) => {
   }
 });
 
-// Auth: HMAC-signed session token. Endpoint protection with the token lands in step 02.
+// Auth: HMAC-signed session token (payloadBase64.signature met { email, exp }).
 function getSessionSecret(): string {
   const fromEnv = process.env.SESSION_SECRET;
   if (fromEnv && fromEnv.trim() && fromEnv !== "MY_SESSION_SECRET") {
@@ -246,11 +257,52 @@ function getSessionSecret(): string {
   return "athena-ai-local-dev-secret";
 }
 
-function signAuthToken(email: string): { token: string; expiresAt: number } {
-  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
-  const payload = Buffer.from(`${email}:${expiresAt}`, "utf8").toString("base64url");
-  const signature = createHmac("sha256", getSessionSecret()).update(payload).digest("hex");
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dagen
+
+function signToken(email: string): { token: string; expiresAt: number } {
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  const payload = Buffer.from(JSON.stringify({ email, exp: expiresAt }), "utf8").toString("base64url");
+  const signature = createHmac("sha256", getSessionSecret()).update(payload).digest("base64url");
   return { token: `${payload}.${signature}`, expiresAt };
+}
+
+function verifyToken(token: string): { email: string } | null {
+  if (!token) return null;
+  const [payloadB64, signature] = token.split(".");
+  if (!payloadB64 || !signature) return null;
+
+  let payloadText: string;
+  try {
+    payloadText = Buffer.from(payloadB64, "base64url").toString("utf8");
+  } catch {
+    return null;
+  }
+
+  const expected = createHmac("sha256", getSessionSecret()).update(payloadB64).digest("base64url");
+  const supplied = Buffer.from(signature, "utf8");
+  const wanted = Buffer.from(expected, "utf8");
+  if (supplied.length !== wanted.length || !timingSafeEqual(supplied, wanted)) return null;
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(payloadText);
+  } catch {
+    return null;
+  }
+  if (typeof parsed.email !== "string" || typeof parsed.exp !== "number") return null;
+  if (Date.now() > parsed.exp) return null;
+  return { email: parsed.email };
+}
+
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  const payload = verifyToken(token);
+  if (!payload) {
+    return res.status(401).json({ success: false, error: "Niet ingelogd of sessie verlopen." });
+  }
+  (req as any).authEmail = payload.email;
+  next();
 }
 
 const GENERIC_LOGIN_ERROR = "Ongeldige gebruikersnaam of wachtwoord.";
@@ -308,7 +360,7 @@ app.post("/api/login", async (req, res) => {
       }
     }
 
-    const { token, expiresAt } = signAuthToken(identifier);
+    const { token, expiresAt } = signToken(identifier);
     const safeUser = {
       username: user?.username || seedUser?.username || "",
       email: user?.email || seedUser?.email || "",

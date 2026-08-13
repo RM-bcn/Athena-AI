@@ -3,6 +3,7 @@ import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodati
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
 import { getActiveUser, isGuestMode as readGuestMode, saveLogin, updateActiveUser, clearSession, ACTIVE_USER_KEY, GUEST_MODE_KEY } from './utils/authStorage';
+import { getToken, clearToken } from './utils/authToken';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { MyItineraryView } from './components/MyItineraryView';
@@ -131,6 +132,15 @@ export default function App() {
   const historySyncRef = useRef<number | null>(null);
   const favoritesSyncRef = useRef<number | null>(null);
 
+  const authFetch = (url: string, init: RequestInit = {}) => {
+    const token = getToken();
+    const headers: Record<string, string> = {
+      ...((init.headers as Record<string, string>) || {}),
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(url, { ...init, headers });
+  };
+
   const messages = useMemo(
     () => chatHistory.filter((m) => m.sessionId === sessionId),
     [chatHistory, sessionId]
@@ -145,11 +155,15 @@ export default function App() {
     if (!currentUser) return;
     if (historySyncRef.current) window.clearTimeout(historySyncRef.current);
     historySyncRef.current = window.setTimeout(() => {
-      fetch('/api/chat/history', {
+      authFetch('/api/chat/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: list.slice(-200) }),
-      }).catch((err) => console.warn("Chat history sync notice:", err));
+      })
+        .then((res) => {
+          if (res.status === 401) handleSessionExpired();
+        })
+        .catch((err) => console.warn("Chat history sync notice:", err));
     }, 1500);
   };
 
@@ -162,11 +176,15 @@ export default function App() {
     if (!currentUser) return;
     if (favoritesSyncRef.current) window.clearTimeout(favoritesSyncRef.current);
     favoritesSyncRef.current = window.setTimeout(() => {
-      fetch('/api/chat/favorites', {
+      authFetch('/api/chat/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ favorites: list.slice(-200) }),
-      }).catch((err) => console.warn("Favorites sync notice:", err));
+      })
+        .then((res) => {
+          if (res.status === 401) handleSessionExpired();
+        })
+        .catch((err) => console.warn("Favorites sync notice:", err));
     }, 1500);
   };
 
@@ -344,7 +362,7 @@ if (loaded.stayBookingLinks) {
     // Only sync to Google Sheets if logged in as admin (not guest or unauthenticated)
     if (!currentUser) return;
 
-    fetch('/api/sheets/save', {
+    authFetch('/api/sheets/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -354,9 +372,15 @@ if (loaded.stayBookingLinks) {
         transportEntries,
       }),
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.status === 401) {
+          handleSessionExpired();
+          return null;
+        }
+        return res.json();
+      })
       .then((data) => {
-        if (data.spreadsheetUrl) {
+        if (data?.spreadsheetUrl) {
           setSheetUrl(data.spreadsheetUrl);
           setIsSheetsConnected(true);
         }
@@ -370,7 +394,7 @@ if (loaded.stayBookingLinks) {
       return;
     }
     try {
-      const res = await fetch('/api/sheets/save', {
+      const res = await authFetch('/api/sheets/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -380,6 +404,11 @@ if (loaded.stayBookingLinks) {
           transportEntries,
         }),
       });
+
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
 
       const data = await res.json().catch(() => null);
 
@@ -482,6 +511,12 @@ if (loaded.stayBookingLinks) {
     setActiveTab('login');
   };
 
+  const handleSessionExpired = () => {
+    clearToken();
+    handleSignOut();
+    alert('Je sessie is verlopen, log opnieuw in.');
+  };
+
   // Update user profile via backend API, then sync React state + localStorage
   const handleUpdateProfile = async (payload: {
     nickname?: string;
@@ -494,7 +529,7 @@ if (loaded.stayBookingLinks) {
     }
 
     try {
-      const res = await fetch('/api/profile/update', {
+      const res = await authFetch('/api/profile/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -506,6 +541,11 @@ if (loaded.stayBookingLinks) {
           newPassword: payload.newPassword,
         }),
       });
+
+      if (res.status === 401) {
+        handleSessionExpired();
+        return { success: false, error: 'Je sessie is verlopen, log opnieuw in.' };
+      }
 
       const data = await res.json().catch(() => ({}));
 
