@@ -9,6 +9,7 @@ import {
   getOrCreateSpreadsheet,
   saveTripToSheet,
   loadTripFromSheet,
+  getTripCodeFromSheet,
   getUserFromSheet,
   updateUserProfileInSheet,
   saveChatHistoryToSheet,
@@ -47,6 +48,28 @@ function getEnvVal(...names: string[]): string {
   }
   return "";
 }
+
+// API: Trip code validation (guest flow; no auth required)
+app.get("/api/trips/validate", async (req, res) => {
+  const code = typeof req.query.code === "string" ? req.query.code.trim().toUpperCase() : "";
+  if (!code) {
+    return res.json({ valid: false });
+  }
+
+  try {
+    let validCodes: string[] = [];
+    if (isGoogleAuthConfigured()) {
+      validCodes = await getTripCodeFromSheet();
+    }
+    if (validCodes.length === 0) {
+      validCodes = ["ATH-2026"];
+    }
+    return res.json({ valid: validCodes.some((c) => c.trim().toUpperCase() === code) });
+  } catch (err: any) {
+    console.error("Trip validation error:", err?.message || err);
+    return res.json({ valid: code === "ATH-2026" });
+  }
+});
 
 // API: Google Sheets Status
 app.get("/api/sheets/status", async (req, res) => {
