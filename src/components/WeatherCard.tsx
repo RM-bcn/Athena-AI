@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { TripData, IslandStay } from '../types';
 import { Sun } from 'lucide-react';
 import { LocationWeather, getWeatherForLocation, DEFAULT_WEATHER } from '../data/weatherData';
+
+interface LiveWeather {
+  location?: string;
+  temperature: number | null;
+  condition: string;
+  sunrise: string;
+  sunset: string;
+}
 
 interface WeatherCardProps {
   trip: TripData;
@@ -110,6 +118,32 @@ const getWeatherForTrip = (trip: TripData): { weather: LocationWeather; isCurren
 export const WeatherCard: React.FC<WeatherCardProps> = ({ trip, variant = 'banner' }) => {
   const { weather, isCurrentLocation, locationNote } = getWeatherForTrip(trip);
 
+  const [live, setLive] = useState<LiveWeather | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/weather?city=${encodeURIComponent(weather.location)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && d && !d.error && typeof d.temperature === 'number') {
+          setLive(d);
+        }
+      })
+      .catch(() => {
+        // keep static data as fallback
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [weather.location]);
+
+  const temp = live?.temperature ?? weather.temp;
+  const conditionNl = live?.condition || weather.conditionNl;
+  const condition = live?.condition || weather.condition;
+  const sunrise = live?.sunrise || weather.sunrise;
+  const sunset = live?.sunset || weather.sunset;
+  const location = live?.location || weather.location;
+
   if (variant === 'floating') {
     return (
       <aside className="absolute top-24 right-10 w-64 p-4 bg-white/85 backdrop-blur-md rounded-2xl shadow-xl border border-[#005BAE]/10 hidden xl:block z-30">
@@ -120,13 +154,13 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ trip, variant = 'banne
           </span>
         </div>
         <h3 className="font-['Plus_Jakarta_Sans'] text-xl font-bold text-[#001a33] mb-0.5">
-          {weather.location}, GR
+          {location}, GR
         </h3>
         <p className="font-['Plus_Jakarta_Sans'] text-3xl font-bold text-[#005BAE]">
-          {weather.temp}°C
+          {temp}°C
         </p>
         <p className="font-['Inter'] text-xs text-[#404752] mt-1">
-          {weather.condition}
+          {condition}
         </p>
 
         {!isCurrentLocation && locationNote && (
@@ -141,8 +175,8 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ trip, variant = 'banne
             <span>SUNSET</span>
           </div>
           <div className="flex justify-between items-center font-['Inter'] text-xs font-medium text-[#001a33] mt-0.5">
-            <span>{weather.sunrise}</span>
-            <span>{weather.sunset}</span>
+            <span>{sunrise}</span>
+            <span>{sunset}</span>
           </div>
         </div>
       </aside>
@@ -165,19 +199,19 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ trip, variant = 'banne
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-end gap-1">
-              <span className="text-5xl font-bold font-['Plus_Jakarta_Sans']">{weather.temp}°</span>
+              <span className="text-5xl font-bold font-['Plus_Jakarta_Sans']">{temp}°</span>
               <span className="text-xl pb-1 font-['Plus_Jakarta_Sans']">C</span>
             </div>
             <p className="mt-2 text-white/90 font-['Inter'] text-xs leading-relaxed">
-              {weather.conditionNl}
+              {conditionNl}
             </p>
           </div>
           <div className="text-right">
-            <p className="font-['Plus_Jakarta_Sans'] text-sm font-bold text-white/90">{weather.location}</p>
+            <p className="font-['Plus_Jakarta_Sans'] text-sm font-bold text-white/90">{location}</p>
             <p className="font-['Inter'] text-[10px] text-white/60">{weather.locationGr}</p>
             <div className="mt-2 text-[10px] font-['Inter'] text-white/70">
-              <div>↑ {weather.sunrise}</div>
-              <div>↓ {weather.sunset}</div>
+              <div>↑ {sunrise}</div>
+              <div>↓ {sunset}</div>
             </div>
           </div>
         </div>
