@@ -1017,6 +1017,7 @@ if (loaded.stayBookingLinks) {
         {activeTab === 'chat' && (
           <ChatInterfaceView
             chatSubTab={chatSubTab}
+            setChatSubTab={setChatSubTab}
             messages={messages}
             historyMessages={chatHistory}
             favorites={favorites}
