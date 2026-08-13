@@ -9,3 +9,33 @@
     scrollbar-width: none;
   }
 }
+
+@media print {
+  body {
+    background: #fff !important;
+  }
+
+  aside,
+  header,
+  nav,
+  button,
+  .fixed,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  img {
+    page-break-inside: avoid;
+  }
+
+  section,
+  article {
+    break-inside: avoid;
+  }
+}
