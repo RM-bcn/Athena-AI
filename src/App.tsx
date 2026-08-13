@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan } from './types';
+import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
+import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId } from './utils/dayPlans';
 import { getActiveUser, isGuestMode as readGuestMode, saveLogin, updateActiveUser, clearSession, ACTIVE_USER_KEY, GUEST_MODE_KEY } from './utils/authStorage';
 import { getToken, clearToken } from './utils/authToken';
 import { Sidebar } from './components/Sidebar';
@@ -331,7 +332,12 @@ export default function App() {
   const [dayPlans, setDayPlans] = useState<Record<string, DayPlan[]>>(() => {
     try {
       const saved = localStorage.getItem(`athena_dayplans_${tripCode}`);
-      return saved ? JSON.parse(saved) : {};
+      const raw = saved ? JSON.parse(saved) : {};
+      const normalized: Record<string, DayPlan[]> = {};
+      for (const [key, value] of Object.entries(raw)) {
+        normalized[key] = normalizeDayPlans(value);
+      }
+      return normalized;
     } catch {
       return {};
     }
@@ -366,7 +372,7 @@ export default function App() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && Array.isArray(data.plans) && data.plans.length > 0) {
-        setDayPlans((prev) => ({ ...prev, [key]: data.plans as DayPlan[] }));
+        setDayPlans((prev) => ({ ...prev, [key]: normalizeDayPlans(data.plans) }));
         return { success: true };
       }
       const message =
@@ -382,6 +388,33 @@ export default function App() {
     } finally {
       setDayPlanGenerating((prev) => ({ ...prev, [key]: false }));
     }
+  };
+
+  // Sla een volledige dagplanning voor een verblijf op (editor-opslag).
+  const saveDayPlans = (stayId: string, plans: DayPlan[]) => {
+    const key = `${tripCode}:${stayId}`;
+    setDayPlans((prev) => ({ ...prev, [key]: plans.map((p) => normalizeDayPlan(p)) }));
+  };
+
+  // Voeg een item (activiteit / eettip / praktische tip) toe aan een dag van
+  // een verblijf. Gebruikt door de chat-export; maakt de dagplanning aan als
+  // die er nog niet is.
+  const addDayPlanItem = (stayId: string, dayIdx: number, type: DayPlanItemType, text: string) => {
+    const key = `${tripCode}:${stayId}`;
+    setDayPlans((prev) => {
+      const existing = normalizeDayPlans(prev[key] || []);
+      const padded = ensureDayPlanCount(existing, dayIdx + 1);
+      const item = {
+        id: dayPlanItemId(type),
+        type,
+        text: text.trim(),
+      };
+      const updated: DayPlan[] = padded.map((p) => {
+        if (p.day === dayIdx) return { ...p, items: [...(p.items || []), item] };
+        return p;
+      });
+      return { ...prev, [key]: updated };
+    });
   };
 
   // Booked transports (ferries, flights, transfers) — persisted to localStorage
@@ -1231,6 +1264,7 @@ if (loaded.stayBookingLinks) {
             dayPlanGenerating={dayPlanGenerating}
             dayPlanErrors={dayPlanErrors}
             onGenerateDayPlan={generateDayPlan}
+            onSaveDayPlans={saveDayPlans}
           />
         )}
 
@@ -1260,6 +1294,7 @@ if (loaded.stayBookingLinks) {
             onDeleteSession={handleDeleteSession}
             onStartNewSession={handleStartNewSession}
             currentTrip={currentTrip}
+            onExportToDayPlan={addDayPlanItem}
           />
         )}
 

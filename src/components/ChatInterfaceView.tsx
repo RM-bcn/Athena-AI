@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChatMessage, ChatFavorite, ChatSubTab, TripData } from '../types';
+import { ChatMessage, ChatFavorite, ChatSubTab, TripData, DayPlanItemType } from '../types';
 import localBackgroundImage from '../assets/images/greece_sunset_bg_1785583337875.jpg';
 import {
   Sailboat,
@@ -18,10 +18,12 @@ import {
   Inbox,
   ChevronDown,
   Trash2,
-  MessageSquarePlus
+  MessageSquarePlus,
+  CalendarPlus
 } from 'lucide-react';
 import { WeatherCard } from './WeatherCard';
 import { extractTextFromImage } from '../utils/ocr';
+import { ChatExportModal } from './Modals/ChatExportModal';
 
 interface ChatInterfaceViewProps {
   chatSubTab: ChatSubTab;
@@ -36,6 +38,7 @@ interface ChatInterfaceViewProps {
   onDeleteSession: (sessionId: string) => void;
   onStartNewSession: () => void;
   currentTrip: TripData;
+  onExportToDayPlan?: (stayId: string, dayIdx: number, type: DayPlanItemType, text: string) => void;
 }
 
 export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
@@ -51,6 +54,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
   onDeleteSession,
   onStartNewSession,
   currentTrip,
+  onExportToDayPlan,
 }) => {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -61,6 +65,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
     text?: string;
     isImage?: boolean;
   } | null>(null);
+  const [exportMessage, setExportMessage] = useState<ChatMessage | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -318,6 +323,15 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
           <span className="text-[11px] font-['Inter'] text-[#717783]">
             {msg.timestamp}
           </span>
+          {msg.role === 'assistant' && onExportToDayPlan && (
+            <button
+              onClick={() => setExportMessage(msg)}
+              className="p-1 rounded-full transition-colors cursor-pointer text-[#c0c7d3] hover:text-[#005BAE] hover:bg-[#f0f4f9]"
+              title="Toevoegen aan dagplanning"
+            >
+              <CalendarPlus className="w-3.5 h-3.5" />
+            </button>
+          )}
           {msg.role === 'assistant' && (
             <button
               onClick={() => onToggleFavorite(msg)}
@@ -682,6 +696,14 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
           </div>
         </div>
       )}
+
+      <ChatExportModal
+        isOpen={exportMessage !== null}
+        onClose={() => setExportMessage(null)}
+        message={exportMessage}
+        trip={currentTrip}
+        onExport={(stayId, dayIdx, type, text) => onExportToDayPlan?.(stayId, dayIdx, type, text)}
+      />
     </div>
   );
 };
