@@ -21,7 +21,7 @@ interface QuickHelpViewProps {
   onOpenTavernas: () => void;
   onOpenBeaches: () => void;
   onOpenChat: () => void;
-  onFindPharmacy: () => void;
+  onFindApotheek: () => void;
   isGuestMode?: boolean;
 }
 
@@ -31,7 +31,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
   onOpenTavernas,
   onOpenBeaches,
   onOpenChat,
-  onFindPharmacy,
+  onFindApotheek,
   isGuestMode = false,
 }) => {
   const [localTime, setLocalTime] = useState<string>('08:01');
@@ -63,13 +63,13 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
       <div className="max-w-5xl mx-auto mb-12">
         <header className="flex flex-col gap-2">
           <span className="text-[#005BAE] font-['Inter'] text-xs tracking-widest uppercase font-bold">
-            Immediate Assistance
+            Directe Hulp
           </span>
           <h2 className="font-['Plus_Jakarta_Sans'] text-4xl md:text-5xl font-bold text-[#002a52]">
-            How can I help you, Traveler?
+            Hoe kan ik je helpen, reiziger?
           </h2>
           <p className="font-['Inter'] text-base md:text-lg text-[#404752] max-w-2xl mt-1">
-            Athena is here to smooth out your Greek odyssey. Select an urgent task or describe your situation.
+            Athena staat voor je klaar om je Griekse odyssee soepel te laten verlopen. Kies een urgente taak of beschrijf je situatie.
           </p>
         </header>
       </div>
@@ -87,10 +87,10 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
                 <Ship className="w-6 h-6" />
               </div>
               <h3 className="font-['Plus_Jakarta_Sans'] text-2xl font-semibold text-[#002a52] mb-3">
-                I missed my ferry
+                Ik heb mijn veerboot gemist
               </h3>
               <p className="font-['Inter'] text-sm text-[#404752] mb-8 leading-relaxed">
-                Don't worry. I'll check the next departures from your current port, look for alternative hydrofoils, or find a nearby hotel if needed.
+                Geen paniek. Ik check de volgende vertrekken vanaf je huidige haven, zoek alternatieve hydrofoils of een hotel in de buurt als dat nodig is.
               </p>
               <button
                 onClick={(e) => {
@@ -99,7 +99,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
                 }}
                 className="bg-[#ba1a1a] text-white px-6 py-3 rounded-full font-['Inter'] font-semibold text-sm flex items-center gap-2 active:scale-95 transition-transform hover:brightness-110 shadow-md cursor-pointer"
               >
-                Resolve Departure
+                Vertrek oplossen
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -107,7 +107,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
             <div className="w-full md:w-1/3 h-48 md:h-auto rounded-2xl overflow-hidden relative grayscale-[20%] group-hover:grayscale-0 transition-all duration-500 shadow-sm">
               <img
                 src={MISSED_FERRY_IMAGE}
-                alt="Ferry boat at Greek port"
+                alt="Veerboot bij Griekse haven"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
             </div>
@@ -125,16 +125,16 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
                 <Camera className="w-6 h-6" />
               </div>
               <h3 className="font-['Plus_Jakarta_Sans'] text-2xl font-semibold mb-2">
-                Translate this menu
+                Vertaal dit menu
               </h3>
               <p className="font-['Inter'] text-sm text-white/80 leading-relaxed">
-                Snap a photo to decipher local delicacies and ingredients.
+                Maak een foto om lokale gerechten en ingrediënten te ontcijferen.
               </p>
             </div>
 
             <div className="mt-8 border-2 border-dashed border-white/40 rounded-xl p-4 flex flex-col items-center gap-2 group-hover:border-white/80 transition-colors bg-white/5">
               <Camera className="w-8 h-8 text-white/90" />
-              <span className="font-['Inter'] text-xs font-semibold">Open Camera</span>
+              <span className="font-['Inter'] text-xs font-semibold">Camera openen</span>
             </div>
           </div>
         </div>
@@ -148,23 +148,23 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
             <div className="shrink-0 w-16 h-16 rounded-2xl overflow-hidden shadow-sm">
               <img
                 src={TAVERNA_IMAGE}
-                alt="Greek Taverna"
+                alt="Griekse Taverne"
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
             </div>
             <div className="flex-1">
               <h3 className="font-['Plus_Jakarta_Sans'] text-xl font-semibold text-[#002a52] mb-2">
-                Recommend a nearby taverna
+                Raad een taverne in de buurt aan
               </h3>
               <p className="font-['Inter'] text-sm text-[#404752] mb-4 leading-relaxed">
-                Finding the most authentic local flavors based on your current location.
+                De meest authentieke lokale smaken, gebaseerd op je huidige locatie.
               </p>
               <div className="flex gap-2">
                 <span className="px-3 py-1 bg-[#f0f6ff] text-[#005BAE] rounded-full text-[11px] font-bold uppercase tracking-wider">
-                  AUTHENTIC
+                  AUTHENTIEK
                 </span>
                 <span className="px-3 py-1 bg-[#f0f6ff] text-[#005BAE] rounded-full text-[11px] font-bold uppercase tracking-wider">
-                  WALKING DISTANCE
+                  OP LOOPAFSTAND
                 </span>
               </div>
             </div>
@@ -180,23 +180,23 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
             <div className="shrink-0 w-16 h-16 rounded-2xl overflow-hidden shadow-sm">
               <img
                 src={QUIET_BEACH_IMAGE}
-                alt="Quiet Beach"
+                alt="Rustig Strand"
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
             </div>
             <div className="flex-1">
               <h3 className="font-['Plus_Jakarta_Sans'] text-xl font-semibold text-[#002a52] mb-2">
-                Find a quiet beach
+                Zoek een rustig strand
               </h3>
               <p className="font-['Inter'] text-sm text-[#404752] mb-4 leading-relaxed">
-                Escaping the crowds? I know the hidden coves that only locals visit.
+                Aan de drukte ontsnappen? Ik ken verborgen baaien die alleen locals bezoeken.
               </p>
               <div className="flex gap-2">
                 <span className="px-3 py-1 bg-[#f0f6ff] text-[#005BAE] rounded-full text-[11px] font-bold uppercase tracking-wider">
-                  SECLUDED
+                  AFGELEGEN
                 </span>
                 <span className="px-3 py-1 bg-[#f0f6ff] text-[#005BAE] rounded-full text-[11px] font-bold uppercase tracking-wider">
-                  NATURAL
+                  NATUURLIJK
                 </span>
               </div>
             </div>
@@ -211,7 +211,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
                 <Sun className="w-5 h-5 animate-spin" style={{ animationDuration: '15s' }} />
               </div>
               <div>
-                <p className="font-['Inter'] text-xs font-semibold text-[#404752]">Tijd op de Cycladen</p>
+                <p className="font-['Inter'] text-xs font-semibold text-[#404752]">Lokale tijd op de Cycladen</p>
                 <p className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[#005BAE]">{localTime}</p>
               </div>
             </div>
@@ -242,11 +242,11 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
               </a>
 
               <button
-                onClick={onFindPharmacy}
+                onClick={onFindApotheek}
                 className="px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/30 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
               >
                 <Cross className="w-3.5 h-3.5" />
-                Pharmacy Nearby
+                Apotheek in de buurt
               </button>
             </div>
           </div>
@@ -262,7 +262,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
           >
             <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />
             <span className="hidden group-hover:inline ml-2 font-['Inter'] text-xs font-semibold whitespace-nowrap overflow-hidden">
-              Type a custom request
+              Typ een eigen verzoek
             </span>
           </button>
         </div>
