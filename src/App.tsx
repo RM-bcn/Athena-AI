@@ -951,6 +951,29 @@ if (loaded.stayBookingLinks) {
     );
   };
 
+  const handleFindPharmacy = () => {
+    const fallback = () =>
+      openChat(
+        "Athena, where is the nearest open pharmacy near me? I couldn't fetch your location automatically — please ask where I am right now, then suggest a nearby open pharmacy."
+      );
+
+    if (!("geolocation" in navigator)) {
+      fallback();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        openChat(
+          `Athena, I'm at (${latitude.toFixed(4)}, ${longitude.toFixed(4)}). Where is the nearest open pharmacy within easy reach of my current location?`
+        );
+      },
+      fallback,
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
   const handleTriggerQuickAction = (action: string) => {
     if (action === 'Ferry Status' || action.includes('ferry')) {
       setIsMissedFerryOpen(true);
@@ -1060,9 +1083,7 @@ if (loaded.stayBookingLinks) {
             onOpenTavernas={handleFindTaverna}
             onOpenBeaches={handleFindSecludedBeaches}
             onOpenChat={openChat}
-            onFindPharmacy={() => {
-              openChat("Athena, where is the nearest open pharmacy in Naxos Chora?");
-            }}
+            onFindPharmacy={handleFindPharmacy}
             isGuestMode={isGuestMode}
           />
         )}
