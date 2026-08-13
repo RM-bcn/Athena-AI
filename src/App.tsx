@@ -905,6 +905,29 @@ if (loaded.stayBookingLinks) {
     if (message) handleSendMessage(message);
   };
 
+  const handleFindSecludedBeaches = () => {
+    const fallback = () =>
+      openChat(
+        "Athena, where are the quietest secluded beaches near me? I couldn't fetch your location automatically — please ask where I am right now, then suggest hidden coves close by."
+      );
+
+    if (!("geolocation" in navigator)) {
+      fallback();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        openChat(
+          `Athena, I'm at (${latitude.toFixed(4)}, ${longitude.toFixed(4)}). Where are the quietest secluded beaches within easy reach of my current location?`
+        );
+      },
+      fallback,
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
   const handleTriggerQuickAction = (action: string) => {
     if (action === 'Ferry Status' || action.includes('ferry')) {
       setIsMissedFerryOpen(true);
@@ -1014,9 +1037,7 @@ if (loaded.stayBookingLinks) {
             onOpenTavernas={() => {
               openChat("Athena, can you recommend authentic local tavernas in Naxos and Milos within walking distance?");
             }}
-            onOpenBeaches={() => {
-              openChat("Athena, where are the quietest secluded beaches in Koufonisia and Naxos?");
-            }}
+            onOpenBeaches={handleFindSecludedBeaches}
             onOpenChat={openChat}
             onFindPharmacy={() => {
               openChat("Athena, where is the nearest open pharmacy in Naxos Chora?");
