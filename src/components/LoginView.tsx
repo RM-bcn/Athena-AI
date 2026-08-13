@@ -8,11 +8,13 @@ import { Key, ArrowRight, LogIn, Info, Sparkles, User, Lock, AlertCircle, HelpCi
 interface LoginViewProps {
   onAccessTripCode: (code: string) => Promise<{ success: boolean; error?: string }>;
   onLoginSuccess: (user: UserAccount, rememberMe?: boolean) => void;
+  initialResetToken?: string;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
   onAccessTripCode,
   onLoginSuccess,
+  initialResetToken,
 }) => {
   const [code, setCode] = useState('');
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
@@ -26,6 +28,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [resetIdentifier, setResetIdentifier] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
   const [resetErrorMsg, setResetErrorMsg] = useState('');
+
+  // Reset-password view state (?reset=<token> in de URL)
+  const [resetToken, setResetToken] = useState<string | undefined>(initialResetToken);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetCompleted, setResetCompleted] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState('');
 
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +94,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }
   };
 
-  const handleResetPasswordSubmit = (e: React.FormEvent) => {
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetErrorMsg('');
     setResetSuccessMsg('');
@@ -95,8 +105,80 @@ export const LoginView: React.FC<LoginViewProps> = ({
       return;
     }
 
-    // TODO: echte reset-mail komt in een latere stap; nu bewust generiek en niets versturen.
-    setResetSuccessMsg('Als dit e-mailadres of deze gebruikersnaam bij ons bekend is, ontvang je instructies.');
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/reset-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernameOrEmail: input }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        setResetErrorMsg(data.error || 'Er is iets misgegaan bij het versturen van de reset-mail. Probeer het opnieuw.');
+        return;
+      }
+
+      setResetSuccessMsg(data.message || 'Als dit e-mailadres bij ons bekend is, ontvang je instructies.');
+    } catch (err) {
+      setResetErrorMsg('Er is een netwerkfout opgetreden. Probeer het later opnieuw.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSetNewPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetPasswordError('');
+
+    if (newPassword.length < 8) {
+      setResetPasswordError('Nieuw wachtwoord moet minimaal 8 tekens bevatten.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetPasswordError('Het nieuwe wachtwoord en de bevestiging komen niet overeen.');
+      return;
+    }
+
+    setResetSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        setResetPasswordError(data.error || 'Er is iets misgegaan bij het instellen van het nieuwe wachtwoord.');
+        return;
+      }
+
+      setResetCompleted(true);
+      setNewPassword('');
+      setConfirmPassword('');
+      try {
+        const cleanUrl = window.location.pathname + window.location.search.replace(/[?&]reset=[^&]*/, '').replace(/^&/, '?');
+        window.history.replaceState({}, '', cleanUrl);
+      } catch {
+        // history API niet beschikbaar
+      }
+    } catch (err) {
+      setResetPasswordError('Er is een netwerkfout opgetreden. Probeer het later opnieuw.');
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
+
+  const handleLeaveResetView = () => {
+    setResetToken(undefined);
+    setResetPasswordError('');
+    setResetCompleted(false);
+  };
+
+  const handleRequestNewLink = () => {
+    handleLeaveResetView();
+    setIsForgotPasswordOpen(true);
   };
 
   return (
@@ -130,7 +212,100 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </div>
         </header>
 
-        {/* Dual Card Section */}
+        {/* Reset-password view (via ?reset=<token> uit de e-mail) */}
+        {resetToken && !resetCompleted ? (
+          <section className="max-w-xl mx-auto bg-[#0B1D2D] text-white rounded-2xl p-8 md:p-10 shadow-xl relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#005BAE] flex items-center justify-center">
+                <Lock className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-xl text-white">
+                  Nieuw wachtwoord instellen
+                </h2>
+                <p className="text-[#d2e4fb] font-['Plus_Jakarta_Sans'] text-sm leading-relaxed">
+                  Kies een nieuw wachtwoord voor je Athena AI account.
+                </p>
+              </div>
+            </div>
+
+            {resetPasswordError && (
+              <div className="mb-4 p-3.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span>{resetPasswordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSetNewPasswordSubmit} className="space-y-4">
+              <div className="relative">
+                <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Nieuw wachtwoord (minimaal 8 tekens)"
+                  className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
+                />
+              </div>
+
+              <div className="relative">
+                <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Bevestig nieuw wachtwoord"
+                  className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={resetSubmitting}
+                className="w-full h-14 bg-[#E2725B] text-white font-['Plus_Jakarta_Sans'] font-semibold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait"
+              >
+                {resetSubmitting ? 'Bezig met opslaan...' : 'Wachtwoord opslaan'}
+              </button>
+            </form>
+
+            {resetPasswordError && (
+              <button
+                type="button"
+                onClick={handleRequestNewLink}
+                className="mt-4 w-full py-2.5 rounded-xl border border-white/20 text-xs font-bold text-[#E2725B] hover:bg-white/10 cursor-pointer"
+              >
+                Nieuwe link aanvragen
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleLeaveResetView}
+              className="mt-2 w-full py-2.5 rounded-xl text-xs font-semibold text-white/70 hover:text-white cursor-pointer"
+            >
+              Terug naar inloggen
+            </button>
+          </section>
+        ) : resetCompleted ? (
+          <section className="max-w-xl mx-auto bg-white/90 backdrop-blur-md rounded-2xl p-8 md:p-10 shadow-sm border border-[#f0f4f9] text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-2xl text-[#0B1D2D] mb-2">
+              Wachtwoord gewijzigd
+            </h2>
+            <p className="text-[#4f6073] font-['Plus_Jakarta_Sans'] text-sm leading-relaxed mb-6">
+              Je wachtwoord is succesvol gewijzigd. Je kunt nu inloggen met je nieuwe wachtwoord.
+            </p>
+            <button
+              type="button"
+              onClick={handleLeaveResetView}
+              className="w-full h-12 bg-[#005BAE] text-white font-['Plus_Jakarta_Sans'] font-semibold text-sm rounded-xl hover:bg-[#0B1D2D] active:scale-95 transition-all shadow-md cursor-pointer"
+            >
+              Naar inloggen
+            </button>
+          </section>
+        ) : (
         <div className="grid md:grid-cols-2 gap-8 items-stretch">
           {/* Section 1: Travel Code Access (Follow a Journey) */}
           <section className="bg-white/90 backdrop-blur-md rounded-2xl p-8 md:p-10 shadow-sm hover:shadow-md transition-all border border-[#f0f4f9] flex flex-col justify-between group">
@@ -268,7 +443,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </form>
             </div>
           </section>
-        </div>
+          </div>
+        )}
 
         {/* Visual Banner */}
         <div className="mt-12 w-full rounded-2xl h-44 relative overflow-hidden border border-[#F0F4F9] shadow-sm">
@@ -357,9 +533,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2.5 rounded-xl bg-[#005BAE] text-white text-xs font-bold hover:brightness-110 cursor-pointer shadow-sm"
+                  disabled={submitting}
+                  className="px-4 py-2.5 rounded-xl bg-[#005BAE] text-white text-xs font-bold hover:brightness-110 cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-wait"
                 >
-                  Wachtwoord Herstellen
+                  {submitting ? 'Bezig met versturen...' : 'Wachtwoord Herstellen'}
                 </button>
               </div>
             </form>

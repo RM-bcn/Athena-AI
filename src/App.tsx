@@ -95,6 +95,20 @@ export default function App() {
       return 'login';
     }
   });
+
+  // Reset-token uit de e-mail (?reset=<token>) — activeert de reset-view in LoginView.
+  const [resetTokenFromUrl, setResetTokenFromUrl] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    const token = new URLSearchParams(window.location.search).get('reset');
+    return token && token.trim() ? token.trim() : undefined;
+  });
+
+  useEffect(() => {
+    if (resetTokenFromUrl) {
+      setActiveTab('login');
+    }
+  }, [resetTokenFromUrl]);
+
   const [chatSubTab, setChatSubTab] = useState<ChatSubTab>('current');
 
   const [sessionId, setSessionId] = useState<string>(() => {
@@ -1208,6 +1222,7 @@ if (loaded.stayBookingLinks) {
           <LoginView
             onAccessTripCode={handleAccessTripCode}
             onLoginSuccess={handleLoginSuccess}
+            initialResetToken={resetTokenFromUrl}
           />
         )}
 
