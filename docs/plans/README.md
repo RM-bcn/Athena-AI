@@ -4,7 +4,7 @@ Overzicht van de geplande stappen voor Athena AI. Uitgevoerde stappen staan
 gearchiveerd in [done/](done/). Elke openstaande stap heeft een eigen plan-bestand
 dat door een agent uitgevoerd kan worden.
 
-## Afgerond (stap 0 + 01–06)
+## Afgerond (stap 0 + 01–08)
 
 - [x] Stap 0 — main bijwerken + branch-/stash-opruiming
 - [x] Step 01 — server-side login (bcrypt, token) → [done](done/step-01-server-auth-login.md)
@@ -13,13 +13,14 @@ dat door een agent uitgevoerd kan worden.
 - [x] Step 04 — reiscode-validatie + share-link (`?code=...`) → [done](done/step-04-reiscode-sharelink.md)
 - [x] Step 05 — transport-sync naar Sheets, nieuwe chat-sessie, DAG-nummering → [done](done/step-05-sync-sessies-dagplanning.md)
 - [x] Step 06 — Nederlandse UI-teksten, conditionele banners → [done](done/step-06-taal-en-teksten.md)
+- [x] Step 07 — wachtwoordreset via e-mail → [done](done/step-07-wachtwoordreset-email.md).
+      **Let op:** e-mail verstuurt nog niet live (geen `RESEND_API_KEY`/domein) — zie "Status" in `AGENTS.md`.
+- [x] Step 08 — AI-dagplanning per verblijfsdag → [done](done/step-08-ai-dagplanning.md)
 
-## Vervolgstappen (openstaand, sequentieel 07 → 09)
+## Vervolgstappen (openstaand)
 
 | Step | Plan-bestand | Kort doel |
 |------|--------------|-----------|
-| 07 | [step-07-wachtwoordreset-email.md](step-07-wachtwoordreset-email.md) | Echte wachtwoordreset via e-mail (reset-token + link) |
-| 08 | [step-08-ai-dagplanning.md](step-08-ai-dagplanning.md) | AI-gegenereerde dagplanning per verblijfsdag in de itinerary |
 | 09 | [step-09-rollen-rechten.md](step-09-rollen-rechten.md) | Rollen & rechten owner vs member server-side én client-side |
 
 Waarom sequentieel: de stappen raken deels dezelfde bestanden (`server.ts`, `App.tsx`,
