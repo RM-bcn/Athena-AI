@@ -402,7 +402,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                   </div>
                   <div className="p-4 rounded-3xl bg-white border border-[#f0f4f9] shadow-sm flex items-center gap-3">
                     <Loader2 className="w-5 h-5 text-[#005BAE] animate-spin" />
-                    <span className="font-['Inter'] text-sm text-[#404752]">Athena is planning your itinerary...</span>
+                    <span className="font-['Inter'] text-sm text-[#404752]">Athena plant je reisschema...</span>
                   </div>
                 </div>
               )}
@@ -439,7 +439,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                   className="flex items-center gap-2 px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
                 >
                   <Ship className="w-4 h-4" />
-                  Ferry Status
+                  Veerbootstatus
                 </button>
 
                 <button
@@ -447,7 +447,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                   className="flex items-center gap-2 px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
                 >
                   <Languages className="w-4 h-4" />
-                  Translate Menu
+                  Vertaal menu
                 </button>
 
                 <button

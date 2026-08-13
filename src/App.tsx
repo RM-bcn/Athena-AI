@@ -29,7 +29,7 @@ const defaultTrip: TripData = {
   title: 'Cyclades Island Hopping Odyssey',
   startDate: '2026-08-15',
   endDate: '2026-08-23',
-  durationDays: 8,
+  durationDays: 9,
   style: 'Eilandhoppen met Dennis & Joyce',
   stays: [
     {
@@ -1032,7 +1032,7 @@ if (loaded.stayBookingLinks) {
     );
   };
 
-  const handleFindPharmacy = () => {
+  const handleFindApotheek = () => {
     const fallback = () =>
       openChat(
         "Athena, where is the nearest open pharmacy near me? I couldn't fetch your location automatically — please ask where I am right now, then suggest a nearby open pharmacy."
@@ -1165,7 +1165,7 @@ if (loaded.stayBookingLinks) {
             onOpenTavernas={handleFindTaverna}
             onOpenBeaches={handleFindSecludedBeaches}
             onOpenChat={openChat}
-            onFindPharmacy={handleFindPharmacy}
+            onFindApotheek={handleFindApotheek}
             isGuestMode={isGuestMode}
           />
         )}
