@@ -52,6 +52,8 @@ export interface DayPlanItem {
   id: string;
   type: DayPlanItemType;
   text: string;
+  /** Optionele tijd (HH:mm) voor deze activiteit / dit record. */
+  time?: string;
   /** Beschermde records (ferry, hotel-inchecken/uitchecken) worden automatisch
    *  uit de verblijfs-/transportdata gezet en mogen niet per ongeluk worden
    *  verwijderd of overschreven wanneer je de dagplanning bewerkt. */

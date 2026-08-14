@@ -27,6 +27,7 @@ export function normalizeDayPlan(raw: any, index = 0): DayPlan {
         id: typeof it?.id === 'string' ? it.id : dayPlanItemId('item'),
         type: normalizeItemType(it?.type) || 'activity',
         text: typeof it?.text === 'string' ? it.text : '',
+        time: typeof it?.time === 'string' && it.time.trim() ? it.time.trim() : undefined,
         protected: it?.protected === true,
       })),
     };
@@ -108,6 +109,7 @@ export function buildStayRecords(
       id: dayPlanItemId('transport'),
       type: 'transport',
       text: arrivalFerry ? formatTransportRecord(arrivalFerry) : `Veerboot overtocht naar ${stay.island}`,
+      time: arrivalFerry?.departureTime,
       protected: true,
     },
     {
@@ -129,6 +131,7 @@ export function buildStayRecords(
       id: dayPlanItemId('transport'),
       type: 'transport',
       text: departureFerry ? formatTransportRecord(departureFerry) : `Veerboot vertrek vanaf ${stay.island}`,
+      time: departureFerry?.departureTime,
       protected: true,
     },
   ];
