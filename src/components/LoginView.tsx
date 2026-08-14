@@ -3,7 +3,7 @@ import greeceSunsetBg from '../assets/images/greece_sunset_bg_1785583337875.jpg'
 import { LOGIN_HERO_IMAGE } from '../data/initialData';
 import { UserAccount } from '../types';
 import { saveAuthToken } from '../utils/authStorage';
-import { Key, ArrowRight, LogIn, Info, Sparkles, User, Lock, AlertCircle, HelpCircle, CheckCircle2, X } from 'lucide-react';
+import { Key, ArrowRight, LogIn, Info, Sparkles, User, Lock, Mail, UserPlus, AlertCircle, HelpCircle, CheckCircle2, X } from 'lucide-react';
 
 interface LoginViewProps {
   onAccessTripCode: (code: string) => Promise<{ success: boolean; error?: string }>;
@@ -22,6 +22,15 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Registratie ("Word lid") state
+  const [showRegister, setShowRegister] = useState(false);
+  const [regUsername, setRegUsername] = useState('');
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [registering, setRegistering] = useState(false);
 
   // Forgot Password modal state
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
@@ -91,6 +100,55 @@ export const LoginView: React.FC<LoginViewProps> = ({
       setErrorMsg('Er is een netwerkfout opgetreden. Probeer het later opnieuw.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    if (!regUsername.trim() || !regName.trim() || !regEmail.trim() || !regPassword) {
+      setErrorMsg('Vul gebruikersnaam, naam, e-mailadres en wachtwoord in.');
+      return;
+    }
+    if (regPassword.length < 8) {
+      setErrorMsg('Wachtwoord moet minimaal 8 tekens bevatten.');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setErrorMsg('Het wachtwoord en de bevestiging komen niet overeen.');
+      return;
+    }
+
+    setRegistering(true);
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: regUsername.trim(),
+          name: regName.trim(),
+          email: regEmail.trim(),
+          password: regPassword,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        setErrorMsg(data.error || 'Registratie is mislukt. Probeer het opnieuw.');
+        return;
+      }
+
+      const user = data.user as UserAccount;
+      if (data.token) {
+        saveAuthToken(data.token as string, rememberMe);
+      }
+      onLoginSuccess(user, rememberMe);
+    } catch (err) {
+      setErrorMsg('Er is een netwerkfout opgetreden. Probeer het later opnieuw.');
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -375,10 +433,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
               <div>
                 <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-2xl text-white mb-2">
-                  Beheerders Inloggen
+                  {showRegister ? 'Lid worden' : 'Beheerders Inloggen'}
                 </h2>
                 <p className="text-[#d2e4fb] font-['Plus_Jakarta_Sans'] text-sm leading-relaxed">
-                  Log in om reisschema's te bewerken, boekingen toe te voegen en wijzigingen te synchroniseren.
+                  {showRegister
+                    ? 'Maak een account aan om het reisschema te bewerken en een reis ter goedkeuring voor te stellen.'
+                    : "Log in om reisschema's te bewerken, boekingen toe te voegen en wijzigingen te synchroniseren."}
                 </p>
               </div>
 
@@ -389,58 +449,148 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
-                <div className="relative">
-                  <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
-                  <input
-                    type="text"
-                    value={usernameOrEmail}
-                    onChange={(e) => setUsernameOrEmail(e.target.value)}
-                    placeholder="Gebruikersnaam of Email"
-                    className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
-                  />
-                </div>
-
-                <div className="relative">
-                  <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Wachtwoord"
-                    className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-1 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer">
+              {showRegister ? (
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  <div className="relative">
+                    <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
                     <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded border-white/30 bg-transparent text-[#E2725B] focus:ring-[#E2725B]"
+                      type="text"
+                      value={regUsername}
+                      onChange={(e) => setRegUsername(e.target.value)}
+                      placeholder="Gebruikersnaam"
+                      className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
                     />
-                    <span className="text-white/80">Onthoud mij</span>
-                  </label>
-                  
+                  </div>
+
+                  <div className="relative">
+                    <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                    <input
+                      type="text"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="Volledige naam"
+                      className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                    <input
+                      type="email"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="E-mailadres"
+                      className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                    <input
+                      type="password"
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Wachtwoord (minimaal 8 tekens)"
+                      className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                    <input
+                      type="password"
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      placeholder="Bevestig wachtwoord"
+                      className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={registering}
+                    className="w-full h-14 bg-[#E2725B] text-white font-['Plus_Jakarta_Sans'] font-semibold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                    {registering ? 'Bezig met aanmelden...' : 'Account aanmaken'}
+                  </button>
+
                   <button
                     type="button"
-                    onClick={() => setIsForgotPasswordOpen(true)}
-                    className="text-[#E2725B] hover:underline font-semibold cursor-pointer text-xs"
+                    onClick={() => {
+                      setShowRegister(false);
+                      setErrorMsg('');
+                    }}
+                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold cursor-pointer"
                   >
-                    Wachtwoord vergeten?
+                    Terug naar inloggen
                   </button>
-                </div>
+                </form>
+              ) : (
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div className="relative">
+                    <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                    <input
+                      type="text"
+                      value={usernameOrEmail}
+                      onChange={(e) => setUsernameOrEmail(e.target.value)}
+                      placeholder="Gebruikersnaam of Email"
+                      className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
+                    />
+                  </div>
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full h-14 bg-[#E2725B] text-white font-['Plus_Jakarta_Sans'] font-semibold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait"
-                >
-                  <LogIn className="w-5 h-5" />
-                  {submitting ? 'Bezig met inloggen...' : 'Inloggen op Athena AI'}
-                </button>
-              </form>
+                  <div className="relative">
+                    <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Wachtwoord"
+                      className="w-full h-14 bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 text-white placeholder:text-white/40 focus:bg-white/15 focus:ring-2 focus:ring-[#E2725B] focus:outline-none transition-all font-['Plus_Jakarta_Sans'] text-sm font-semibold"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 text-xs">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-white/30 bg-transparent text-[#E2725B] focus:ring-[#E2725B]"
+                      />
+                      <span className="text-white/80">Onthoud mij</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPasswordOpen(true)}
+                      className="text-[#E2725B] hover:underline font-semibold cursor-pointer text-xs"
+                    >
+                      Wachtwoord vergeten?
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full h-14 bg-[#E2725B] text-white font-['Plus_Jakarta_Sans'] font-semibold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait"
+                  >
+                    <LogIn className="w-5 h-5" />
+                    {submitting ? 'Bezig met inloggen...' : 'Inloggen op Athena AI'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRegister(true);
+                      setErrorMsg('');
+                    }}
+                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold cursor-pointer"
+                  >
+                    Nog geen account? <span className="text-[#E2725B] font-bold">Word lid</span>
+                  </button>
+                </form>
+              )}
             </div>
           </section>
           </div>
