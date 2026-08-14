@@ -240,7 +240,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
             </div>
           )}
 
-          <p className="font-['Inter'] text-sm md:text-base leading-relaxed whitespace-pre-line">
+          <p className="font-['Inter'] text-sm md:text-base leading-relaxed whitespace-pre-line break-words">
             {msg.content}
           </p>
 
@@ -301,7 +301,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
           )}
 
           {msg.quickButtons && msg.quickButtons.length > 0 && (
-            <div className="mt-5 flex items-center gap-3">
+            <div className="mt-5 flex flex-wrap items-center gap-2">
               {msg.quickButtons.map((btn, idx) => (
                 <button
                   key={idx}
@@ -613,7 +613,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                       {sessionMessages.map(msg => (
                         <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                           <div
-                            className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
+                            className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line break-words ${
                               msg.role === 'user'
                                 ? 'bg-[#005BAE] text-white rounded-br-sm'
                                 : 'bg-[#f0f6ff] text-[#001a33] rounded-bl-sm border border-[#005BAE]/10'
@@ -672,7 +672,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                     Verwijderen
                   </span>
                 </div>
-                <p className="font-['Inter'] text-sm text-[#001a33] leading-relaxed whitespace-pre-line">
+                <p className="font-['Inter'] text-sm text-[#001a33] leading-relaxed whitespace-pre-line break-words">
                   {fav.content}
                 </p>
                 {fav.sources && fav.sources.length > 0 && (
