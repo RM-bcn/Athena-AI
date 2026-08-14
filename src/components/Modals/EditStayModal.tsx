@@ -83,7 +83,7 @@ export const EditStayModal: React.FC<EditStayModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-[#005BAE]/20 relative">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-[#005BAE]/20 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full cursor-pointer"
