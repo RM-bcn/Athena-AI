@@ -90,8 +90,14 @@ export interface Accommodation {
   location: string;
   status: 'CONFIRMED' | 'PAST STAY' | 'PENDING';
   image: string;
-  checkIn?: string;   // YYYY-MM-DD
-  checkOut?: string;  // YYYY-MM-DD
+  checkIn?: string;     // YYYY-MM-DD
+  checkOut?: string;    // YYYY-MM-DD
+  island?: string;      // eiland voor dropdown + kaartje
+  pricePerNight?: number;
+  address?: string;     // straat + huisnummer, postcode, plaats
+  checkInTime?: string; // bv. 15:00
+  checkOutTime?: string;// bv. 11:00
+  link?: string;        // URL (Booking/Airbnb)
 }
 
 export interface LocalTip {

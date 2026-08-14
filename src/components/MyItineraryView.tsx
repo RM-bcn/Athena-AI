@@ -52,7 +52,7 @@ interface MyItineraryViewProps {
   currentUser: UserAccount | null;
   isGuestMode: boolean;
   tripCode: string;
-  onOpenNewBooking: (mode?: 'manual' | 'ai', island?: string) => void;
+  onOpenNewBooking: (mode?: 'manual' | 'ai', island?: string, bookingId?: string) => void;
   onShare: () => void;
   onExportPDF: () => void;
   onOpenNewTripModal: () => void;
@@ -143,8 +143,14 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   };
 
   const handleChangeLink = (stayId: string) => {
-    onUnlinkStayBooking?.(stayId);
-    onOpenNewBooking('manual', currentTrip.stays.find(s => s.id === stayId)?.island);
+    const stay = currentTrip.stays.find(s => s.id === stayId);
+    if (!stay) return;
+    const linkInfo = getLinkInfo(stay);
+    if (linkInfo.state === 'linked' && linkInfo.matchedBooking) {
+      onOpenNewBooking('manual', stay.island, linkInfo.matchedBooking.id);
+    } else {
+      onOpenNewBooking('manual', stay.island);
+    }
   };
 
   const handleUnlink = (stayId: string) => {
@@ -804,6 +810,33 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                         <p className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold mt-1">
                           {formatDateFriendly(stay.startDate)} – {formatDateFriendly(stay.endDate)}
                         </p>
+                        {linkInfo.state === 'linked' && linkInfo.matchedBooking && (
+                          <>
+                            {linkInfo.matchedBooking.address && (
+                              <p className="font-['Inter'] text-[10px] text-[#404752] mt-1 flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-[#005BAE]" />
+                                {linkInfo.matchedBooking.address}
+                              </p>
+                            )}
+                            {(linkInfo.matchedBooking.checkInTime || linkInfo.matchedBooking.checkOutTime) && (
+                              <p className="font-['Inter'] text-[10px] text-[#404752] mt-1 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-[#005BAE]" />
+                                In: {linkInfo.matchedBooking.checkInTime || '-'} · Uit: {linkInfo.matchedBooking.checkOutTime || '-'}
+                              </p>
+                            )}
+                            {linkInfo.matchedBooking.link && (
+                              <a
+                                href={linkInfo.matchedBooking.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold mt-1 flex items-center gap-1 hover:underline cursor-pointer"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Bekijk accommodatie
+                              </a>
+                            )}
+                          </>
+                        )}
                         {linkInfo.state === 'linked' && linkInfo.matchedBooking && (
                           <p className="font-['Inter'] text-[10px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" />

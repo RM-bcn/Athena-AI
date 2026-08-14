@@ -331,6 +331,7 @@ export default function App() {
   const [bookingIsland, setBookingIsland] = useState<string | undefined>(undefined);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [customBookings, setCustomBookings] = useState<Accommodation[]>([]);
+  const [editingBooking, setEditingBooking] = useState<Accommodation | null>(null);
   const [stayBookingLinks, setStayBookingLinks] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('athena_stay_booking_links');
@@ -990,14 +991,16 @@ if (loaded.stayBookingLinks) {
     updateAndSaveTrip(newTripObj);
   };
 
-  const handleOpenAddBooking = (mode: 'manual' | 'ai' = 'manual', island?: string) => {
+  const handleOpenAddBooking = (mode: 'manual' | 'ai' = 'manual', island?: string, bookingId?: string) => {
     if (isGuestMode) {
       alert("⚠️ Je bent ingelogd als Gast. Log in als Dennis of Joyce om accommodaties toe te voegen!");
       setActiveTab('login');
       return;
     }
+    const booking = bookingId ? customBookings.find((b) => b.id === bookingId) : undefined;
     setBookingMode(mode);
     setBookingIsland(island);
+    setEditingBooking(booking || null);
     setIsAddBookingOpen(true);
   };
 
@@ -1010,6 +1013,10 @@ if (loaded.stayBookingLinks) {
     image?: string;
     checkIn?: string;
     checkOut?: string;
+    address?: string;
+    checkInTime?: string;
+    checkOutTime?: string;
+    link?: string;
   }) => {
     const newAccom: Accommodation = {
       id: `booking-${Date.now()}`,
@@ -1019,6 +1026,10 @@ if (loaded.stayBookingLinks) {
       image: booking.image || 'https://lh3.googleusercontent.com/aida-public/AB6AXuDaynCJsoW5hGEsjYxWiFiFTUq6FF_3wMiDJNfr8XJm_ZEteWs-Jb_pTH6oM9AxjXq1zc3uXUjcVDUil0BNaduxay62Z9Tfh2AX-yMVxdswtqGXu36U8shML7hCVe41PKcnK_SFbXPo4HkNeiZWgNFjbmLUe0Oc18nCWdBs2gwLlg7aUt1GZS_k9EMeaPGXH3zLRsDUtUPYj1MmOA-4H43cNk2KjAE70iRYUTadS1eYCfvZA84H2G7uMQ',
       checkIn: booking.checkIn,
       checkOut: booking.checkOut,
+      address: booking.address,
+      checkInTime: booking.checkInTime,
+      checkOutTime: booking.checkOutTime,
+      link: booking.link,
     };
 
     const nextBookings = [...customBookings, newAccom];
@@ -1064,6 +1075,30 @@ if (loaded.stayBookingLinks) {
 
     handleSendMessage(
       `Ik heb een accommodatie toegevoegd voor ${booking.island || booking.location}: ${booking.name} (€${booking.pricePerNight || 150}/nacht, Status: ${booking.status}). Update mijn reis- en dagschema!`
+    );
+  };
+
+  const handleUpdateBooking = (booking: Accommodation) => {
+    const nextBookings = customBookings.map((b) => (b.id === booking.id ? booking : b));
+    setCustomBookings(nextBookings);
+
+    // Als de boeking aan een stay gekoppeld is, werk de accommodationName mee
+    // (bijv. bij een naamswijziging in de edit-modal).
+    const linkedStayId = Object.entries(stayBookingLinks).find(([, id]) => id === booking.id)?.[0];
+    const updatedStays = linkedStayId
+      ? currentTrip.stays.map((s) =>
+          s.id === linkedStayId ? { ...s, accommodationName: booking.name } : s
+        )
+      : currentTrip.stays;
+
+    updateAndSaveTrip(
+      { ...currentTrip, stays: updatedStays },
+      nextBookings,
+      stayBookingLinks
+    );
+
+    handleSendMessage(
+      `Ik heb accommodatie "${booking.name}" aangepast (€${booking.pricePerNight || 150}/nacht, Status: ${booking.status}). Werk het dagschema bij!`
     );
   };
 
@@ -1571,8 +1606,13 @@ if (loaded.stayBookingLinks) {
 
       <AddBookingModal
         isOpen={isAddBookingOpen}
-        onClose={() => setIsAddBookingOpen(false)}
+        onClose={() => {
+          setIsAddBookingOpen(false);
+          setEditingBooking(null);
+        }}
         onAddBooking={handleAddBooking}
+        onUpdateBooking={handleUpdateBooking}
+        editingBooking={editingBooking}
         tripStays={currentTrip.stays}
         initialMode={bookingMode}
         initialIsland={bookingIsland}
