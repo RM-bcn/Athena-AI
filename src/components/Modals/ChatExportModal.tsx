@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, CalendarPlus, Check, Utensils, Lightbulb, CheckCircle2 } from 'lucide-react';
+import { X, CalendarPlus, Check, Utensils, Lightbulb, CheckCircle2, Ship, Hotel, LogOut } from 'lucide-react';
 import type { ChatMessage, TripData, DayPlanItemType } from '../../types';
 
 interface ChatExportModalProps {
@@ -14,6 +14,9 @@ const TYPE_LABELS: Record<DayPlanItemType, string> = {
   activity: 'Activiteit',
   dining: 'Eettip',
   tip: 'Praktische tip',
+  transport: 'Transport / Ferry',
+  checkin: 'Inchecken hotel',
+  checkout: 'Uitchecken hotel',
 };
 
 export const ChatExportModal: React.FC<ChatExportModalProps> = ({
@@ -141,6 +144,9 @@ export const ChatExportModal: React.FC<ChatExportModalProps> = ({
                   <option value="activity">Activiteit</option>
                   <option value="dining">Eettip</option>
                   <option value="tip">Praktische tip</option>
+                  <option value="transport">Transport / Ferry</option>
+                  <option value="checkin">Inchecken hotel</option>
+                  <option value="checkout">Uitchecken hotel</option>
                 </select>
               </div>
             </div>

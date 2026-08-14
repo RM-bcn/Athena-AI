@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
-import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId } from './utils/dayPlans';
+import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId, applyStayRecords } from './utils/dayPlans';
 import { getActiveUser, isGuestMode as readGuestMode, saveLogin, updateActiveUser, clearSession, ACTIVE_USER_KEY, GUEST_MODE_KEY } from './utils/authStorage';
 import { getToken, clearToken } from './utils/authToken';
 import { Sidebar } from './components/Sidebar';
@@ -372,7 +372,12 @@ export default function App() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && Array.isArray(data.plans) && data.plans.length > 0) {
-        setDayPlans((prev) => ({ ...prev, [key]: normalizeDayPlans(data.plans) }));
+        const base = normalizeDayPlans(data.plans);
+        // Vaste records (ferry + inchecken dag 0, uitchecken + ferry laatste
+        // dag) uit de verblijfs- en transportdata toepassen, zodat ze nooit
+        // verloren gaan bij regenereren of handmatig bewerken.
+        const withRecords = applyStayRecords(base, stay, transportEntriesRef.current);
+        setDayPlans((prev) => ({ ...prev, [key]: withRecords }));
         return { success: true };
       }
       const message =
@@ -393,7 +398,12 @@ export default function App() {
   // Sla een volledige dagplanning voor een verblijf op (editor-opslag).
   const saveDayPlans = (stayId: string, plans: DayPlan[]) => {
     const key = `${tripCode}:${stayId}`;
-    setDayPlans((prev) => ({ ...prev, [key]: plans.map((p) => normalizeDayPlan(p)) }));
+    const stay = currentTrip.stays.find((s) => s.id === stayId);
+    const normalized = plans.map((p) => normalizeDayPlan(p));
+    // Records opnieuw toepassen zodat ferry/inchecken/uitchecken ook na een
+    // handmatige bewerkingsronde op de juiste dagen blijven staan.
+    const withRecords = stay ? applyStayRecords(normalized, stay, transportEntriesRef.current) : normalized;
+    setDayPlans((prev) => ({ ...prev, [key]: withRecords }));
   };
 
   // Voeg een item (activiteit / eettip / praktische tip) toe aan een dag van
@@ -401,6 +411,7 @@ export default function App() {
   // die er nog niet is.
   const addDayPlanItem = (stayId: string, dayIdx: number, type: DayPlanItemType, text: string) => {
     const key = `${tripCode}:${stayId}`;
+    const stay = currentTrip.stays.find((s) => s.id === stayId);
     setDayPlans((prev) => {
       const existing = normalizeDayPlans(prev[key] || []);
       const padded = ensureDayPlanCount(existing, dayIdx + 1);
@@ -408,11 +419,15 @@ export default function App() {
         id: dayPlanItemId(type),
         type,
         text: text.trim(),
+        protected: type === 'transport' || type === 'checkin' || type === 'checkout',
       };
-      const updated: DayPlan[] = padded.map((p) => {
+      let updated: DayPlan[] = padded.map((p) => {
         if (p.day === dayIdx) return { ...p, items: [...(p.items || []), item] };
         return p;
       });
+      // Zorg dat de vaste records op dag 0 en de laatste dag staan, ook wanneer
+      // de planning nog niet eerder was gegenereerd.
+      if (stay) updated = applyStayRecords(updated, stay, transportEntriesRef.current);
       return { ...prev, [key]: updated };
     });
   };
@@ -477,6 +492,33 @@ if (loaded.stayBookingLinks) {
   useEffect(() => { customBookingsRef.current = customBookings; }, [customBookings]);
   useEffect(() => { stayBookingLinksRef.current = stayBookingLinks; }, [stayBookingLinks]);
   useEffect(() => { transportEntriesRef.current = transportEntries; }, [transportEntries]);
+
+  // Herbouw de beschermde records (ferry, hotel-inchecken/-uitchecken) wanneer
+  // de transportdata of verblijven veranderen, zodat ze altijd actueel zijn en
+  // ook bestaande (oudere) planningen bij het laden hun records krijgen.
+  const recordsSyncKeyRef = useRef<string>('');
+  useEffect(() => {
+    const syncKey = JSON.stringify({ transports: transportEntries, stays: currentTrip.stays, code: tripCode });
+    if (syncKey === recordsSyncKeyRef.current) return;
+    recordsSyncKeyRef.current = syncKey;
+
+    setDayPlans((prev) => {
+      let changed = false;
+      const next: Record<string, DayPlan[]> = {};
+      for (const [key, plans] of Object.entries(prev)) {
+        next[key] = plans;
+        const stay = currentTrip.stays.find((s) => `${tripCode}:${s.id}` === key);
+        if (!stay) continue;
+        const withRecords = applyStayRecords(plans, stay, transportEntries);
+        if (JSON.stringify(withRecords) !== JSON.stringify(plans)) {
+          next[key] = withRecords;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transportEntries, currentTrip.stays, tripCode]);
 
   // Single debounced save path to Google Sheets. Trip edits and transport edits
   // both funnel through here, so concurrent changes bundle into one request.

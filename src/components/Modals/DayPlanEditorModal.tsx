@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Sparkles, Plus, Trash2, ArrowUp, ArrowDown, RefreshCw, Utensils, Lightbulb, CheckCircle2, Calendar } from 'lucide-react';
+import { X, Sparkles, Plus, Trash2, ArrowUp, ArrowDown, RefreshCw, Utensils, Lightbulb, CheckCircle2, Calendar, Ship, Hotel, Lock, LogOut } from 'lucide-react';
 import type { IslandStay, DayPlan, DayPlanItem, DayPlanItemType } from '../../types';
-import { normalizeDayPlans, dayPlanItemId, ensureDayPlanCount, emptyDayPlan } from '../../utils/dayPlans';
+import { normalizeDayPlans, dayPlanItemId, ensureDayPlanCount, emptyDayPlan, isProtectedItem } from '../../utils/dayPlans';
 
 interface DayPlanEditorModalProps {
   isOpen: boolean;
@@ -18,12 +18,18 @@ const TYPE_LABELS: Record<DayPlanItemType, string> = {
   activity: 'Activiteit',
   dining: 'Eettip',
   tip: 'Praktische tip',
+  transport: 'Transport / Ferry',
+  checkin: 'Inchecken hotel',
+  checkout: 'Uitchecken hotel',
 };
 
 const TYPE_ICONS: Record<DayPlanItemType, React.ReactNode> = {
   activity: <CheckCircle2 className="w-4 h-4 text-[#005BAE]" />,
   dining: <Utensils className="w-4 h-4 text-[#005BAE]" />,
   tip: <Lightbulb className="w-4 h-4 text-amber-500" />,
+  transport: <Ship className="w-4 h-4 text-[#005BAE]" />,
+  checkin: <Hotel className="w-4 h-4 text-emerald-600" />,
+  checkout: <LogOut className="w-4 h-4 text-emerald-600" />,
 };
 
 export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
@@ -77,7 +83,13 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
   const addItem = () => {
     const text = newItemText.trim();
     if (!text) return;
-    const item: DayPlanItem = { id: dayPlanItemId(newItemType), type: newItemType, text };
+    const isRecordType = newItemType === 'transport' || newItemType === 'checkin' || newItemType === 'checkout';
+    const item: DayPlanItem = {
+      id: dayPlanItemId(newItemType),
+      type: newItemType,
+      text,
+      protected: isRecordType,
+    };
     const target = padded[activeDay] || emptyDayPlan(activeDay);
     updatePlan(padded.map((p) => (p.day === activeDay ? { ...p, items: [...(p.items || []), item] } : p)));
     setNewItemText('');
@@ -178,45 +190,62 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
           </p>
         ) : (
           <ul className="space-y-1.5 mb-4">
-            {activePlan.items.map((item, idx) => (
-              <li
-                key={item.id}
-                className="flex items-start gap-2 px-3 py-2.5 bg-[#f7f9ff] rounded-xl border border-[#c0c7d3]/20"
-              >
-                <span className="mt-0.5 flex-shrink-0">{TYPE_ICONS[item.type]}</span>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#717783] block">
-                    {TYPE_LABELS[item.type]}
-                  </span>
-                  <span className="font-['Inter'] text-sm text-[#0b1d2d] whitespace-pre-line">{item.text}</span>
-                </div>
-                <div className="flex flex-col gap-0.5 ml-1 flex-shrink-0">
-                  <button
-                    onClick={() => moveItem(item.id, -1)}
-                    disabled={idx === 0}
-                    className="p-1 text-[#717783] hover:text-[#005BAE] hover:bg-white rounded transition-colors disabled:opacity-30 disabled:cursor-default cursor-pointer"
-                    title="Omhoog"
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => moveItem(item.id, 1)}
-                    disabled={idx === activePlan.items.length - 1}
-                    className="p-1 text-[#717783] hover:text-[#005BAE] hover:bg-white rounded transition-colors disabled:opacity-30 disabled:cursor-default cursor-pointer"
-                    title="Omlaag"
-                  >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <button
-                  onClick={() => removeItem(item.id)}
-                  className="p-1 text-[#717783] hover:text-red-500 hover:bg-white rounded transition-colors flex-shrink-0 cursor-pointer"
-                  title="Verwijderen"
+            {activePlan.items.map((item, idx) => {
+              const isProtected = isProtectedItem(item);
+              return (
+                <li
+                  key={item.id}
+                  className={`flex items-start gap-2 px-3 py-2.5 rounded-xl border ${
+                    isProtected
+                      ? 'bg-[#e4efff]/60 border-[#005BAE]/25'
+                      : 'bg-[#f7f9ff] border-[#c0c7d3]/20'
+                  }`}
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </li>
-            ))}
+                  <span className="mt-0.5 flex-shrink-0">{TYPE_ICONS[item.type]}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#717783] block flex items-center gap-1">
+                      {TYPE_LABELS[item.type]}
+                      {isProtected && (
+                        <span className="inline-flex items-center gap-0.5 text-[#005BAE]">
+                          <Lock className="w-2.5 h-2.5" />
+                          vast record
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-['Inter'] text-sm text-[#0b1d2d] whitespace-pre-line">{item.text}</span>
+                  </div>
+                  {!isProtected && (
+                    <>
+                      <div className="flex flex-col gap-0.5 ml-1 flex-shrink-0">
+                        <button
+                          onClick={() => moveItem(item.id, -1)}
+                          disabled={idx === 0}
+                          className="p-1 text-[#717783] hover:text-[#005BAE] hover:bg-white rounded transition-colors disabled:opacity-30 disabled:cursor-default cursor-pointer"
+                          title="Omhoog"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => moveItem(item.id, 1)}
+                          disabled={idx === activePlan.items.length - 1}
+                          className="p-1 text-[#717783] hover:text-[#005BAE] hover:bg-white rounded transition-colors disabled:opacity-30 disabled:cursor-default cursor-pointer"
+                          title="Omlaag"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="p-1 text-[#717783] hover:text-red-500 hover:bg-white rounded transition-colors flex-shrink-0 cursor-pointer"
+                        title="Verwijderen"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -225,11 +254,14 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
           <select
             value={newItemType}
             onChange={(e) => setNewItemType(e.target.value as DayPlanItemType)}
-            className="px-3 py-2.5 bg-white border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-xs text-[#0b1d2d] focus:outline-none focus:ring-2 focus:ring-[#005BAE]/30 sm:w-36 cursor-pointer"
+            className="px-3 py-2.5 bg-white border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-xs text-[#0b1d2d] focus:outline-none focus:ring-2 focus:ring-[#005BAE]/30 sm:w-40 cursor-pointer"
           >
             <option value="activity">Activiteit</option>
             <option value="dining">Eettip</option>
             <option value="tip">Praktische tip</option>
+            <option value="transport">Transport / Ferry</option>
+            <option value="checkin">Inchecken hotel</option>
+            <option value="checkout">Uitchecken hotel</option>
           </select>
           <input
             value={newItemText}

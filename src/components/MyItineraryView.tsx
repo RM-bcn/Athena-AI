@@ -713,6 +713,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                                   <Utensils className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
                                 ) : item.type === 'tip' ? (
                                   <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                ) : item.type === 'transport' ? (
+                                  <Ship className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
+                                ) : item.type === 'checkin' || item.type === 'checkout' ? (
+                                  <Hotel className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                                 ) : (
                                   <CheckCircle2 className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
                                 )}
