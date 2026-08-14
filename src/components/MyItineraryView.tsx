@@ -620,8 +620,8 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
           <div className="absolute inset-0 bg-gradient-to-t from-white/90 via-white/25 to-transparent" />
 
           {/* Interactive Timeline Overlay */}
-          <div className="absolute inset-x-0 bottom-0 p-6">
-            <div className="flex justify-between items-center max-w-4xl mx-auto gap-4">
+          <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 overflow-x-auto no-scrollbar">
+            <div className="flex items-center max-w-4xl mx-auto gap-4 min-w-max sm:min-w-0 sm:justify-between">
               {timelineStops.map((stop, index) => (
                 <React.Fragment key={stop.id}>
                   <div
