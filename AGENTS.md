@@ -47,10 +47,9 @@ execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
 
 ## Status & openstaande zaken (bijgewerkt 14 aug 2026)
 
-- **Steps 01–09 zijn afgerond en live.** Openstaand: 10 (accommodatie bewerken),
-  11 (reisdagboek/stories), 12 (gast-verbod dagplanning-bewerking), 13 (AI
-  dagoverzicht voor gasten), 14 (proactief tegen Groq-modelrotatie). Plannen staan
-  in `docs/plans/step-1X-*.md`; voer ze uit in volgorde 10 → 14.
+- **Alle geplande stappen 01–14 zijn afgerond en live.** Nieuwe wensen worden als
+  stap 15+ opgeschreven in een nieuw plan-bestand (`docs/plans/step-15-*.md`).
+  Gearchiveerde plannen staan in `docs/plans/done/`.
 - **Step 07 (wachtwoordreset via e-mail) is live** maar verstuurt nog géén e-mail:
   er is nog géén `RESEND_API_KEY` (geen domein geverifieerd). Zonder key logt de
   server de reset-link naar de serverconsole (`[Reset] Reset link: ...`) en verstuurt

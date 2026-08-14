@@ -4,7 +4,7 @@ Overzicht van de geplande stappen voor Athena AI. Uitgevoerde stappen staan
 gearchiveerd in [done/](done/). Elke openstaande stap heeft een eigen plan-bestand
 dat door een agent uitgevoerd kan worden.
 
-## Afgerond (stap 0 + 01–09)
+## Afgerond (stap 0 + 01–14)
 
 - [x] Stap 0 — main bijwerken + branch-/stash-opruiming
 - [x] Step 01 — server-side login (bcrypt, token) → [done](done/step-01-server-auth-login.md)
@@ -17,16 +17,16 @@ dat door een agent uitgevoerd kan worden.
       **Let op:** e-mail verstuurt nog niet live (geen `RESEND_API_KEY`/domein) — zie "Status" in `AGENTS.md`.
 - [x] Step 08 — AI-dagplanning per verblijfsdag → [done](done/step-08-ai-dagplanning.md)
 - [x] Step 09 — rollen, reis-aanvragen & goedkeuring, registratie → [done](done/step-09-rollen-rechten.md)
+- [x] Step 10 — accommodatie bewerken (edit-modus + nieuwe velden) → [done](done/step-10-accommodatie-bewerken.md)
+- [x] Step 11 — reisdagboek & "Vandaag"-stories → [done](done/step-11-reisdagboek-stories.md)
+- [x] Step 12 — gasten geen dagplanning-bewerking → [done](done/step-12-gast-verbod-dagplanning.md)
+- [x] Step 13 — AI-dagoverzicht voor gasten → [done](done/step-13-gast-ai-dagoverzicht.md)
+- [x] Step 14 — proactief tegen Groq-modelrotatie → [done](done/step-14-groq-model-rotatie.md)
 
 ## Vervolgstappen (openstaand)
 
-| Step | Plan-bestand | Kort doel |
-|------|--------------|-----------|
-| 10 | [step-10-accommodatie-bewerken.md](step-10-accommodatie-bewerken.md) | "Wijzigen"-flow van geboekte accommodaties (edit-modus + UPDATE), nieuwe velden (adres, check-in/out-tijd, link) |
-| 11 | [step-11-reisdagboek-stories.md](step-11-reisdagboek-stories.md) | Reisdagboek (dagelijkse foto's + tekst) en "Vandaag"-stories (fullscreen-strip met AI-bijschrift) |
-| 12 | [step-12-gast-verbod-dagplanning.md](step-12-gast-verbod-dagplanning.md) | Verberg dagplanning-bewerkingsknoppen voor gasten |
-| 13 | [step-13-gast-ai-dagoverzicht.md](step-13-gast-ai-dagoverzicht.md) | AI-dagoverzicht voor gasten (één-klik-samenvatting met weer, activiteiten, regio-info) |
-| 14 | [step-14-groq-model-rotatie.md](step-14-groq-model-rotatie.md) | Zelfherstellend tegen Groq-modelrotatie: dynamische model-ontdekking, ranking, self-healing en configureerbaar Gemini-model |
+Geen openstaande geplande stappen meer. Nieuwe wensen kunnen als stap 15+ worden
+opgeschreven in een nieuw plan-bestand (patroon: `docs/plans/step-15-*.md`).
 
 Waarom sequentieel: de stappen raken deels dezelfde bestanden (`server.ts`, `App.tsx`,
 `MyItineraryView.tsx`, `LoginView.tsx`). Parallel werken geeft merge-conflicten.
