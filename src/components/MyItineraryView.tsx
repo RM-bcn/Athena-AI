@@ -5,7 +5,8 @@ import {
   TripData,
   IslandStay,
   UserAccount,
-  DayPlan
+  DayPlan,
+  DayPlanItemType
 } from '../types';
 import { getStayLinkInfo, StayLinkInfo } from '../utils/accommodationMatcher';
 import {
@@ -51,7 +52,6 @@ interface MyItineraryViewProps {
   currentUser: UserAccount | null;
   isGuestMode: boolean;
   tripCode: string;
-  onOpenChat: () => void;
   onOpenNewBooking: (mode?: 'manual' | 'ai', island?: string) => void;
   onShare: () => void;
   onExportPDF: () => void;
@@ -74,8 +74,8 @@ interface MyItineraryViewProps {
   dayPlans?: Record<string, DayPlan[]>;
   onSaveDayPlans?: (stayId: string, plans: DayPlan[]) => void;
   onAskDayPlanInChat?: (stay: IslandStay) => void;
-  dayPlanAutoSync?: Record<string, boolean>;
-  onSetAutoSync?: (stayId: string, enabled: boolean) => void;
+  dayPlanAutoSync?: Record<string, Partial<Record<DayPlanItemType, boolean>>>;
+  onSetAutoSync?: (stayId: string, type: DayPlanItemType, enabled: boolean) => void;
 }
 
 export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
@@ -83,7 +83,6 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   currentUser,
   isGuestMode,
   tripCode,
-  onOpenChat,
   onOpenNewBooking,
   onShare,
   onExportPDF,
@@ -636,16 +635,6 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       </>
                     )}
 
-                    {!isGuestMode && (
-                      <button
-                        onClick={onOpenChat}
-                        className="text-xs font-['Inter'] font-semibold text-white bg-[#005BAE] px-3 py-1.5 rounded-lg hover:brightness-110 transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        Vraag Concierge
-                      </button>
-                    )}
-
                     {onAskDayPlanInChat && (
                       <button
                         onClick={() => onAskDayPlanInChat(stay)}
@@ -982,12 +971,13 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
           if (dayPlanEditorStay) onSaveDayPlans?.(dayPlanEditorStay.id, plans);
         }}
         onAskChat={(stay) => onAskDayPlanInChat?.(stay)}
-        autoSync={dayPlanEditorStay ? dayPlanAutoSync[`${tripCode}:${dayPlanEditorStay.id}`] !== false : true}
+        autoSync={dayPlanEditorStay ? dayPlanAutoSync[`${tripCode}:${dayPlanEditorStay.id}`] || {} : {}}
         onToggleAutoSync={
           dayPlanEditorStay && onSetAutoSync
-            ? () => onSetAutoSync(
+            ? (type) => onSetAutoSync(
                 dayPlanEditorStay.id,
-                dayPlanAutoSync[`${tripCode}:${dayPlanEditorStay.id}`] === false
+                type,
+                (dayPlanAutoSync[`${tripCode}:${dayPlanEditorStay.id}`] || {})[type] === false
               )
             : undefined
         }

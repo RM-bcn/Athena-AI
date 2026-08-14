@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
-import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId, applyStayRecords } from './utils/dayPlans';
+import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId, applyStayRecords, DAY_PLAN_RECORD_TYPES } from './utils/dayPlans';
 import { getActiveUser, isGuestMode as readGuestMode, saveLogin, updateActiveUser, clearSession, ACTIVE_USER_KEY, GUEST_MODE_KEY } from './utils/authStorage';
 import { getToken, clearToken } from './utils/authToken';
 import { Sidebar } from './components/Sidebar';
@@ -342,7 +342,10 @@ export default function App() {
       return {};
     }
   });
-  const [dayPlanAutoSync, setDayPlanAutoSync] = useState<Record<string, boolean>>(() => {
+  // Auto-sync van vaste records per verblijf, individueel per record-type
+  // (transport/ferry, inchecken, uitchecken). Default alles aan; de gebruiker
+  // kan elk type per verblijf apart uitzetten.
+  const [dayPlanAutoSync, setDayPlanAutoSync] = useState<Record<string, Partial<Record<DayPlanItemType, boolean>>>>(() => {
     try {
       const saved = localStorage.getItem(`athena_dayplans_autosync_${tripCode}`);
       return saved ? JSON.parse(saved) : {};
@@ -350,15 +353,28 @@ export default function App() {
       return {};
     }
   });
-  const isAutoSyncEnabled = (stayId: string) => dayPlanAutoSync[`${tripCode}:${stayId}`] !== false;
-  const setAutoSyncEnabled = (stayId: string, enabled: boolean) => {
+  const isAutoSyncEnabled = (stayId: string, type?: DayPlanItemType): boolean => {
+    const prefs = dayPlanAutoSync[`${tripCode}:${stayId}`];
+    if (!type) return !prefs || DAY_PLAN_RECORD_TYPES.some((t) => prefs[t] !== false);
+    return !prefs || prefs[type] !== false;
+  };
+  const getEnabledRecordTypes = (stayId: string): DayPlanItemType[] | null => {
+    const prefs = dayPlanAutoSync[`${tripCode}:${stayId}`];
+    if (!prefs) return null;
+    const enabled = DAY_PLAN_RECORD_TYPES.filter((t) => prefs[t] !== false);
+    return enabled.length === DAY_PLAN_RECORD_TYPES.length ? null : enabled;
+  };
+  const setAutoSyncEnabled = (stayId: string, type: DayPlanItemType, enabled: boolean) => {
     const key = `${tripCode}:${stayId}`;
-    setDayPlanAutoSync((prev) => ({ ...prev, [key]: enabled }));
-    try {
-      localStorage.setItem(`athena_dayplans_autosync_${tripCode}`, JSON.stringify({ ...dayPlanAutoSync, [key]: enabled }));
-    } catch (e) {
-      console.error("Failed to save day plan auto-sync preference", e);
-    }
+    setDayPlanAutoSync((prev) => {
+      const next = { ...prev, [key]: { ...(prev[key] || {}), [type]: enabled } };
+      try {
+        localStorage.setItem(`athena_dayplans_autosync_${tripCode}`, JSON.stringify(next));
+      } catch (e) {
+        console.error("Failed to save day plan auto-sync preference", e);
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -378,7 +394,7 @@ export default function App() {
     // handmatige bewerkingsronde op de juiste dagen blijven staan (tenzij de
     // auto-sync voor dit verblijf is uitgeschakeld).
     const withRecords = stay && isAutoSyncEnabled(stayId)
-      ? applyStayRecords(normalized, stay, transportEntriesRef.current)
+      ? applyStayRecords(normalized, stay, transportEntriesRef.current, getEnabledRecordTypes(stayId))
       : normalized;
     setDayPlans((prev) => ({ ...prev, [key]: withRecords }));
   };
@@ -411,7 +427,7 @@ export default function App() {
       });
       // Zorg dat de vaste records op dag 0 en de laatste dag staan, ook wanneer
       // de planning nog niet eerder was gegenereerd.
-      if (stay && isAutoSyncEnabled(stayId)) updated = applyStayRecords(updated, stay, transportEntriesRef.current);
+      if (stay && isAutoSyncEnabled(stayId)) updated = applyStayRecords(updated, stay, transportEntriesRef.current, getEnabledRecordTypes(stayId));
       return { ...prev, [key]: updated };
     });
   };
@@ -495,7 +511,7 @@ if (loaded.stayBookingLinks) {
         if (!stay) continue;
         // Auto-sync overslaan voor verblijven waar de gebruiker deze uitzette.
         if (!isAutoSyncEnabled(stay.id)) continue;
-        const withRecords = applyStayRecords(plans, stay, transportEntries);
+        const withRecords = applyStayRecords(plans, stay, transportEntries, getEnabledRecordTypes(stay.id));
         if (JSON.stringify(withRecords) !== JSON.stringify(plans)) {
           next[key] = withRecords;
           changed = true;
@@ -1276,7 +1292,6 @@ if (loaded.stayBookingLinks) {
             currentUser={currentUser}
             isGuestMode={isGuestMode}
             tripCode={tripCode}
-            onOpenChat={openChat}
             onOpenNewBooking={handleOpenAddBooking}
             onShare={() => setIsShareOpen(true)}
             onExportPDF={handleExportPDF}

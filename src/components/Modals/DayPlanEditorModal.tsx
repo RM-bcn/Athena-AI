@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Sparkles, Plus, Trash2, ArrowUp, ArrowDown, Utensils, Lightbulb, CheckCircle2, Calendar, Ship, Hotel, Lock, LogOut, Clock, MessageCircle } from 'lucide-react';
 import type { IslandStay, DayPlan, DayPlanItem, DayPlanItemType } from '../../types';
-import { normalizeDayPlans, dayPlanItemId, ensureDayPlanCount, emptyDayPlan, isProtectedItem } from '../../utils/dayPlans';
+import { normalizeDayPlans, dayPlanItemId, ensureDayPlanCount, emptyDayPlan, isProtectedItem, DAY_PLAN_RECORD_TYPES } from '../../utils/dayPlans';
 
 interface DayPlanEditorModalProps {
   isOpen: boolean;
@@ -10,8 +10,8 @@ interface DayPlanEditorModalProps {
   plans: DayPlan[];
   onSave: (plans: DayPlan[]) => void;
   onAskChat: (stay: IslandStay) => void;
-  autoSync?: boolean;
-  onToggleAutoSync?: () => void;
+  autoSync?: Partial<Record<DayPlanItemType, boolean>>;
+  onToggleAutoSync?: (type: DayPlanItemType) => void;
 }
 
 const TYPE_LABELS: Record<DayPlanItemType, string> = {
@@ -32,6 +32,12 @@ const TYPE_ICONS: Record<DayPlanItemType, React.ReactNode> = {
   checkout: <LogOut className="w-4 h-4 text-emerald-600" />,
 };
 
+const RECORD_TYPE_LABELS: Partial<Record<DayPlanItemType, string>> = {
+  transport: 'Ferry / transport',
+  checkin: 'Hotel inchecken',
+  checkout: 'Hotel uitchecken',
+};
+
 export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
   isOpen,
   onClose,
@@ -39,7 +45,7 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
   plans,
   onSave,
   onAskChat,
-  autoSync = true,
+  autoSync = {},
   onToggleAutoSync,
 }) => {
   const [draft, setDraft] = useState<DayPlan[]>(() => normalizeDayPlans(plans));
@@ -162,27 +168,41 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
         </div>
 
         {onToggleAutoSync && (
-          <button
-            onClick={onToggleAutoSync}
-            className="mb-4 w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#f7f9ff] border border-[#c0c7d3]/30 font-['Inter'] text-xs cursor-pointer hover:bg-[#f0f4f9] transition-colors"
-            title="Zet de automatische records (ferry, inchecken, uitchecken) voor dit verblijf aan of uit"
-          >
-            <span className="flex items-center gap-2 text-[#0b1d2d] font-semibold">
+          <div className="mb-4 px-3.5 py-3 rounded-xl bg-[#f7f9ff] border border-[#c0c7d3]/30">
+            <p className="flex items-center gap-2 text-[#0b1d2d] font-semibold font-['Inter'] text-xs mb-2">
               <Lock className="w-3.5 h-3.5 text-[#005BAE]" />
-              Auto-records (ferry, incheck, uitcheck)
-            </span>
-            <span
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                autoSync ? 'bg-[#005BAE]' : 'bg-[#c0c7d3]'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  autoSync ? 'translate-x-[18px]' : 'translate-x-0.5'
-                }`}
-              />
-            </span>
-          </button>
+              Auto-records per type
+            </p>
+            <div className="space-y-1.5">
+              {DAY_PLAN_RECORD_TYPES.map((type) => {
+                const enabled = autoSync[type] !== false;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => onToggleAutoSync(type)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg font-['Inter'] text-xs cursor-pointer hover:bg-white transition-colors"
+                    title={`Zet automatisch ${RECORD_TYPE_LABELS[type]} voor dit verblijf aan of uit`}
+                  >
+                    <span className="flex items-center gap-2 text-[#0b1d2d]">
+                      {TYPE_ICONS[type]}
+                      {RECORD_TYPE_LABELS[type]}
+                    </span>
+                    <span
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        enabled ? 'bg-[#005BAE]' : 'bg-[#c0c7d3]'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {/* Title */}
@@ -207,7 +227,7 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
         ) : (
           <ul className="space-y-1.5 mb-4">
             {activePlan.items.map((item, idx) => {
-              const isProtected = isProtectedItem(item) && autoSync;
+              const isProtected = isProtectedItem(item) && (autoSync[item.type] !== false);
               return (
                 <li
                   key={item.id}
