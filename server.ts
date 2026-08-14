@@ -419,6 +419,92 @@ app.post("/api/dayphotos/caption", requireAuth, async (req, res) => {
   }
 });
 
+// API: AI-dagoverzicht voor gasten (non-chat, één-klik-samenvatting).
+app.post("/api/dayoverview", async (req, res) => {
+  try {
+    const { island, date, dayPlan } = req.body || {};
+    const safeIsland = typeof island === "string" && island.trim() ? island.trim() : "de Cycladen";
+    const safeDate = typeof date === "string" && date.trim() ? date.trim() : "";
+
+    // Weer ophalen via de bestaande live-provider; bij fout statische fallback.
+    let weatherText = "Warm en zonnig, typisch voor de Cycladen in augustus";
+    try {
+      const weather = await getWeather(safeIsland === "de Cycladen" ? "Naxos" : safeIsland);
+      if (weather && weather.text && !weather.text.startsWith("Geen") && !weather.text.startsWith("Weer niet") && !weather.text.includes("niet gevonden")) {
+        weatherText = weather.text;
+      }
+    } catch {
+      // statische fallback behouden
+    }
+
+    const dayPlanText = Array.isArray(dayPlan) && dayPlan.length > 0
+      ? dayPlan
+          .map((item: any, i: number) => {
+            const time = typeof item?.time === "string" && item.time.trim() ? ` ${item.time}` : "";
+            const text = typeof item?.text === "string" ? item.text : "";
+            return `${i + 1}.${time} ${text}`.trim();
+          })
+          .join("\n")
+      : "Geen specifieke dagplanning; de dag is vrij in te vullen.";
+
+    const systemPrompt = [
+      "Je bent Athena AI, een persoonlijke reisconcierge voor de Cycladen.",
+      "Geef een kort, warm overzicht van de dag voor een gast die de reis volgt.",
+      "Inclusief:",
+      "- Weerbericht (kort, als het beschikbaar is)",
+      "- Geplande activiteiten (uit de dagplanning)",
+      "- Highlights van het eiland/-regio",
+      "- Aanbevolen restaurants of lokale specialiteiten",
+      "",
+      "Antwoord in het Nederlands. Max 150 woorden. Geen markdown, geen opsommingstekens.",
+      "Gebruik een vriendelijke, persoonlijke toon.",
+    ].join("\n");
+
+    const userPrompt = [
+      `Eiland: ${safeIsland}.`,
+      safeDate ? `Datum: ${safeDate}.` : "",
+      `Weer:\n${weatherText}`,
+      `Dagplanning:\n${dayPlanText}`,
+    ].filter(Boolean).join("\n\n");
+
+    let overview = "";
+    const groqResult = await callGroqAI(systemPrompt, userPrompt);
+    if (groqResult && groqResult.content && groqResult.content.trim()) {
+      overview = groqResult.content.trim();
+    } else {
+      const ai = getGeminiClient();
+      if (ai) {
+        try {
+          const response = await ai.models.generateContent({
+            model: getGeminiModel(),
+            contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+          });
+          let rawText = response.text || "";
+          if (!rawText && response.candidates?.[0]?.content?.parts) {
+            rawText = response.candidates[0].content.parts
+              .filter((p: any) => p.text)
+              .map((p: any) => p.text)
+              .join("\n")
+              .trim();
+          }
+          overview = rawText.trim();
+        } catch (gemErr: any) {
+          console.warn("Day overview Gemini error:", gemErr?.message || gemErr);
+        }
+      }
+    }
+
+    if (!overview) {
+      overview = `Welkom op ${safeIsland}${safeDate ? `, ${safeDate}` : ""}! Het belooft een warme, zonnige dag te worden, typisch voor de Cycladen in augustus. Geniet van de geplande activiteiten, verken de charmante straatjes en sluit de dag af met een diner bij een authentieke vissers-taverne. Kalimera!`;
+    }
+
+    res.json({ success: true, overview });
+  } catch (err: any) {
+    console.error("Day overview error:", err?.message || err);
+    res.status(500).json({ success: false, error: "Fout bij het ophalen van het dagoverzicht." });
+  }
+});
+
 app.delete("/api/dayphotos/:id", requireAuth, async (req, res) => {
   try {
     const id = req.params.id;
