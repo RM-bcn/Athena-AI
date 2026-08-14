@@ -31,7 +31,7 @@ execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
 5. Push en open een PR naar `main` met in de beschrijving: wat/waarom, verwijzing
    naar het plan-bestand (`docs/plans/step-XX-*.md`) en de afgevinkte acceptatiecriteria.
 6. Merge NIET zelf; laat de gebruiker reviewen. Na merge wordt de branch verwijderd.
-7. Werk sequentieel: de stappen bouwen op elkaar (01 → 06). Niet parallel werken.
+7. Werk sequentieel: de stappen bouwen op elkaar (01 → 14). Niet parallel werken.
 
 ## Veiligheid
 
@@ -45,8 +45,12 @@ execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
 - UI-teksten: Nederlands (dit wordt stapsgewijs consistent gemaakt in step 06).
 - Geen comments toevoegen tenzij gevraagd. Volg bestaande codeconventies per bestand.
 
-## Status & openstaande zaken (bijgewerkt 13 aug 2026)
+## Status & openstaande zaken (bijgewerkt 14 aug 2026)
 
+- **Steps 01–09 zijn afgerond en live.** Openstaand: 10 (accommodatie bewerken),
+  11 (reisdagboek/stories), 12 (gast-verbod dagplanning-bewerking), 13 (AI
+  dagoverzicht voor gasten), 14 (proactief tegen Groq-modelrotatie). Plannen staan
+  in `docs/plans/step-1X-*.md`; voer ze uit in volgorde 10 → 14.
 - **Step 07 (wachtwoordreset via e-mail) is live** maar verstuurt nog géén e-mail:
   er is nog géén `RESEND_API_KEY` (geen domein geverifieerd). Zonder key logt de
   server de reset-link naar de serverconsole (`[Reset] Reset link: ...`) en verstuurt
@@ -72,7 +76,6 @@ execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
 
 - Google Sheets heeft tabbladen: TripInfo, Stays, Users, CustomBookings, BookingLinks,
   Transports, ChatHistory, Favorites.
-- Gebruikersbeheer: `server/profile-service.ts` (bcrypt), login nog niet server-side
-  (wordt opgelost in step 01).
+- Gebruikersbeheer: `server/profile-service.ts` (bcrypt), login server-side sinds step 01.
 - Voer een plan uit zoals beschreven in `docs/plans/step-XX-*.md`; wijk alleen af na
   overleg. Check de acceptatiecriteria en rapporteer wat wel/niet is gelukt.
