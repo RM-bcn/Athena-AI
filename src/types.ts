@@ -1,4 +1,4 @@
-export type ActiveTab = 'itinerary' | 'quick-help' | 'chat' | 'settings' | 'support' | 'login' | 'not-found' | 'profile';
+export type ActiveTab = 'itinerary' | 'quick-help' | 'chat' | 'settings' | 'support' | 'login' | 'not-found' | 'profile' | 'requests';
 export type ChatSubTab = 'current' | 'history' | 'favorites';
 
 export interface UserAccount {
@@ -160,6 +160,23 @@ export interface FerryResolution {
   options: FerryAlternative[];
   recommendedHotel: string;
   advice: string;
+}
+
+export interface TripRequest {
+  id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  style: string;
+  tripCode: string;
+  stays: IslandStay[];
+  requestedBy: string;
+  requestedAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  decidedBy?: string;
+  decidedAt?: string;
+  notes?: string;
 }
 
 export interface ResetRequestResponse {

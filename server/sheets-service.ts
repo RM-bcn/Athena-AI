@@ -127,7 +127,7 @@ async function ensureTabsExist(sheets: any, spreadsheetId: string) {
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const existingSheetTitles = (meta.data.sheets || []).map((s: any) => s.properties.title);
     
-    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks", "Transports", "ChatHistory", "Favorites"];
+    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks", "Transports", "ChatHistory", "Favorites", "TripRequests"];
     const missingTabs = requiredTabs.filter((title) => !existingSheetTitles.includes(title));
 
     if (missingTabs.length > 0) {
@@ -246,6 +246,7 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
           { properties: { title: "Transports" } },
           { properties: { title: "ChatHistory" } },
           { properties: { title: "Favorites" } },
+          { properties: { title: "TripRequests" } },
         ],
       },
     });
@@ -303,6 +304,12 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
             range: "Transports!A1:L1",
             values: [
               ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId"]
+            ],
+          },
+          {
+            range: "TripRequests!A1:N1",
+            values: [
+              ["ID", "Title", "StartDate", "EndDate", "DurationDays", "Style", "TripCode", "StaysJSON", "RequestedBy", "RequestedAt", "Status", "DecidedBy", "DecidedAt", "Notes"]
             ],
           },
         ],
@@ -945,6 +952,220 @@ export async function loadFavoritesFromSheet(): Promise<SheetFavorite[]> {
         sources,
       };
     });
+}
+
+const TRIP_REQUEST_HEADERS = ["ID", "Title", "StartDate", "EndDate", "DurationDays", "Style", "TripCode", "StaysJSON", "RequestedBy", "RequestedAt", "Status", "DecidedBy", "DecidedAt", "Notes"];
+
+// Ensure the TripRequests sheet has the required columns.
+async function ensureTripRequestHeaders(sheets: any, spreadsheetId: string) {
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "TripRequests!A1:N1",
+    });
+
+    const existingHeaders = (res.data.values && res.data.values[0]) || [];
+    const needsFix = TRIP_REQUEST_HEADERS.some(
+      (header, index) => (existingHeaders[index] || "").trim().toLowerCase() !== header.toLowerCase()
+    );
+
+    if (needsFix) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: "TripRequests!A1",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [TRIP_REQUEST_HEADERS] },
+      });
+      console.log("[Google Sheets] TripRequests sheet headers updated.");
+    }
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not ensure TripRequests headers:", err?.message || err);
+  }
+}
+
+function parseTripRequestRow(row: any[]): any {
+  let stays: any[] = [];
+  try {
+    stays = JSON.parse(row[7] || "[]");
+  } catch {
+    stays = [];
+  }
+  return {
+    id: row[0],
+    title: row[1] || "",
+    startDate: row[2] || "",
+    endDate: row[3] || "",
+    durationDays: Number(row[4]) || 0,
+    style: row[5] || "",
+    tripCode: row[6] || "",
+    stays,
+    requestedBy: row[8] || "",
+    requestedAt: row[9] || "",
+    status: row[10] || "pending",
+    decidedBy: row[11] || "",
+    decidedAt: row[12] || "",
+    notes: row[13] || "",
+  };
+}
+
+// Store a new trip proposal (Status=pending) in the TripRequests tab. The
+// active trip code stays unchanged until the owner approves the request.
+export async function createTripRequest(input: { trip: any; requestedBy: string }): Promise<any> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google Sheets is niet geconfigureerd.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+  await ensureTripRequestHeaders(sheets, spreadsheetId);
+
+  const trip = input.trip || {};
+  const start = new Date(trip.startDate);
+  const end = new Date(trip.endDate);
+  const id = `REQ-${Date.now()}`;
+  const now = new Date().toISOString();
+  const durationDays =
+    trip.durationDays ||
+    (isNaN(start.getTime()) || isNaN(end.getTime())
+      ? 0
+      : Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+
+  const row = [
+    id,
+    trip.title || "Nieuwe reis",
+    trip.startDate || "",
+    trip.endDate || "",
+    String(durationDays),
+    trip.style || "",
+    trip.id || id,
+    JSON.stringify(trip.stays || []),
+    input.requestedBy || "",
+    now,
+    "pending",
+    "",
+    "",
+    "",
+  ];
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: "TripRequests!A:N",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [row] },
+  });
+
+  return {
+    id,
+    title: trip.title || "Nieuwe reis",
+    startDate: trip.startDate || "",
+    endDate: trip.endDate || "",
+    durationDays,
+    style: trip.style || "",
+    tripCode: trip.id || id,
+    stays: trip.stays || [],
+    requestedBy: input.requestedBy || "",
+    requestedAt: now,
+    status: "pending",
+    decidedBy: "",
+    decidedAt: "",
+    notes: "",
+  };
+}
+
+// Load trip requests from the TripRequests tab, optionally filtered by status.
+export async function getTripRequests(status?: string): Promise<any[]> {
+  const auth = getOAuthClient();
+  if (!auth) return [];
+
+  try {
+    const { spreadsheetId } = await getOrCreateSpreadsheet();
+    const sheets = google.sheets({ version: "v4", auth });
+    await ensureTabsExist(sheets, spreadsheetId);
+    await ensureTripRequestHeaders(sheets, spreadsheetId);
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "TripRequests!A2:N500",
+    });
+
+    const rows = res.data.values || [];
+    const requests = rows.filter((row: any) => row && row[0]).map((row: any) => parseTripRequestRow(row));
+    return status ? requests.filter((r) => r.status === status) : requests;
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not load trip requests:", err?.message || err);
+    return [];
+  }
+}
+
+export async function getTripRequestById(id: string): Promise<any | null> {
+  const all = await getTripRequests();
+  return all.find((r) => r.id === id) || null;
+}
+
+// Set the status (approved/rejected) of a trip request, recording who decided.
+export async function updateTripRequestStatus(id: string, status: string, decidedBy: string, notes = ""): Promise<any | null> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google Sheets is niet geconfigureerd.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+  await ensureTripRequestHeaders(sheets, spreadsheetId);
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "TripRequests!A2:N500",
+  });
+
+  const rows = res.data.values || [];
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === id) {
+      const rowNumber = i + 2; // 1-based sheet row, skipping the header
+      const decidedAt = new Date().toISOString();
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `TripRequests!K${rowNumber}:N${rowNumber}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [[status, decidedBy, decidedAt, notes]] },
+      });
+      return getTripRequestById(id);
+    }
+  }
+  return null;
+}
+
+// Append a new member to the Users tab. New members get Role=member and the
+// active trip code, so they can edit the trip and submit trip requests.
+export async function createUserInSheet(input: { username: string; email: string; name: string; passwordHash: string }): Promise<any | null> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google Sheets is niet geconfigureerd.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+  await ensureUserSheetHeaders(sheets, spreadsheetId);
+
+  const updatedAt = new Date().toISOString();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: "Users!A:I",
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[
+        input.username,
+        input.email,
+        input.name,
+        "member",
+        "ATH-2026",
+        input.name || input.username,
+        "",
+        input.passwordHash,
+        updatedAt,
+      ]],
+    },
+  });
+
+  return getUserFromSheet(input.email, input.username);
 }
 
 

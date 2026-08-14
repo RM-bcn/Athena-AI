@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActiveTab, UserAccount } from '../types';
-import { Sailboat, MessageSquare, Calendar, HelpCircle, Plus, Settings, LifeBuoy, LogOut, LogIn, Key, User, X } from 'lucide-react';
+import { Sailboat, MessageSquare, Calendar, HelpCircle, Plus, Settings, LifeBuoy, LogOut, LogIn, Key, User, X, Inbox } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -12,6 +12,8 @@ interface SidebarProps {
   onSignOut: () => void;
   isOpen?: boolean;
   onClose?: () => void;
+  isOwner?: boolean;
+  pendingRequestCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -24,6 +26,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSignOut,
   isOpen = false,
   onClose,
+  isOwner = false,
+  pendingRequestCount = 0,
 }) => {
   const handleNavClick = (tab?: ActiveTab, action?: () => void) => {
     if (tab) setActiveTab(tab);
@@ -151,6 +155,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <HelpCircle className="w-4 h-4" />
             Quick Help
+          </button>
+        )}
+
+        {/* Reis-aanvragen - admin panel, only for the owner */}
+        {isOwner && (
+          <button
+            onClick={() => handleNavClick('requests')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
+              activeTab === 'requests'
+                ? 'bg-[#005BAE] text-white shadow-sm'
+                : 'text-[#404752] hover:bg-[#f0f4f9]'
+            }`}
+          >
+            <Inbox className="w-4 h-4" />
+            Reis-aanvragen
+            {pendingRequestCount > 0 && (
+              <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">
+                {pendingRequestCount}
+              </span>
+            )}
           </button>
         )}
       </nav>

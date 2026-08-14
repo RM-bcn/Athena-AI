@@ -18,7 +18,13 @@ import {
   loadChatHistoryFromSheet,
   saveFavoritesToSheet,
   loadFavoritesFromSheet,
+  createTripRequest,
+  getTripRequests,
+  getTripRequestById,
+  updateTripRequestStatus,
+  createUserInSheet,
 } from "./server/sheets-service.js";
+import { validateTrip } from "./server/trip-validation.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
 import { SEED_USERS } from "./server/seed-users.js";
 import { getWeather, searchWeb, findRestaurants, getCityTips } from "./server/live-providers.js";
@@ -136,6 +142,93 @@ app.post("/api/sheets/save", requireAuth, async (req, res) => {
       success: false,
       error: err.message || "Fout bij opslaan naar Google Sheets."
     });
+  }
+});
+
+// API: Reis-aanvragen — member stelt een nieuwe reis voor (pending), de owner
+// keurt later goed (dan wordt het de actieve reis) of keurt af.
+app.post("/api/trips/request", requireAuth, async (req, res) => {
+  try {
+    const { trip } = req.body || {};
+    const validation = validateTrip(trip);
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error || "Ongeldige reis-aanvraag." });
+    }
+    const requestedBy = (req as any).authEmail || "";
+    const request = await createTripRequest({ trip, requestedBy });
+    res.json({ success: true, request });
+  } catch (err: any) {
+    console.error("Trip request error:", err?.message || err);
+    res.status(500).json({ success: false, error: err?.message || "Fout bij het indienen van de reis-aanvraag." });
+  }
+});
+
+app.get("/api/trips/requests", requireAuth, async (req, res) => {
+  try {
+    const role = (req as any).authRole;
+    const email = (req as any).authEmail || "";
+    let requests = await getTripRequests();
+    if (role !== "owner") {
+      requests = requests.filter((r) => (r.requestedBy || "").toLowerCase() === email.toLowerCase());
+    }
+    res.json({ success: true, requests });
+  } catch (err: any) {
+    console.error("Trip requests load error:", err?.message || err);
+    res.status(500).json({ success: false, error: "Fout bij het laden van reis-aanvragen." });
+  }
+});
+
+app.post("/api/trips/requests/:id/approve", requireAuth, requireOwner, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const request = await getTripRequestById(id);
+    if (!request) {
+      return res.status(404).json({ success: false, error: "Reis-aanvraag niet gevonden." });
+    }
+    if (request.status !== "pending") {
+      return res.status(400).json({ success: false, error: "Alleen lopende aanvragen kunnen worden goedgekeurd." });
+    }
+
+    const trip = {
+      id: request.tripCode || "ATH-2026",
+      title: request.title || "Cyclades Odyssey",
+      startDate: request.startDate,
+      endDate: request.endDate,
+      durationDays: request.durationDays,
+      style: request.style || "Eilandhoppen",
+      stays: request.stays || [],
+    };
+    // Goedgekeurde aanvraag wordt de actieve reis: boekingen/links/transport
+    // worden gereset zodat de nieuwe reis in de sheet en UI het uitgangspunt is.
+    await saveTripToSheet(trip, [], {}, []);
+
+    const decidedBy = (req as any).authEmail || "";
+    const updated = await updateTripRequestStatus(id, "approved", decidedBy);
+    res.json({ success: true, request: updated });
+  } catch (err: any) {
+    console.error("Trip approve error:", err?.message || err);
+    res.status(500).json({ success: false, error: err?.message || "Fout bij het goedkeuren van de reis-aanvraag." });
+  }
+});
+
+app.post("/api/trips/requests/:id/reject", requireAuth, requireOwner, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const request = await getTripRequestById(id);
+    if (!request) {
+      return res.status(404).json({ success: false, error: "Reis-aanvraag niet gevonden." });
+    }
+    if (request.status !== "pending") {
+      return res.status(400).json({ success: false, error: "Alleen lopende aanvragen kunnen worden afgekeurd." });
+    }
+
+    const notes = typeof req.body?.notes === "string" ? req.body.notes.trim() : "";
+    const decidedBy = (req as any).authEmail || "";
+    const updated = await updateTripRequestStatus(id, "rejected", decidedBy, notes);
+    res.json({ success: true, request: updated });
+  } catch (err: any) {
+    console.error("Trip reject error:", err?.message || err);
+    res.status(500).json({ success: false, error: err?.message || "Fout bij het afkeuren van de reis-aanvraag." });
   }
 });
 
@@ -330,18 +423,19 @@ function verifySignedPayload(token: string, expectedType?: string): Record<strin
   return parsed;
 }
 
-function signToken(email: string): { token: string; expiresAt: number } {
+function signToken(email: string, role = "member"): { token: string; expiresAt: number } {
   const expiresAt = Date.now() + SESSION_TTL_MS;
-  const token = signSignedPayload({ email, typ: "session", exp: expiresAt });
+  const token = signSignedPayload({ email, role, typ: "session", exp: expiresAt });
   return { token, expiresAt };
 }
 
-function verifyToken(token: string): { email: string } | null {
+function verifyToken(token: string): { email: string; role: string } | null {
   const parsed = verifySignedPayload(token);
   if (!parsed || typeof parsed.email !== "string") return null;
   // Backward compatible: tokens van vóór het type-veld hebben geen "typ".
   if (parsed.typ !== undefined && parsed.typ !== "session") return null;
-  return { email: parsed.email };
+  // Backward compatible: tokens zonder rol worden als member behandeld.
+  return { email: parsed.email, role: typeof parsed.role === "string" ? parsed.role : "member" };
 }
 
 function signResetToken(email: string): { token: string; expiresAt: number } {
@@ -365,6 +459,15 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
     return res.status(401).json({ success: false, error: "Niet ingelogd of sessie verlopen." });
   }
   (req as any).authEmail = payload.email;
+  (req as any).authRole = payload.role;
+  next();
+}
+
+function requireOwner(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const role = (req as any).authRole;
+  if (role !== "owner") {
+    return res.status(403).json({ success: false, error: "Geen beheerderrechten voor deze actie." });
+  }
   next();
 }
 
@@ -423,7 +526,8 @@ app.post("/api/login", async (req, res) => {
       }
     }
 
-    const { token, expiresAt } = signToken(identifier);
+    const role = user?.role || seedUser?.role || "member";
+    const { token, expiresAt } = signToken(identifier, role);
     const safeUser = {
       username: user?.username || seedUser?.username || "",
       email: user?.email || seedUser?.email || "",
@@ -431,13 +535,111 @@ app.post("/api/login", async (req, res) => {
       nickname: user?.nickname || seedUser?.nickname || "",
       avatar: seedUser?.avatar || "",
       avatarUrl: user?.avatarUrl || seedUser?.avatarUrl || "",
-      role: user?.role || seedUser?.role || "member",
+      role,
       tripCode: user?.tripCode || seedUser?.tripCode || "ATH-2026",
       updatedAt: user?.updatedAt || "",
     };
     return res.json({ success: true, user: safeUser, token, expiresAt });
   } catch (err: any) {
     console.error("[Login] Error:", err?.message || err);
+    return res.status(500).json({ success: false, error: "Er is een onverwachte serverfout opgetreden." });
+  }
+});
+
+// API: Registratie ("lid worden") — nieuwe leden krijgen role=member, worden
+// in de Users-sheet opgeslagen en zijn daarna direct ingelogd.
+async function findExistingUserIdentifier(username: string, email: string): Promise<"username" | "email" | null> {
+  let sheetUser: any = null;
+  if (isGoogleAuthConfigured()) {
+    try {
+      sheetUser = await getUserFromSheet(email, username);
+    } catch (err: any) {
+      console.warn("[Register] Sheets lookup skipped:", err?.message || err);
+    }
+  }
+  if (sheetUser) {
+    return (sheetUser.username || "").toLowerCase() === username.toLowerCase() ? "username" : "email";
+  }
+  const seedUser = SEED_USERS.find(
+    (u) =>
+      u.username.toLowerCase() === username.toLowerCase() ||
+      u.email.toLowerCase() === email.toLowerCase()
+  );
+  if (seedUser) {
+    return seedUser.username.toLowerCase() === username.toLowerCase() ? "username" : "email";
+  }
+  return null;
+}
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { username, email, name, password } = req.body || {};
+    const uname = typeof username === "string" ? username.trim() : "";
+    const eml = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const fullName = typeof name === "string" ? name.trim() : "";
+    const pass = typeof password === "string" ? password : "";
+
+    if (!uname || !eml || !fullName || !pass) {
+      return res.status(400).json({ success: false, error: "Vul gebruikersnaam, naam, e-mailadres en wachtwoord in." });
+    }
+    if (pass.length < 8) {
+      return res.status(400).json({ success: false, error: "Wachtwoord moet minimaal 8 tekens bevatten." });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(eml)) {
+      return res.status(400).json({ success: false, error: "Ongeldig e-mailadres." });
+    }
+
+    const existing = await findExistingUserIdentifier(uname, eml);
+    if (existing === "username") {
+      return res.status(409).json({ success: false, error: "Deze gebruikersnaam is al in gebruik." });
+    }
+    if (existing === "email") {
+      return res.status(409).json({ success: false, error: "Dit e-mailadres is al in gebruik." });
+    }
+
+    const salt = await genSalt(10);
+    const passwordHash = await hash(pass, salt);
+
+    let createdUser: any = null;
+    if (isGoogleAuthConfigured()) {
+      try {
+        createdUser = await createUserInSheet({ username: uname, email: eml, name: fullName, passwordHash });
+      } catch (err: any) {
+        console.warn("[Register] Sheets create skipped:", err?.message || err);
+      }
+    }
+
+    // Dev-fallback: zonder Sheets wordt de gebruiker in-memory toegevoegd zodat
+    // de flow lokaal testbaar blijft (zelfde patroon als de reset-password flow).
+    if (!createdUser) {
+      SEED_USERS.push({
+        username: uname,
+        email: eml,
+        name: fullName,
+        nickname: fullName || uname,
+        avatar: "",
+        avatarUrl: "",
+        role: "member",
+        tripCode: "ATH-2026",
+        passwordHash,
+      });
+    }
+
+    const { token, expiresAt } = signToken(eml, "member");
+    const safeUser = {
+      username: createdUser?.username || uname,
+      email: createdUser?.email || eml,
+      name: createdUser?.name || fullName,
+      nickname: createdUser?.nickname || fullName || uname,
+      avatar: "",
+      avatarUrl: createdUser?.avatarUrl || "",
+      role: "member",
+      tripCode: "ATH-2026",
+      updatedAt: createdUser?.updatedAt || new Date().toISOString(),
+    };
+    return res.json({ success: true, user: safeUser, token, expiresAt });
+  } catch (err: any) {
+    console.error("[Register] Error:", err?.message || err);
     return res.status(500).json({ success: false, error: "Er is een onverwachte serverfout opgetreden." });
   }
 });
