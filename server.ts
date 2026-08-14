@@ -422,14 +422,18 @@ app.post("/api/dayphotos/caption", requireAuth, async (req, res) => {
 // API: AI-dagoverzicht voor gasten (non-chat, één-klik-samenvatting).
 app.post("/api/dayoverview", async (req, res) => {
   try {
-    const { island, date, dayPlan } = req.body || {};
+    const { island, date, dayPlan, accommodation, area } = req.body || {};
     const safeIsland = typeof island === "string" && island.trim() ? island.trim() : "de Cycladen";
     const safeDate = typeof date === "string" && date.trim() ? date.trim() : "";
+    const stayArea = typeof area === "string" && area.trim() ? area.trim() : "";
+    const accommodationName = typeof accommodation === "string" && accommodation.trim() ? accommodation.trim() : "";
 
-    // Weer ophalen via de bestaande live-provider; bij fout statische fallback.
+    // Weer ophalen via de specifiekere verblijfslocatie (bijv. Glyfada), anders
+    // het eiland; bij fout statische fallback.
     let weatherText = "Warm en zonnig, typisch voor de Cycladen in augustus";
     try {
-      const weather = await getWeather(safeIsland === "de Cycladen" ? "Naxos" : safeIsland);
+      const weatherQuery = stayArea || (safeIsland === "de Cycladen" ? "Naxos" : safeIsland);
+      const weather = await getWeather(weatherQuery);
       if (weather && weather.text && !weather.text.startsWith("Geen") && !weather.text.startsWith("Weer niet") && !weather.text.includes("niet gevonden")) {
         weatherText = weather.text;
       }
@@ -449,19 +453,25 @@ app.post("/api/dayoverview", async (req, res) => {
 
     const systemPrompt = [
       "Je bent Athena AI, een persoonlijke reisconcierge voor de Cycladen.",
-      "Geef een kort, warm overzicht van de dag voor een gast die de reis volgt.",
+      "Geef een kort, warm overzicht van de dag voor een gast die de reis van Dennis & Joyce volgt.",
+      "De reizigers zijn Dennis & Joyce; de gast leest mee. Beschrijf de dag dus als hun dag, niet als de dag van de lezer. Gebruik 'zij', 'ze' of 'Dennis & Joyce' in plaats van 'je' of 'jij'.",
       "Inclusief:",
       "- Weerbericht (kort, als het beschikbaar is)",
       "- Geplande activiteiten (uit de dagplanning)",
-      "- Highlights van het eiland/-regio",
-      "- Aanbevolen restaurants of lokale specialiteiten",
+      "- Highlights van de verblijfslocatie/regio (gebruik de buurt/wijk als die bekend is, bijvoorbeeld Glyfada)",
+      "- Aanbevolen restaurants of lokale specialiteiten (zo dicht mogelijk bij de verblijfslocatie)",
       "",
       "Antwoord in het Nederlands. Max 150 woorden. Geen markdown, geen opsommingstekens.",
       "Gebruik een vriendelijke, persoonlijke toon.",
     ].join("\n");
 
+    const stayLine = [
+      accommodationName ? `Accommodatie: ${accommodationName}.` : "",
+      stayArea ? `Verblijf in: ${stayArea} (${safeIsland}).` : `Eiland: ${safeIsland}.`,
+    ].filter(Boolean).join(" ");
+
     const userPrompt = [
-      `Eiland: ${safeIsland}.`,
+      stayLine,
       safeDate ? `Datum: ${safeDate}.` : "",
       `Weer:\n${weatherText}`,
       `Dagplanning:\n${dayPlanText}`,
@@ -495,7 +505,7 @@ app.post("/api/dayoverview", async (req, res) => {
     }
 
     if (!overview) {
-      overview = `Welkom op ${safeIsland}${safeDate ? `, ${safeDate}` : ""}! Het belooft een warme, zonnige dag te worden, typisch voor de Cycladen in augustus. Geniet van de geplande activiteiten, verken de charmante straatjes en sluit de dag af met een diner bij een authentieke vissers-taverne. Kalimera!`;
+      overview = `Dennis & Joyce zijn vandaag${safeDate ? ` (${safeDate})` : ""} in ${stayArea ? `${stayArea}, ` : ""}${safeIsland}. Het belooft een warme, zonnige dag te worden, typisch voor de Cycladen in augustus. Geniet mee van de geplande activiteiten, de charmante straatjes en een diner bij een authentieke vissers-taverne. Kalimera!`;
     }
 
     res.json({ success: true, overview });

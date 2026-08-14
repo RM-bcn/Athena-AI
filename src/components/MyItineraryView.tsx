@@ -241,12 +241,16 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
           date = '';
         }
       }
+      const linkInfo = getLinkInfo(stay);
+      const matchedBooking = linkInfo.matchedBooking || linkInfo.suggestedBooking;
       const res = await fetch('/api/dayoverview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           island: stay.island,
           date,
+          accommodation: matchedBooking?.name || stay.accommodationName || '',
+          area: matchedBooking?.location || '',
           dayPlan: plan?.items || [],
         }),
       });
