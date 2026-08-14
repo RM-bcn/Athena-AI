@@ -130,8 +130,8 @@ export const StoriesModal: React.FC<StoriesModalProps> = ({ isOpen, photos, onCl
 
         {/* Voortgangsbalk */}
         {photos.length > 1 && (
-          <div className="absolute top-5 left-1/2 -translate-x-1/2 flex gap-1.5">
-            {photos.map((p, i) => (
+          <div className="absolute top-5 left-1/2 -translate-x-1/2 flex gap-1.5 max-w-[55vw] overflow-hidden">
+            {photos.slice(0, 8).map((p, i) => (
               <div
                 key={p.id}
                 className={`h-1 rounded-full transition-all ${

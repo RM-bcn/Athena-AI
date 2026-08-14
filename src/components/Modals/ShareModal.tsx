@@ -80,7 +80,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, tripCod
           </h4>
           <div className="space-y-2">
             {DEFAULT_USERS.map((user) => (
-              <div key={user.username} className="p-3 bg-[#f0f4f9] rounded-xl flex items-center justify-between">
+              <div key={user.username} className="p-3 bg-[#f0f4f9] rounded-xl flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full bg-[#005BAE] text-white overflow-hidden flex-shrink-0">
                     <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />

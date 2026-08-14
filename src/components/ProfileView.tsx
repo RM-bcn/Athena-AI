@@ -205,7 +205,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUser, onUpdateU
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-[#005BAE] text-white flex items-center justify-center shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                className="absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-[#005BAE] text-white flex items-center justify-center shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                 title="Profielfoto wijzigen"
               >
                 <Camera className="w-4 h-4" />
@@ -338,7 +338,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUser, onUpdateU
             <button
               type="submit"
               disabled={isSaving}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#005BAE] text-white font-['Inter'] font-semibold text-sm hover:brightness-110 active:scale-95 disabled:opacity-60 transition-all shadow-md cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-xl bg-[#005BAE] text-white font-['Inter'] font-semibold text-sm hover:brightness-110 active:scale-95 disabled:opacity-60 transition-all shadow-md cursor-pointer"
             >
               {isSaving ? (
                 <>

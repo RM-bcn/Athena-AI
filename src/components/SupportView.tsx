@@ -17,14 +17,14 @@ export const SupportView: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="p-6 rounded-[24px] border border-[#e1efff] bg-white shadow-sm hover:border-[#005BAE] transition-all">
             <div className="w-10 h-10 rounded-full bg-[#f0f4f9] text-[#005BAE] flex items-center justify-center mb-4">
               <PhoneCall className="w-5 h-5" />
             </div>
             <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d]">Haven &amp; Veerdienst</h3>
             <p className="font-['Inter'] text-xs text-[#717783] mt-1 mb-4">Direct contact met de afvaartdesks van de Egeïsche veerboten</p>
-            <a href="tel:+302104100000" className="text-[#005BAE] font-['Inter'] text-sm font-bold flex items-center gap-1 hover:underline">
+            <a href="tel:+302104100000" className="text-[#005BAE] font-['Inter'] text-sm font-bold flex items-center gap-1 hover:underline break-words">
               +30 210 410 0000 <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
@@ -35,7 +35,7 @@ export const SupportView: React.FC = () => {
             </div>
             <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#0b1d2d]">Concierge Balie</h3>
             <p className="font-['Inter'] text-xs text-[#717783] mt-1 mb-4">Prioritaire ondersteuning voor reisplanaanpassingen</p>
-            <a href="mailto:concierge@athena-ai.studio" className="text-[#005BAE] font-['Inter'] text-sm font-bold flex items-center gap-1 hover:underline">
+            <a href="mailto:concierge@athena-ai.studio" className="text-[#005BAE] font-['Inter'] text-sm font-bold flex items-center gap-1 hover:underline break-words">
               concierge@athena-ai.studio <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>

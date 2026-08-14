@@ -56,7 +56,7 @@ export const MissedFerryModal: React.FC<MissedFerryModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[28px] max-w-xl w-full p-8 shadow-2xl border border-[#ba1a1a]/30 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-[28px] max-w-xl w-full p-6 md:p-8 shadow-2xl border border-[#ba1a1a]/30 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-6 right-6 p-2 text-[#717783] hover:text-[#005BAE] rounded-full hover:bg-[#f0f4f9] transition-colors cursor-pointer"
@@ -204,7 +204,7 @@ export const MissedFerryModal: React.FC<MissedFerryModalProps> = ({
             </div>
           )}
 
-          <div className="p-4 bg-[#f0f4f9] rounded-2xl flex items-center justify-between gap-3">
+          <div className="p-4 bg-[#f0f4f9] rounded-2xl flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <MapPin className="w-5 h-5 text-[#005BAE]" />
               <div>

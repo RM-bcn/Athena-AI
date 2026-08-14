@@ -513,11 +513,11 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       </section>
 
       {/* Stay Schedule Breakdown Banner ("Wanneer blijf ik waar?") */}
-      <section className="mb-8 bg-[#f0f4f9] rounded-[24px] p-6 border border-[#005BAE]/20 shadow-sm">
+      <section className="mb-8 bg-[#f0f4f9] rounded-[24px] p-4 sm:p-6 border border-[#005BAE]/20 shadow-sm">
         <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-[#005BAE]" />
-            <h2 className="font-[#Plus_Jakarta_Sans'] font-bold text-lg text-[#001a33]">
+            <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#001a33]">
               Verblijfsplanning — Eiland Stopt & Hotels
             </h2>
           </div>
@@ -676,7 +676,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             return (
               <div
                 key={stay.id}
-                className={`space-y-4 p-6 rounded-[28px] border transition-all ${
+                className={`space-y-4 p-4 sm:p-6 rounded-[28px] border transition-all ${
                   isStayActive
                     ? 'border-[#005BAE]/40 bg-white shadow-md'
                     : 'border-[#e1efff] bg-white/70'
@@ -890,7 +890,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         <div className="lg:col-span-4 flex flex-col gap-6">
           {/* Accommodation Panel */}
           <div className="bg-white rounded-[24px] overflow-hidden border border-[#e1efff] shadow-sm">
-            <div className="p-6 bg-white border-b border-[#f0f4f9] flex items-center justify-between">
+            <div className="p-4 sm:p-6 bg-white border-b border-[#f0f4f9] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Hotel className="w-5 h-5 text-[#005BAE]" />
                 <span className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d]">
@@ -907,7 +907,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             </div>
 
             {accommodationsOpen && (
-              <div className="p-6 pt-4 space-y-4">
+              <div className="p-4 sm:p-6 pt-4 space-y-4">
                 {/* Current Trip Stays Accommodations */}
                 {currentTrip.stays.map(stay => {
                   const linkInfo = getLinkInfo(stay);
@@ -1081,7 +1081,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             </button>
 
             {tipsOpen && (
-              <div className="p-6 pt-0 space-y-4">
+              <div className="p-4 sm:p-6 pt-0 space-y-4">
                 <ul className="space-y-3">
                   {tipsChecklist.map(tip => (
                     <li
@@ -1160,7 +1160,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         </div>
 
         {reisdagboekOpen && (
-          <div className="p-6 pt-4">
+          <div className="p-4 sm:p-6 pt-4">
             {dayPhotos.length === 0 ? (
               <div className="py-10 flex flex-col items-center justify-center gap-3 text-center">
                 <Images className="w-10 h-10 text-[#c0c7d3]" />
@@ -1255,7 +1255,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       {showStoriesButton && (
         <button
           onClick={() => setStoriesPhotos(storiesDayPhotos)}
-          className="fixed bottom-6 right-6 z-40 px-5 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-['Inter'] text-sm font-bold hover:brightness-110 shadow-2xl active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 px-4 py-2.5 sm:px-5 sm:py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-['Inter'] text-sm font-bold hover:brightness-110 shadow-2xl active:scale-95 transition-all cursor-pointer flex items-center gap-2"
           title="Bekijk de foto's van vandaag fullscreen"
         >
           <Play className="w-4 h-4 fill-current" />

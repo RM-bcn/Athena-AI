@@ -307,13 +307,13 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
             <option value="checkin">Inchecken hotel</option>
             <option value="checkout">Uitchecken hotel</option>
           </select>
-          <div className="relative flex-shrink-0">
+          <div className="relative w-full sm:w-auto sm:flex-shrink-0">
             <Clock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#717783] pointer-events-none" />
             <input
               type="time"
               value={newItemTime}
               onChange={(e) => setNewItemTime(e.target.value)}
-              className="pl-8 pr-2 py-2.5 bg-[#f7f9ff] border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-xs text-[#001a33] focus:outline-none focus:ring-2 focus:ring-[#005BAE]/30"
+              className="pl-8 pr-2 py-2.5 w-full sm:w-auto bg-[#f7f9ff] border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-xs text-[#001a33] focus:outline-none focus:ring-2 focus:ring-[#005BAE]/30"
               title="Optionele tijd (bijv. 09:30)"
             />
           </div>

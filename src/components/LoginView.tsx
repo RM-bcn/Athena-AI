@@ -364,7 +364,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </button>
           </section>
         ) : (
-        <div className="grid md:grid-cols-2 gap-8 items-stretch">
+        <div className="grid lg:grid-cols-2 gap-8 items-stretch">
           {/* Section 1: Travel Code Access (Follow a Journey) */}
           <section className="bg-white/90 backdrop-blur-md rounded-2xl p-8 md:p-10 shadow-sm hover:shadow-md transition-all border border-[#f0f4f9] flex flex-col justify-between group">
             <div className="space-y-6">
@@ -392,8 +392,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
                       setCode(e.target.value.toUpperCase());
                       if (errorMsg) setErrorMsg('');
                     }}
-                    placeholder="Voer reiscode in (bijv. ATH-2026)"
-                    className="w-full pl-12 pr-4 py-4 bg-[#F0F4F9] border border-[#0B1D2D]/10 rounded-xl font-['Plus_Jakarta_Sans'] text-base font-semibold text-[#0B1D2D] focus:ring-2 focus:ring-[#005BAE] focus:outline-none uppercase tracking-widest transition-all"
+                    placeholder="Reiscode (bijv. ATH-2026)"
+                    className="w-full pl-12 pr-4 py-4 bg-[#F0F4F9] border border-[#0B1D2D]/10 rounded-xl font-['Plus_Jakarta_Sans'] text-base font-semibold text-[#0B1D2D] focus:ring-2 focus:ring-[#005BAE] focus:outline-none uppercase transition-all"
                   />
                 </div>
 
@@ -521,7 +521,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                       setShowRegister(false);
                       setErrorMsg('');
                     }}
-                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold cursor-pointer"
+                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold py-2 cursor-pointer"
                   >
                     Terug naar inloggen
                   </button>
@@ -564,7 +564,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsForgotPasswordOpen(true)}
-                      className="text-[#E2725B] hover:underline font-semibold cursor-pointer text-xs"
+                      className="text-[#E2725B] hover:underline font-semibold py-2 cursor-pointer text-xs"
                     >
                       Wachtwoord vergeten?
                     </button>
@@ -585,7 +585,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                       setShowRegister(true);
                       setErrorMsg('');
                     }}
-                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold cursor-pointer"
+                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold py-2 cursor-pointer"
                   >
                     Nog geen account? <span className="text-[#E2725B] font-bold">Word lid</span>
                   </button>
@@ -626,7 +626,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 setResetSuccessMsg('');
                 setResetErrorMsg('');
               }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

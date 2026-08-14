@@ -118,7 +118,7 @@ export const EditStayModal: React.FC<EditStayModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-[#0b1d2d] mb-1">Aankomst Datum</label>
               <input
