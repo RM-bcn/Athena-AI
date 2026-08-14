@@ -21,7 +21,7 @@ dat door een agent uitgevoerd kan worden.
 
 | Step | Plan-bestand | Kort doel |
 |------|--------------|-----------|
-| 09 | [step-09-rollen-rechten.md](step-09-rollen-rechten.md) | Rollen & rechten owner vs member server-side én client-side |
+| 09 | [step-09-rollen-rechten.md](step-09-rollen-rechten.md) | Rollen (owner=admin, member=editor), reis-aanvragen met goedkeuring, registratie ("lid worden") |
 
 Waarom sequentieel: de stappen raken deels dezelfde bestanden (`server.ts`, `App.tsx`,
 `MyItineraryView.tsx`, `LoginView.tsx`). Parallel werken geeft merge-conflicten.
