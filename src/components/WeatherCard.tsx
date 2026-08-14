@@ -184,7 +184,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ trip, variant = 'banne
   }
 
   return (
-    <div className="bg-[#005BAE] text-white rounded-[24px] p-6 shadow-lg relative overflow-hidden">
+    <div className="bg-[#005BAE] text-white rounded-[24px] p-4 sm:p-6 shadow-lg relative overflow-hidden">
       <div className="relative z-10">
         <div className="flex justify-between items-center mb-4">
           <div className="flex flex-col">
