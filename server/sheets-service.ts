@@ -289,9 +289,9 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
             ],
           },
           {
-            range: "CustomBookings!A1:I1",
+            range: "CustomBookings!A1:M1",
             values: [
-              ["ID", "Name", "Location", "Status", "Island", "PricePerNight", "CheckIn", "CheckOut", "Image"]
+              ["ID", "Name", "Location", "Status", "Island", "PricePerNight", "CheckIn", "CheckOut", "Image", "Address", "CheckInTime", "CheckOutTime", "Link"]
             ],
           },
           {
@@ -448,7 +448,7 @@ export async function saveTripToSheet(
     });
 
     // Format Custom Bookings rows
-    const bookingHeaders = ["ID", "Name", "Location", "Status", "Island", "PricePerNight", "CheckIn", "CheckOut", "Image"];
+    const bookingHeaders = ["ID", "Name", "Location", "Status", "Island", "PricePerNight", "CheckIn", "CheckOut", "Image", "Address", "CheckInTime", "CheckOutTime", "Link"];
     const bookingRows = validBookings.map((b: any) => [
       b.id,
       b.name,
@@ -458,7 +458,11 @@ export async function saveTripToSheet(
       b.pricePerNight || "",
       b.checkIn || "",
       b.checkOut || "",
-      b.image || ""
+      b.image || "",
+      b.address || "",
+      b.checkInTime || "",
+      b.checkOutTime || "",
+      b.link || ""
     ]);
     const bookingValues = [bookingHeaders, ...bookingRows];
 
@@ -505,7 +509,7 @@ export async function saveTripToSheet(
         data: [
           { range: "TripInfo!A1:G2", values: tripInfoValues },
           { range: `Stays!A1:G${Math.max(staysValues.length, 2)}`, values: staysValues },
-          { range: `CustomBookings!A1:I${Math.max(bookingValues.length, 2)}`, values: bookingValues },
+          { range: `CustomBookings!A1:M${Math.max(bookingValues.length, 2)}`, values: bookingValues },
           { range: `BookingLinks!A1:B${Math.max(linkValues.length, 2)}`, values: linkValues },
           { range: `Transports!A1:L${Math.max(transportValues.length, 2)}`, values: transportValues }
         ]
@@ -559,7 +563,7 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
 
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:I50", "BookingLinks!A2:B50", "Transports!A2:L100"],
+      ranges: ["TripInfo!A2:G2", "Stays!A2:G20", "CustomBookings!A2:M50", "BookingLinks!A2:B50", "Transports!A2:L100"],
     });
 
     const valueRanges = res.data.valueRanges || [];
@@ -603,6 +607,10 @@ export async function loadTripFromSheet(): Promise<{ trip: any; customBookings: 
         checkIn: row[6] || "",
         checkOut: row[7] || "",
         image: row[8] || "",
+        address: row[9] || "",
+        checkInTime: row[10] || "",
+        checkOutTime: row[11] || "",
+        link: row[12] || "",
       }));
 
 const stayBookingLinks = linkRows
