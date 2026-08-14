@@ -22,16 +22,13 @@ dat door een agent uitgevoerd kan worden.
 - [x] Step 12 — gasten geen dagplanning-bewerking → [done](done/step-12-gast-verbod-dagplanning.md)
 - [x] Step 13 — AI-dagoverzicht voor gasten → [done](done/step-13-gast-ai-dagoverzicht.md)
 - [x] Step 14 — proactief tegen Groq-modelrotatie → [done](done/step-14-groq-model-rotatie.md)
+- [x] Step 15 — mobiele responsiveness: kritieke fixes → [done](done/step-15-mobiel-responsive-kritiek.md)
+- [x] Step 16 — mobiele responsive polijsting → [done](done/step-16-mobiel-responsive-polijsting.md)
 
 ## Vervolgstappen (openstaand)
 
-| Step | Plan-bestand | Kort doel |
-|------|--------------|-----------|
-| 15 | [step-15-mobiel-responsive-kritiek.md](step-15-mobiel-responsive-kritiek.md) | Mobiel: kritieke fixes (modals scrollbaar, timeline, overflows header/knoppen) |
-| 16 | [step-16-mobiel-responsive-polijsting.md](step-16-mobiel-responsive-polijsting.md) | Mobiel: touch-targets, tablet-gat (md→lg), paddings, kleine grid/footer-fixes |
-
-Voer ze uit in volgorde 15 → 16: beide raken `MyItineraryView.tsx`,
-`ChatInterfaceView.tsx` en de modals — niet parallel werken.
+Geen openstaande geplande stappen. Nieuwe wensen kunnen als stap 17+ worden
+opgeschreven in een nieuw plan-bestand (patroon: `docs/plans/step-17-*.md`).
 
 Waarom sequentieel: de stappen raken deels dezelfde bestanden (`server.ts`, `App.tsx`,
 `MyItineraryView.tsx`, `LoginView.tsx`). Parallel werken geeft merge-conflicten.

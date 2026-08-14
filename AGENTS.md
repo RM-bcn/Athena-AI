@@ -47,11 +47,9 @@ execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
 
 ## Status & openstaande zaken (bijgewerkt 14 aug 2026)
 
-- **Alle geplande stappen 01–14 zijn afgerond en live.** Openstaand: 15 + 16
-  (mobiele responsiveness — eerst kritieke fixes, dan polijsting). Plannen
-  staan in `docs/plans/step-15-*.md` en `docs/plans/step-16-*.md`; volgorde
-  15 → 16 (beide raken dezelfde client-bestanden). Gearchiveerde plannen
-  staan in `docs/plans/done/`.
+- **Alle geplande stappen 01–16 zijn afgerond en live.** Nieuwe wensen worden als
+  stap 17+ opgeschreven in een nieuw plan-bestand (`docs/plans/step-17-*.md`).
+  Gearchiveerde plannen staan in `docs/plans/done/`.
 - **Step 07 (wachtwoordreset via e-mail) is live** maar verstuurt nog géén e-mail:
   er is nog géén `RESEND_API_KEY` (geen domein geverifieerd). Zonder key logt de
   server de reset-link naar de serverconsole (`[Reset] Reset link: ...`) en verstuurt
