@@ -418,7 +418,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {onSyncSheets && (
               <button
                 onClick={onSyncSheets}
@@ -493,7 +493,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             </p>
           </div>
 
-          <div className="flex gap-3 flex-shrink-0">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={onShare}
               className="flex items-center gap-2 px-5 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 rounded-xl font-['Inter'] font-semibold text-sm transition-all cursor-pointer shadow-sm"
@@ -781,12 +781,12 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                         key={dayIdx}
                         className="p-5 bg-[#f0f4f9]/50 hover:bg-[#f0f4f9] rounded-2xl border border-[#c0c7d3]/20 transition-all space-y-3"
                       >
-                        <div className="flex justify-between items-start">
+                        <div className="flex flex-wrap justify-between items-start gap-2">
                           <div className="flex items-center gap-3">
-                            <span className="px-3 py-1 rounded-full bg-[#005BAE] text-white font-['Inter'] font-semibold text-xs">
+                            <span className="px-3 py-1 rounded-full bg-[#005BAE] text-white font-['Inter'] font-semibold text-xs whitespace-nowrap">
                               DAG {globalDayNum}
                             </span>
-                            <h4 className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d]">
+                            <h4 className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d] min-w-0 break-words">
                               {plan
                                 ? plan.title
                                 : dayIdx === 0
