@@ -273,7 +273,7 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
                 </select>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   value={form.from}
                   onChange={(e) => setForm((f) => ({ ...f, from: e.target.value }))}
@@ -315,7 +315,7 @@ export const TransportSidebarCard: React.FC<TransportSidebarCardProps> = ({
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type="time"
                   value={form.departureTime}

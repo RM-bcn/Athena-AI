@@ -204,7 +204,7 @@ export const MissedFerryModal: React.FC<MissedFerryModalProps> = ({
             </div>
           )}
 
-          <div className="p-4 bg-[#f0f4f9] rounded-2xl flex items-center justify-between gap-3">
+          <div className="p-4 bg-[#f0f4f9] rounded-2xl flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <MapPin className="w-5 h-5 text-[#005BAE]" />
               <div>

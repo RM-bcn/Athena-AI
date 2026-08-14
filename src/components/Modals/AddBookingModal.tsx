@@ -448,7 +448,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
               </div>
             </div>
 
-            <div className="pt-4 flex items-center justify-between gap-3">
+            <div className="pt-4 flex flex-wrap items-center justify-between gap-3">
               {!editingBooking && (
                 <button
                   type="button"
