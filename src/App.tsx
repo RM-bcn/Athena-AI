@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType, TripRequest } from './types';
+import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType, TripRequest, DayPhoto } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
 import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId, applyStayRecords, DAY_PLAN_RECORD_TYPES } from './utils/dayPlans';
@@ -76,6 +76,9 @@ export default function App() {
   // Reis-aanvragen (leden stellen voor, de eigenaar keurt goed/af) + meldingen.
   const [tripRequests, setTripRequests] = useState<TripRequest[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Reisdagboek: dagelijkse foto's + bijschriften (gasten mogen lezen).
+  const [dayPhotos, setDayPhotos] = useState<DayPhoto[]>([]);
 
   useEffect(() => {
     if (!notice) return;
@@ -678,6 +681,114 @@ if (loaded.stayBookingLinks) {
     loadTripRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
+
+  // Laad het Reisdagboek (voor iedereen, incl. gasten) bij mount.
+  useEffect(() => {
+    async function loadDayPhotos() {
+      try {
+        const res = await fetch('/api/dayphotos');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.photos)) {
+            setDayPhotos(data.photos as DayPhoto[]);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load day photos:", err);
+      }
+    }
+    loadDayPhotos();
+  }, []);
+
+  const handleAddDayPhoto = async (input: {
+    imageBase64: string;
+    date: string;
+    island: string;
+    caption: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Je bent niet ingelogd. Log in om een foto toe te voegen.' };
+    }
+    try {
+      const res = await authFetch('/api/dayphotos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: input.imageBase64,
+          date: input.date,
+          island: input.island,
+          caption: input.caption,
+          author: currentUser.nickname || currentUser.name || currentUser.username,
+        }),
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return { success: false, error: 'Je sessie is verlopen, log opnieuw in.' };
+      }
+      const data = await res.json().catch(() => null);
+      if (!data?.success) {
+        return { success: false, error: data?.error || 'Foto kon niet worden opgeslagen.' };
+      }
+      if (data.photo) {
+        setDayPhotos((prev) => [data.photo as DayPhoto, ...prev]);
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.warn("Add day photo error:", err);
+      return { success: false, error: 'Netwerkfout bij het toevoegen van de foto.' };
+    }
+  };
+
+  const handleDeleteDayPhoto = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Je bent niet ingelogd.' };
+    }
+    try {
+      const res = await authFetch(`/api/dayphotos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return { success: false, error: 'Je sessie is verlopen, log opnieuw in.' };
+      }
+      const data = await res.json().catch(() => null);
+      if (!data?.success) {
+        return { success: false, error: data?.error || 'Foto kon niet worden verwijderd.' };
+      }
+      setDayPhotos((prev) => prev.filter((p) => p.id !== id));
+      return { success: true };
+    } catch (err: any) {
+      console.warn("Delete day photo error:", err);
+      return { success: false, error: 'Netwerkfout bij het verwijderen van de foto.' };
+    }
+  };
+
+  const handleGenerateCaption = async (photoContext: {
+    island: string;
+    date: string;
+    text?: string;
+  }): Promise<{ success: boolean; caption?: string; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Je bent niet ingelogd.' };
+    }
+    try {
+      const res = await authFetch('/api/dayphotos/caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoContext }),
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return { success: false, error: 'Je sessie is verlopen, log opnieuw in.' };
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.success && data.caption) {
+        return { success: true, caption: data.caption };
+      }
+      return { success: false, error: data?.error || 'Bijschrift kon niet worden gegenereerd.' };
+    } catch (err: any) {
+      console.warn("Generate caption error:", err);
+      return { success: false, error: 'Netwerkfout bij het genereren van het bijschrift.' };
+    }
+  };
 
   const reloadTripFromSheet = async () => {
     try {
@@ -1496,6 +1607,10 @@ if (loaded.stayBookingLinks) {
             onAskDayPlanInChat={askDayPlanInChat}
             dayPlanAutoSync={dayPlanAutoSync}
             onSetAutoSync={setAutoSyncEnabled}
+            dayPhotos={dayPhotos}
+            onAddDayPhoto={handleAddDayPhoto}
+            onDeleteDayPhoto={handleDeleteDayPhoto}
+            onGenerateCaption={handleGenerateCaption}
           />
         )}
 

@@ -6,7 +6,8 @@ import {
   IslandStay,
   UserAccount,
   DayPlan,
-  DayPlanItemType
+  DayPlanItemType,
+  DayPhoto
 } from '../types';
 import { getStayLinkInfo, StayLinkInfo } from '../utils/accommodationMatcher';
 import {
@@ -34,10 +35,15 @@ import {
   FileSpreadsheet,
   ExternalLink,
   RefreshCw,
-  Lock
+  Lock,
+  Images,
+  Trash2,
+  Play
 } from 'lucide-react';
 import { EditStayModal } from './Modals/EditStayModal';
 import { DayPlanEditorModal } from './Modals/DayPlanEditorModal';
+import { ReisdagboekUploadModal } from './Modals/ReisdagboekUploadModal';
+import { StoriesModal } from './Modals/StoriesModal';
 import { WeatherCard } from './WeatherCard';
 import { TransportSidebarCard } from '../transport/TransportSidebarCard';
 import { TransportRouteConnector } from '../transport/TransportRouteConnector';
@@ -76,6 +82,19 @@ interface MyItineraryViewProps {
   onAskDayPlanInChat?: (stay: IslandStay) => void;
   dayPlanAutoSync?: Record<string, Partial<Record<DayPlanItemType, boolean>>>;
   onSetAutoSync?: (stayId: string, type: DayPlanItemType, enabled: boolean) => void;
+  dayPhotos?: DayPhoto[];
+  onAddDayPhoto?: (input: {
+    imageBase64: string;
+    date: string;
+    island: string;
+    caption: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  onDeleteDayPhoto?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onGenerateCaption?: (photoContext: {
+    island: string;
+    date: string;
+    text?: string;
+  }) => Promise<{ success: boolean; caption?: string; error?: string }>;
 }
 
 export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
@@ -107,6 +126,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   onAskDayPlanInChat,
   dayPlanAutoSync = {},
   onSetAutoSync,
+  dayPhotos = [],
+  onAddDayPhoto,
+  onDeleteDayPhoto,
+  onGenerateCaption,
 }) => {
 
   const [accommodationsOpen, setAccommodationsOpen] = useState(true);
@@ -127,6 +150,41 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
 
   // Day Plan Editor Modal state
   const [dayPlanEditorStay, setDayPlanEditorStay] = useState<IslandStay | null>(null);
+
+  // Reisdagboek modal states
+  const [isReisdagboekUploadOpen, setIsReisdagboekUploadOpen] = useState(false);
+  const [storiesPhotos, setStoriesPhotos] = useState<DayPhoto[] | null>(null);
+  const [reisdagboekOpen, setReisdagboekOpen] = useState(true);
+
+  // "Vandaag"-stories: foto's van vandaag, anders van de meest recente dag.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayPhotos = dayPhotos.filter((p) => p.date === todayStr);
+  const storiesDayPhotos = todayPhotos.length > 0
+    ? todayPhotos
+    : (() => {
+        const byDate = new Map<string, DayPhoto[]>();
+        for (const p of dayPhotos) {
+          if (!p.date) continue;
+          const list = byDate.get(p.date) || [];
+          list.push(p);
+          byDate.set(p.date, list);
+        }
+        if (byDate.size === 0) return [];
+        const latestDate = Array.from(byDate.keys()).sort().pop()!;
+        return byDate.get(latestDate) || [];
+      })();
+  const showStoriesButton = dayPhotos.length > 0;
+
+  // Reisdagboek: groepeer foto's op datum (nieuwste eerst).
+  const dayPhotoGroups = Array.from(
+    dayPhotos.reduce((map, p) => {
+      const date = p.date || 'Onbekend';
+      const list = map.get(date) || [];
+      list.push(p);
+      map.set(date, list);
+      return map;
+    }, new Map<string, DayPhoto[]>())
+  ).sort((a, b) => b[0].localeCompare(a[0]));
 
   const [tipsChecklist, setTipsChecklist] = useState([
     { id: '1', text: 'Boek veerboottickets minimaal 48 uur van tevoren in het hoogseizoen.', checked: true },
@@ -977,7 +1035,179 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         </div>
       </div>
 
-{/* Interactive Floating Chat Action */}
+      {/* Reisdagboek — dagelijkse hoogtepunten met foto's (A) */}
+      <section className="mt-10 bg-white rounded-[24px] overflow-hidden border border-[#e1efff] shadow-sm">
+        <div className="p-6 bg-white border-b border-[#f0f4f9] flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-[#005BAE] text-white flex items-center justify-center shadow-sm flex-shrink-0">
+              <Images className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-['Inter'] text-xs font-semibold text-[#005BAE] uppercase tracking-wider block">
+                Reisdagboek
+              </span>
+              <h2 className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d]">
+                Dagelijkse hoogtepunten van Dennis & Joyce
+              </h2>
+              <p className="font-['Inter'] text-[11px] text-[#717783]">
+                Foto's en momenten per dag, live gedeeld met de gasten.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {showStoriesButton && (
+              <button
+                onClick={() => setStoriesPhotos(storiesDayPhotos)}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-['Inter'] text-xs font-bold hover:brightness-110 shadow-md transition-all cursor-pointer flex items-center gap-2"
+                title="Bekijk de foto's van vandaag (of de meest recente dag) fullscreen"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                Vandaag
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={() => setIsReisdagboekUploadOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                Foto toevoegen
+              </button>
+            )}
+            <button
+              onClick={() => setReisdagboekOpen(!reisdagboekOpen)}
+              className="p-2 text-[#717783] hover:text-[#005BAE] cursor-pointer"
+            >
+              {reisdagboekOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+
+        {reisdagboekOpen && (
+          <div className="p-6 pt-4">
+            {dayPhotos.length === 0 ? (
+              <div className="py-10 flex flex-col items-center justify-center gap-3 text-center">
+                <Images className="w-10 h-10 text-[#c0c7d3]" />
+                <p className="font-['Inter'] text-sm font-semibold text-[#404752]">
+                  {canEdit
+                    ? 'Nog geen foto\'s — voeg vandaag je eerste foto toe!'
+                    : 'Nog geen foto\'s — check straks onze dagelijkse hoogtepunten!'}
+                </p>
+                {canEdit && (
+                  <button
+                    onClick={() => setIsReisdagboekUploadOpen(true)}
+                    className="mt-1 px-4 py-2 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Foto toevoegen
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {dayPhotoGroups.map(([date, photos]) => (
+                  <div key={date}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="px-3 py-1 rounded-full bg-[#f0f4f9] border border-[#c0c7d3]/30 text-[#005BAE] font-['Inter'] text-xs font-bold flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {formatDateFriendly(date)}
+                      </span>
+                      <span className="text-[11px] font-['Inter'] text-[#717783]">
+                        {photos.length} {photos.length === 1 ? 'foto' : 'foto\'s'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {photos.map((photo) => (
+                        <div
+                          key={photo.id}
+                          className="group relative rounded-2xl overflow-hidden bg-[#f0f4f9] border border-[#e1efff] shadow-sm cursor-pointer"
+                          onClick={() => setStoriesPhotos(photos)}
+                        >
+                          <div className="aspect-[4/3] overflow-hidden">
+                            <img
+                              src={photo.imageUrl}
+                              alt={photo.caption || `Reisdagboek ${photo.date}`}
+                              loading="lazy"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          </div>
+                          <div className="p-3">
+                            {photo.island && (
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-[#005BAE]/10 text-[#005BAE] text-[10px] font-bold mb-1.5">
+                                {photo.island}
+                              </span>
+                            )}
+                            {photo.caption && (
+                              <p className="font-['Inter'] text-xs text-[#404752] leading-snug line-clamp-2">
+                                {photo.caption}
+                              </p>
+                            )}
+                            {photo.author && (
+                              <p className="font-['Inter'] text-[10px] text-[#717783] mt-1">
+                                door {photo.author}
+                              </p>
+                            )}
+                          </div>
+
+                          {canEdit && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm('Deze foto uit het reisdagboek verwijderen?')) {
+                                  onDeleteDayPhoto?.(photo.id);
+                                }
+                              }}
+                              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              title="Verwijderen"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Floating "Vandaag" stories button */}
+      {showStoriesButton && (
+        <button
+          onClick={() => setStoriesPhotos(storiesDayPhotos)}
+          className="fixed bottom-6 right-6 z-40 px-5 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-['Inter'] text-sm font-bold hover:brightness-110 shadow-2xl active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+          title="Bekijk de foto's van vandaag fullscreen"
+        >
+          <Play className="w-4 h-4 fill-current" />
+          Vandaag
+          <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+        </button>
+      )}
+
+      {/* Reisdagboek modals */}
+      <ReisdagboekUploadModal
+        isOpen={isReisdagboekUploadOpen}
+        onClose={() => setIsReisdagboekUploadOpen(false)}
+        stays={currentTrip.stays}
+        onSave={onAddDayPhoto || (async () => ({ success: false, error: 'Upload niet beschikbaar.' }))}
+        onGenerateCaption={
+          onGenerateCaption || (async () => ({ success: false, error: 'AI niet beschikbaar.' }))
+        }
+      />
+
+      <StoriesModal
+        isOpen={storiesPhotos !== null}
+        photos={storiesPhotos || []}
+        onClose={() => setStoriesPhotos(null)}
+      />
+
+      {/* Interactive Floating Chat Action */}
         {/* Button removed as requested */}
 
       {/* Edit Stay Modal */}
