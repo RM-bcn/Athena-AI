@@ -418,7 +418,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {onSyncSheets && (
               <button
                 onClick={onSyncSheets}
@@ -493,7 +493,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
             </p>
           </div>
 
-          <div className="flex gap-3 flex-shrink-0">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={onShare}
               className="flex items-center gap-2 px-5 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 rounded-xl font-['Inter'] font-semibold text-sm transition-all cursor-pointer shadow-sm"
@@ -620,8 +620,8 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
           <div className="absolute inset-0 bg-gradient-to-t from-white/90 via-white/25 to-transparent" />
 
           {/* Interactive Timeline Overlay */}
-          <div className="absolute inset-x-0 bottom-0 p-6">
-            <div className="flex justify-between items-center max-w-4xl mx-auto gap-4">
+          <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 overflow-x-auto no-scrollbar">
+            <div className="flex items-center max-w-4xl mx-auto gap-4 min-w-max sm:min-w-0 sm:justify-between">
               {timelineStops.map((stop, index) => (
                 <React.Fragment key={stop.id}>
                   <div
@@ -697,7 +697,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {canEdit && (
                       <>
                         <button
@@ -714,10 +714,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                             return (
                               <button
                                 onClick={() => handleChangeLink(stay.id)}
-                                className="text-xs font-['Inter'] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1"
+                                className="text-xs font-['Inter'] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1 max-w-full"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                {linkInfo.matchedBooking.name}
+                                <span className="truncate max-w-[160px]">{linkInfo.matchedBooking.name}</span>
                               </button>
                             );
                           }
@@ -781,12 +781,12 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                         key={dayIdx}
                         className="p-5 bg-[#f0f4f9]/50 hover:bg-[#f0f4f9] rounded-2xl border border-[#c0c7d3]/20 transition-all space-y-3"
                       >
-                        <div className="flex justify-between items-start">
+                        <div className="flex flex-wrap justify-between items-start gap-2">
                           <div className="flex items-center gap-3">
-                            <span className="px-3 py-1 rounded-full bg-[#005BAE] text-white font-['Inter'] font-semibold text-xs">
+                            <span className="px-3 py-1 rounded-full bg-[#005BAE] text-white font-['Inter'] font-semibold text-xs whitespace-nowrap">
                               DAG {globalDayNum}
                             </span>
-                            <h4 className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d]">
+                            <h4 className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d] min-w-0 break-words">
                               {plan
                                 ? plan.title
                                 : dayIdx === 0

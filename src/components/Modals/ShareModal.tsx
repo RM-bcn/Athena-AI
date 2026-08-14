@@ -34,7 +34,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, tripCod
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[28px] max-w-lg w-full p-8 shadow-2xl border border-[#005BAE]/20 relative animate-in fade-in zoom-in duration-200 font-['Plus_Jakarta_Sans']">
+      <div className="bg-white rounded-[28px] max-w-lg w-full p-6 md:p-8 shadow-2xl border border-[#005BAE]/20 relative animate-in fade-in zoom-in duration-200 font-['Plus_Jakarta_Sans'] max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-6 right-6 p-2 text-[#717783] hover:text-[#005BAE] rounded-full hover:bg-[#f0f4f9] transition-colors cursor-pointer"

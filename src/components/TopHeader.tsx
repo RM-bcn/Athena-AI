@@ -33,8 +33,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   isOwner = false,
 }) => {
   return (
-    <header className="fixed top-0 left-0 md:left-64 right-0 flex justify-between items-center px-4 md:px-8 py-3 md:py-4 bg-white/90 backdrop-blur-xl z-40 border-b border-[#f0f4f9]">
-      <div className="flex items-center gap-3 md:gap-8">
+    <header className="fixed top-0 left-0 md:left-64 right-0 flex justify-between items-center gap-2 px-4 md:px-8 py-3 md:py-4 bg-white/90 backdrop-blur-xl z-40 border-b border-[#f0f4f9]">
+      <div className="flex items-center gap-2 md:gap-8 min-w-0 flex-1">
         {/* Hamburger Menu on Mobile */}
         <button
           onClick={onToggleMobileMenu}
@@ -44,7 +44,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <Menu className="w-6 h-6" />
         </button>
 
-        <span className="font-['Plus_Jakarta_Sans'] text-lg md:text-2xl font-bold text-[#005BAE] truncate">
+        <span className="font-['Plus_Jakarta_Sans'] text-lg md:text-2xl font-bold text-[#005BAE] truncate min-w-0">
           {activeTab === 'chat'
             ? 'Chat'
             : activeTab === 'itinerary'
@@ -146,7 +146,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </nav>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
         {activeTab === 'chat' && (
           <button className="p-2 rounded-full hover:bg-[#f0f4f9] text-[#404752] transition-colors cursor-pointer" title="Berichten zoeken">
             <Search className="w-5 h-5" />
@@ -182,7 +182,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </div>
         ) : isGuestMode ? (
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-full text-amber-900 text-xs font-bold">
+            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1.5 rounded-full text-amber-900 text-[11px] font-bold whitespace-nowrap">
               <Eye className="w-3.5 h-3.5 text-amber-600" />
               <span>Gastmodus ({tripCode})</span>
             </div>

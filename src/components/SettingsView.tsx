@@ -44,7 +44,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser, onOpenP
         </div>
 
         <div className="bg-white rounded-[24px] border border-[#e1efff] p-6 shadow-sm space-y-6">
-          <div className="flex items-center justify-between gap-4 pb-6 border-b border-[#f0f4f9]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-[#f0f4f9]">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-[#f0f4f9] text-[#005BAE] flex items-center justify-center overflow-hidden flex-shrink-0">
                 {avatarSrc ? (
@@ -53,9 +53,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser, onOpenP
                   <User className="w-7 h-7" />
                 )}
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-['Plus_Jakarta_Sans'] font-semibold text-lg text-[#0b1d2d]">{displayName}</h3>
-                <p className="font-['Inter'] text-xs text-[#717783]">{displayEmail}</p>
+                <p className="font-['Inter'] text-xs text-[#717783] break-all">{displayEmail}</p>
                 <p className="font-['Inter'] text-[10px] text-[#005BAE] font-semibold mt-0.5">
                   {currentUser ? `Reiscode: ${currentUser.tripCode}` : 'Reiscode: ATH-2026'}
                 </p>

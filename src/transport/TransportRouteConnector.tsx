@@ -53,7 +53,7 @@ export const TransportRouteConnector: React.FC<Props> = ({
       <React.Fragment>
         <div
           onClick={onConnectorClick}
-          className={`flex-1 min-w-[50px] h-[2px] relative transition-all cursor-pointer ${
+          className={`flex-1 min-w-[50px] h-[2px] w-[50px] sm:w-auto relative transition-all cursor-pointer ${
             isSelected
               ? 'bg-[#005BAE]'
               : 'bg-[#005BAE]/20 group-hover:bg-[#005BAE]/40'
@@ -74,7 +74,7 @@ export const TransportRouteConnector: React.FC<Props> = ({
             ))}
           </div>
           {label && (
-            <span className={`font-['Inter'] text-[10px] font-bold text-[#005BAE] bg-white/95 px-1.5 py-px rounded-full whitespace-nowrap shadow-sm ${
+            <span className={`font-['Inter'] text-[10px] font-bold text-[#005BAE] bg-white/95 px-1.5 py-px rounded-full hidden sm:inline-block max-w-[90px] truncate shadow-sm ${
               isSelected ? 'ring-1 ring-[#005BAE]/30' : ''
             }`}>
               {label}
@@ -93,7 +93,7 @@ export const TransportRouteConnector: React.FC<Props> = ({
   }
 
   return (
-    <div className="flex-1 min-w-[50px] h-[2px] bg-[#005BAE]/20 relative">
+    <div className="flex-1 min-w-[50px] h-[2px] w-[50px] sm:w-auto bg-[#005BAE]/20 relative">
       {canEdit && (
         <button
           onClick={() => onAddForLeg?.(leg)}

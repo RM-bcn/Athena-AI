@@ -159,7 +159,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
               <p className="font-['Inter'] text-sm text-[#404752] mb-4 leading-relaxed">
                 De meest authentieke lokale smaken, gebaseerd op je huidige locatie.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 <span className="px-3 py-1 bg-[#f0f6ff] text-[#005BAE] rounded-full text-[11px] font-bold uppercase tracking-wider">
                   AUTHENTIEK
                 </span>
@@ -191,7 +191,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
               <p className="font-['Inter'] text-sm text-[#404752] mb-4 leading-relaxed">
                 Aan de drukte ontsnappen? Ik ken verborgen baaien die alleen locals bezoeken.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 <span className="px-3 py-1 bg-[#f0f6ff] text-[#005BAE] rounded-full text-[11px] font-bold uppercase tracking-wider">
                   AFGELEGEN
                 </span>

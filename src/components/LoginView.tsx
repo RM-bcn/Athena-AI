@@ -619,7 +619,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
       {/* Forgot Password Modal */}
       {isForgotPasswordOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 relative text-[#0B1D2D]">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 relative text-[#0B1D2D] max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => {
                 setIsForgotPasswordOpen(false);
