@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType } from './types';
+import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType, TripRequest } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
 import type { TransportEntry } from './transport/types';
 import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId, applyStayRecords, DAY_PLAN_RECORD_TYPES } from './utils/dayPlans';
@@ -11,6 +11,7 @@ import { MyItineraryView } from './components/MyItineraryView';
 import { QuickHelpView } from './components/QuickHelpView';
 import { ChatInterfaceView } from './components/ChatInterfaceView';
 import { SettingsView } from './components/SettingsView';
+import { TripRequestsView } from './components/TripRequestsView';
 import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
 import { LoginView } from './components/LoginView';
@@ -69,6 +70,18 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getActiveUser());
 
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => readGuestMode());
+
+  const isOwner = currentUser?.role === 'owner';
+
+  // Reis-aanvragen (leden stellen voor, de eigenaar keurt goed/af) + meldingen.
+  const [tripRequests, setTripRequests] = useState<TripRequest[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
 
   const [tripCode, setTripCode] = useState<string>(() => {
     if (typeof window === 'undefined') return 'ATH-2026';
@@ -638,9 +651,105 @@ if (loaded.stayBookingLinks) {
     }
   };
 
+  // Laad de reis-aanvragen voor de ingelogde gebruiker (owner ziet alle,
+  // member alleen de eigen aanvragen — de server filtert al).
+  const loadTripRequests = async () => {
+    if (!currentUser) {
+      setTripRequests([]);
+      return;
+    }
+    try {
+      const res = await authFetch('/api/trips/requests');
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.success && Array.isArray(data.requests)) {
+        setTripRequests(data.requests);
+      }
+    } catch (err) {
+      console.warn("Could not load trip requests:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadTripRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
+
+  const reloadTripFromSheet = async () => {
+    try {
+      const loadRes = await fetch('/api/sheets/load');
+      if (loadRes.ok) {
+        const loaded = await loadRes.json();
+        if (loaded.trip && loaded.trip.stays && loaded.trip.stays.length > 0) {
+          setCurrentTrip(loaded.trip);
+        }
+        if (loaded.customBookings) {
+          setCustomBookings(loaded.customBookings);
+        }
+        if (loaded.stayBookingLinks) {
+          setStayBookingLinks(loaded.stayBookingLinks);
+        }
+        if (loaded.transportEntries) {
+          setTransportEntries(loaded.transportEntries as TransportEntry[]);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not reload trip from sheet:", err);
+    }
+  };
+
+  const handleApproveTripRequest = async (id: string) => {
+    try {
+      const res = await authFetch(`/api/trips/requests/${encodeURIComponent(id)}/approve`, { method: 'POST' });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        setNotice('Reis-aanvraag goedgekeurd. De nieuwe reis is nu actief.');
+        loadTripRequests();
+        setActiveTab('itinerary');
+        reloadTripFromSheet();
+      } else {
+        setNotice(data?.error || 'De reis-aanvraag kon niet worden goedgekeurd.');
+      }
+    } catch (err: any) {
+      console.warn("Approve trip request error:", err);
+      setNotice('Netwerkfout bij het goedkeuren van de reis-aanvraag.');
+    }
+  };
+
+  const handleRejectTripRequest = async (id: string, notes?: string) => {
+    try {
+      const res = await authFetch(`/api/trips/requests/${encodeURIComponent(id)}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notes || '' }),
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        setNotice('Reis-aanvraag afgekeurd.');
+        loadTripRequests();
+      } else {
+        setNotice(data?.error || 'De reis-aanvraag kon niet worden afgekeurd.');
+      }
+    } catch (err: any) {
+      console.warn("Reject trip request error:", err);
+      setNotice('Netwerkfout bij het afkeuren van de reis-aanvraag.');
+    }
+  };
+
   const handleOpenNewTripModal = () => {
     if (!currentUser) {
-      alert("⚠️ Inloggen vereist: Alleen beheerder-accounts (Dennis of Joyce) kunnen nieuwe reizen of datums bewerken.");
+      alert("⚠️ Inloggen vereist: Log in om een nieuwe reis te plannen of een aanvraag in te dienen.");
       setActiveTab('login');
       return;
     }
@@ -652,12 +761,16 @@ if (loaded.stayBookingLinks) {
   const handleSetActiveTab = (tab: ActiveTab) => {
     const isAuthenticated = currentUser !== null || isGuestMode;
 
-    if (!isAuthenticated && (tab === 'chat' || tab === 'itinerary' || tab === 'quick-help' || tab === 'settings' || tab === 'profile')) {
+    if (!isAuthenticated && (tab === 'chat' || tab === 'itinerary' || tab === 'quick-help' || tab === 'settings' || tab === 'profile' || tab === 'requests')) {
       setActiveTab('login');
       return;
     }
 
     if (tab === 'chat' && isGuestMode) return;
+    if (tab === 'requests' && currentUser?.role !== 'owner') {
+      setActiveTab('settings');
+      return;
+    }
     setActiveTab(tab);
   };
 
@@ -1231,27 +1344,56 @@ if (loaded.stayBookingLinks) {
   };
 
   const handleCreateTrip = (newTrip: TripData) => {
-    // A new trip starts with no booked accommodations or links. Reset state and
-    // persist the fresh state to the Google Sheet so the DB matches the new trip.
-    setCustomBookings([]);
-    setStayBookingLinks({});
-    try {
-      localStorage.setItem('athena_stay_booking_links', JSON.stringify({}));
-    } catch (e) {
-      console.error("Failed to clear stay-booking links", e);
+    if (isOwner) {
+      // Owner: de reis wordt direct geactiveerd en als actieve reis opgeslagen.
+      // Een nieuwe reis start zonder geboekte accommodaties of links; reset de
+      // state en bewaar de verse staat in de Google Sheet zodat die klopt.
+      setCustomBookings([]);
+      setStayBookingLinks({});
+      try {
+        localStorage.setItem('athena_stay_booking_links', JSON.stringify({}));
+      } catch (e) {
+        console.error("Failed to clear stay-booking links", e);
+      }
+
+      setTripCode(newTrip.id);
+      updateAndSaveTrip(newTrip, [], {}, newTrip.id);
+      setActiveTab('itinerary');
+
+      const staySummary = newTrip.stays
+        .map((s) => `${s.island} (${s.startDate} - ${s.endDate}, ${s.nights} nachten)`)
+        .join(', ');
+
+      handleSendMessage(
+        `We hebben een nieuwe reis geselecteerd: "${newTrip.title}" met de volgende verblijven: ${staySummary}. Pas ons dagschema aan!`
+      );
+      return;
     }
 
-    setTripCode(newTrip.id);
-    updateAndSaveTrip(newTrip, [], {}, newTrip.id);
-    setActiveTab('itinerary');
-
-    const staySummary = newTrip.stays
-      .map((s) => `${s.island} (${s.startDate} - ${s.endDate}, ${s.nights} nachten)`)
-      .join(', ');
-
-    handleSendMessage(
-      `We hebben een nieuwe reis geselecteerd: "${newTrip.title}" met de volgende verblijven: ${staySummary}. Pas ons dagschema aan!`
-    );
+    // Member: stel de reis voor ter goedkeuring. De actieve reis blijft
+    // ongewijzigd tot de eigenaar de aanvraag goedkeurt.
+    authFetch('/api/trips/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trip: newTrip }),
+    })
+      .then(async (res) => {
+        if (res.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+        const data = await res.json().catch(() => null);
+        if (data?.success) {
+          setNotice('Aanvraag ingediend. De eigenaar keurt hem goed.');
+          loadTripRequests();
+        } else {
+          setNotice(data?.error || 'De reis-aanvraag kon niet worden ingediend.');
+        }
+      })
+      .catch((err) => {
+        console.warn("Trip request submit error:", err);
+        setNotice('Netwerkfout bij het indienen van de reis-aanvraag.');
+      });
   };
 
   return (
@@ -1267,6 +1409,8 @@ if (loaded.stayBookingLinks) {
         onSignOut={handleSignOut}
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
+        isOwner={isOwner}
+        pendingRequestCount={tripRequests.filter((r) => r.status === 'pending').length}
       />
 
       {/* Top Navigation Header */}
@@ -1282,6 +1426,7 @@ if (loaded.stayBookingLinks) {
         onSignOut={handleSignOut}
         onLoginClick={() => setActiveTab('login')}
         onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
+        isOwner={isOwner}
       />
 
       {/* View Content based on Active Tab */}
@@ -1356,6 +1501,15 @@ if (loaded.stayBookingLinks) {
           />
         )}
 
+        {activeTab === 'requests' && isOwner && (
+          <TripRequestsView
+            requests={tripRequests}
+            isOwner={isOwner}
+            onApprove={handleApproveTripRequest}
+            onReject={handleRejectTripRequest}
+          />
+        )}
+
         {activeTab === 'profile' && currentUser && (
           <ProfileView
             currentUser={currentUser}
@@ -1388,7 +1542,14 @@ if (loaded.stayBookingLinks) {
         isOpen={isNewTripOpen}
         onClose={() => setIsNewTripOpen(false)}
         onCreateTrip={handleCreateTrip}
+        isOwner={isOwner}
       />
+
+      {notice && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl bg-[#0b1d2d] text-white text-sm font-['Inter'] font-semibold shadow-2xl border border-[#005BAE]/40 animate-in fade-in slide-in-from-bottom-2 duration-200 max-w-md text-center">
+          {notice}
+        </div>
+      )}
 
       <MissedFerryModal
         isOpen={isMissedFerryOpen}

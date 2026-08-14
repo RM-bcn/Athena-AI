@@ -6,13 +6,14 @@ interface NewTripModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateTrip: (tripData: TripData) => void;
+  isOwner?: boolean;
 }
 
 const POPULAR_DESTINATIONS = [
   'Milos', 'Naxos', 'Paros', 'Koufonisia', 'Mykonos', 'Santorini', 'Athens', 'Crete', 'Rhodes'
 ];
 
-export const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onCreateTrip }) => {
+export const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onCreateTrip, isOwner = true }) => {
   const todayStr = new Date().toISOString().split('T')[0];
   
   // Calculate date offset helper
@@ -372,7 +373,7 @@ export const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onC
               className="w-full bg-[#005BAE] text-white py-3.5 rounded-xl font-['Inter'] font-semibold text-sm hover:brightness-110 active:scale-95 transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4" />
-              Genereer Complete Trip Itinerary
+              {isOwner ? 'Reis activeren' : 'Indienen ter goedkeuring'}
             </button>
           </div>
         </form>

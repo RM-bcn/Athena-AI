@@ -15,6 +15,7 @@ interface TopHeaderProps {
   onSignOut: () => void;
   onLoginClick: () => void;
   onToggleMobileMenu?: () => void;
+  isOwner?: boolean;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -29,6 +30,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onSignOut,
   onLoginClick,
   onToggleMobileMenu,
+  isOwner = false,
 }) => {
   return (
     <header className="fixed top-0 left-0 md:left-64 right-0 flex justify-between items-center px-4 md:px-8 py-3 md:py-4 bg-white/90 backdrop-blur-xl z-40 border-b border-[#f0f4f9]">
@@ -53,6 +55,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             ? 'Inloggen'
             : activeTab === 'settings'
             ? 'Instellingen'
+            : activeTab === 'requests'
+            ? 'Reis-aanvragen'
             : activeTab === 'profile'
             ? 'Mijn Profiel'
             : activeTab === 'support'
@@ -125,6 +129,16 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   >
                     Directe Hulp
                   </button>
+                  {isOwner && (
+                    <button
+                      onClick={() => setActiveTab('requests')}
+                      className={`font-['Inter'] text-sm transition-colors py-1 cursor-pointer ${
+                        activeTab === 'requests' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
+                      }`}
+                    >
+                      Reis-aanvragen
+                    </button>
+                  )}
                 </>
               )}
             </>
