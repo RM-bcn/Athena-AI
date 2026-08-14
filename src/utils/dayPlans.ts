@@ -81,6 +81,9 @@ export function isProtectedItem(item: DayPlanItem): boolean {
   return item?.protected === true || item?.type === 'transport' || item?.type === 'checkin' || item?.type === 'checkout';
 }
 
+// De vaste record-types die per verblijf automatisch kunnen worden toegevoegd.
+export const DAY_PLAN_RECORD_TYPES: DayPlanItemType[] = ['transport', 'checkin', 'checkout'];
+
 export function formatTransportRecord(entry: TransportEntry): string {
   const time = entry.departureTime ? `${entry.departureTime} ` : '';
   const operator = entry.operator ? ` (${entry.operator})` : '';
@@ -142,10 +145,13 @@ export function buildStayRecords(
 // Zet de beschermde records op hun plek: dag 0 krijgt aankomst-records en de
 // laatste dag vertrek-records. Bestaande beschermde records van die dagen worden
 // vervangen (opnieuw uit de actuele data), alle andere items blijven intact.
+// `enabledTypes` beperkt welke record-types worden toegevoegd (individuele
+// auto-sync uitschakeling); null betekent "alles aan".
 export function applyStayRecords(
   plans: DayPlan[],
   stay: { id: string; island: string; startDate: string; endDate: string; accommodationName?: string; nights?: number },
-  transports: TransportEntry[]
+  transports: TransportEntry[],
+  enabledTypes: DayPlanItemType[] | null = null
 ): DayPlan[] {
   const nightCount = Math.max(stay?.nights || plans.length || 1, 1);
   const padded = ensureDayPlanCount(plans, nightCount);
@@ -154,19 +160,24 @@ export function applyStayRecords(
 
   const { arrival, departure } = buildStayRecords(stay, transports);
 
+  const filterEnabled = (records: DayPlanItem[]) =>
+    enabledTypes ? records.filter((r) => enabledTypes.includes(r.type)) : records;
+  const arrivalFiltered = filterEnabled(arrival);
+  const departureFiltered = filterEnabled(departure);
+
   return padded.map((p) => {
     if (sameDay) {
       // Eén nacht: aankomst én vertrek vallen op dezelfde dag.
       if (p.day === 0) {
-        return { ...p, items: [...arrival, ...departure, ...(p.items || []).filter((it) => !isProtectedItem(it))] };
+        return { ...p, items: [...arrivalFiltered, ...departureFiltered, ...(p.items || []).filter((it) => !isProtectedItem(it))] };
       }
       return p;
     }
     if (p.day === 0) {
-      return { ...p, items: [...arrival, ...(p.items || []).filter((it) => !isProtectedItem(it))] };
+      return { ...p, items: [...arrivalFiltered, ...(p.items || []).filter((it) => !isProtectedItem(it))] };
     }
     if (p.day === lastDay) {
-      return { ...p, items: [...departure, ...(p.items || []).filter((it) => !isProtectedItem(it))] };
+      return { ...p, items: [...departureFiltered, ...(p.items || []).filter((it) => !isProtectedItem(it))] };
     }
     return p;
   });
