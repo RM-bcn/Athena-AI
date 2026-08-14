@@ -392,8 +392,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
                       setCode(e.target.value.toUpperCase());
                       if (errorMsg) setErrorMsg('');
                     }}
-                    placeholder="Voer reiscode in (bijv. ATH-2026)"
-                    className="w-full pl-12 pr-4 py-4 bg-[#F0F4F9] border border-[#0B1D2D]/10 rounded-xl font-['Plus_Jakarta_Sans'] text-base font-semibold text-[#0B1D2D] focus:ring-2 focus:ring-[#005BAE] focus:outline-none uppercase tracking-widest transition-all"
+                    placeholder="Reiscode (bijv. ATH-2026)"
+                    className="w-full pl-12 pr-4 py-4 bg-[#F0F4F9] border border-[#0B1D2D]/10 rounded-xl font-['Plus_Jakarta_Sans'] text-base font-semibold text-[#0B1D2D] focus:ring-2 focus:ring-[#005BAE] focus:outline-none uppercase transition-all"
                   />
                 </div>
 

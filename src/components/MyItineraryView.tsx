@@ -517,7 +517,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-[#005BAE]" />
-            <h2 className="font-[#Plus_Jakarta_Sans'] font-bold text-lg text-[#001a33]">
+            <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#001a33]">
               Verblijfsplanning — Eiland Stopt & Hotels
             </h2>
           </div>
@@ -1255,7 +1255,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
       {showStoriesButton && (
         <button
           onClick={() => setStoriesPhotos(storiesDayPhotos)}
-          className="fixed bottom-6 right-6 z-40 px-5 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-['Inter'] text-sm font-bold hover:brightness-110 shadow-2xl active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 px-4 py-2.5 sm:px-5 sm:py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-['Inter'] text-sm font-bold hover:brightness-110 shadow-2xl active:scale-95 transition-all cursor-pointer flex items-center gap-2"
           title="Bekijk de foto's van vandaag fullscreen"
         >
           <Play className="w-4 h-4 fill-current" />

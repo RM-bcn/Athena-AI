@@ -96,13 +96,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser, onOpenP
               <span className="font-['Inter'] text-xs font-bold text-[#005BAE] bg-[#f0f4f9] px-3 py-1.5 rounded-full">Nederlands</span>
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-xl bg-orange-50/50 border border-orange-200/60">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between p-4 rounded-xl bg-orange-50/50 border border-orange-200/60">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   ⚡
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="font-['Inter'] text-sm font-bold text-[#0b1d2d]">AI Chat Engine (Groq primair)</p>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white">
                       GROQ AI

@@ -396,7 +396,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
       {chatSubTab === 'current' && (
         <>
-          <div className="flex-1 flex flex-col pt-16 md:pt-24 px-4 md:px-12 pb-40 md:pb-44 overflow-y-auto">
+          <div className="flex-1 flex flex-col pt-16 md:pt-24 px-4 md:px-12 pb-56 md:pb-44 overflow-y-auto">
             <div className="max-w-3xl mx-auto w-full space-y-8 py-6">
               {messages.length === 0 && (
                 <div className="p-10 bg-white/80 backdrop-blur-sm rounded-3xl border border-[#005BAE]/15 text-center">
