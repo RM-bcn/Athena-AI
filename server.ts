@@ -441,12 +441,22 @@ app.post("/api/dayoverview", async (req, res) => {
       // statische fallback behouden
     }
 
+    const DAY_PLAN_LABELS: Record<string, string> = {
+      activity: "Activiteit",
+      dining: "Eten/diner",
+      tip: "Tip",
+      transport: "Transfer",
+      checkin: "Inchecken",
+      checkout: "Uitchecken",
+    };
+
     const dayPlanText = Array.isArray(dayPlan) && dayPlan.length > 0
       ? dayPlan
           .map((item: any, i: number) => {
+            const type = typeof item?.type === "string" && item.type ? `[${DAY_PLAN_LABELS[item.type] || item.type}]` : "";
             const time = typeof item?.time === "string" && item.time.trim() ? ` ${item.time}` : "";
             const text = typeof item?.text === "string" ? item.text : "";
-            return `${i + 1}.${time} ${text}`.trim();
+            return `${i + 1}. ${type}${time} ${text}`.trim();
           })
           .join("\n")
       : "Geen specifieke dagplanning; de dag is vrij in te vullen.";
@@ -455,11 +465,12 @@ app.post("/api/dayoverview", async (req, res) => {
       "Je bent Athena AI, een persoonlijke reisconcierge voor de Cycladen.",
       "Geef een kort, warm overzicht van de dag voor een gast die de reis van Dennis & Joyce volgt.",
       "De reizigers zijn Dennis & Joyce; de gast leest mee. Beschrijf de dag dus als hun dag, niet als de dag van de lezer. Gebruik 'zij', 'ze' of 'Dennis & Joyce' in plaats van 'je' of 'jij'.",
+      "Verwerk de geplande elementen uit de dagplanning expliciet in je verhaal: noem de veerboot/transfer (met tijd als die er is), het hotel waar wordt ingecheckt/uitgecheckt, en het geplande restaurant/diner. Gebruik alleen wat er daadwerkelijk gepland staat; verzin geen extra boekingen.",
       "Inclusief:",
       "- Weerbericht (kort, als het beschikbaar is)",
-      "- Geplande activiteiten (uit de dagplanning)",
+      "- Geplande activiteiten en transfers (uit de dagplanning)",
       "- Highlights van de verblijfslocatie/regio (gebruik de buurt/wijk als die bekend is, bijvoorbeeld Glyfada)",
-      "- Aanbevolen restaurants of lokale specialiteiten (zo dicht mogelijk bij de verblijfslocatie)",
+      "- Aanbevolen restaurants of lokale specialiteiten (zo dicht mogelijk bij de verblijfslocatie, tenzij er al een diner gepland staat)",
       "",
       "Antwoord in het Nederlands. Max 150 woorden. Geen markdown, geen opsommingstekens.",
       "Gebruik een vriendelijke, persoonlijke toon.",

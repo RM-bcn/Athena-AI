@@ -251,7 +251,11 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
           date,
           accommodation: matchedBooking?.name || stay.accommodationName || '',
           area: matchedBooking?.location || '',
-          dayPlan: plan?.items || [],
+          dayPlan: (plan?.items || []).map(item => ({
+            type: item.type,
+            text: item.text,
+            time: item.time,
+          })),
         }),
       });
       const data = await res.json().catch(() => null);
