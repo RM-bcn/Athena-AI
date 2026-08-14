@@ -15,7 +15,7 @@ import {
   Loader2,
   Plus
 } from 'lucide-react';
-import { IslandStay } from '../../types';
+import { IslandStay, Accommodation } from '../../types';
 
 export interface AIHotel {
   id: string;
@@ -44,16 +44,37 @@ interface AddBookingModalProps {
     checkIn?: string;
     checkOut?: string;
     image?: string;
+    address?: string;
+    checkInTime?: string;
+    checkOutTime?: string;
+    link?: string;
   }) => void;
+  onUpdateBooking?: (booking: Accommodation) => void;
+  editingBooking?: Accommodation | null;
   tripStays?: IslandStay[];
   initialMode?: 'manual' | 'ai';
   initialIsland?: string;
 }
 
+const stripIslandSuffix = (loc: string, island?: string): string => {
+  if (!island || !loc) return loc;
+  const suffix = ` (${island})`;
+  return loc.endsWith(suffix) ? loc.slice(0, -suffix.length) : loc;
+};
+
+const toUniqueIslands = (stays: IslandStay[], extra?: string): string[] => {
+  const islands = new Set<string>();
+  for (const s of stays) if (s.island) islands.add(s.island);
+  if (extra) islands.add(extra);
+  return Array.from(islands);
+};
+
 export const AddBookingModal: React.FC<AddBookingModalProps> = ({
   isOpen,
   onClose,
   onAddBooking,
+  onUpdateBooking,
+  editingBooking,
   tripStays = [],
   initialMode = 'manual',
   initialIsland,
@@ -65,9 +86,13 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
   const [location, setLocation] = useState('');
   const [selectedIsland, setSelectedIsland] = useState(initialIsland || (tripStays[0]?.island || 'Naxos'));
   const [status, setStatus] = useState<'CONFIRMED' | 'PAST STAY' | 'PENDING'>('CONFIRMED');
-  const [pricePerNight, setPricePerNight] = useState<string>('150');
+  const [pricePerNight, setPricePerNight] = useState<string>('');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
+  const [address, setAddress] = useState('');
+  const [checkInTime, setCheckInTime] = useState('');
+  const [checkOutTime, setCheckOutTime] = useState('');
+  const [link, setLink] = useState('');
 
   // AI Suggesties Search State
   const [searchIsland, setSearchIsland] = useState<string>(initialIsland || (tripStays[0]?.island || 'Naxos'));
@@ -79,16 +104,40 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
   // Synchronize when modal opens
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialMode);
-      if (initialIsland) {
-        setSelectedIsland(initialIsland);
-        setSearchIsland(initialIsland);
+      setActiveTab(editingBooking ? 'manual' : initialMode);
+      if (editingBooking) {
+        setName(editingBooking.name || '');
+        setLocation(stripIslandSuffix(editingBooking.location || '', editingBooking.island));
+        setSelectedIsland(editingBooking.island || '');
+        setStatus(editingBooking.status || 'CONFIRMED');
+        setPricePerNight(editingBooking.pricePerNight != null ? String(editingBooking.pricePerNight) : '');
+        setCheckIn(editingBooking.checkIn || '');
+        setCheckOut(editingBooking.checkOut || '');
+        setAddress(editingBooking.address || '');
+        setCheckInTime(editingBooking.checkInTime || '');
+        setCheckOutTime(editingBooking.checkOutTime || '');
+        setLink(editingBooking.link || '');
+        setSearchIsland(editingBooking.island || (tripStays[0]?.island || 'Naxos'));
+      } else {
+        setName('');
+        setLocation('');
+        setSelectedIsland('');
+        setStatus('CONFIRMED');
+        setPricePerNight('');
+        setCheckIn('');
+        setCheckOut('');
+        setAddress('');
+        setCheckInTime('');
+        setCheckOutTime('');
+        setLink('');
+        setSearchIsland(initialIsland || (tripStays[0]?.island || 'Naxos'));
       }
       if (activeTab === 'ai' || initialMode === 'ai') {
         fetchAIHotels(initialIsland || searchIsland);
       }
     }
-  }, [isOpen, initialMode, initialIsland]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialMode, initialIsland, editingBooking]);
 
   const fetchAIHotels = async (targetIsland: string) => {
     setIsLoadingHotels(true);
@@ -113,15 +162,40 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
     e.preventDefault();
     if (!name || !location) return;
 
-    onAddBooking({
-      name,
-      location: `${location} (${selectedIsland})`,
-      island: selectedIsland,
-      status,
-      pricePerNight: Number(pricePerNight) || 150,
-      checkIn,
-      checkOut,
-    });
+    const isEdit = !!editingBooking && !!onUpdateBooking;
+    const loc = selectedIsland ? `${location} (${selectedIsland})` : location;
+    const price = pricePerNight !== '' ? Number(pricePerNight) : (isEdit ? editingBooking.pricePerNight : 150);
+
+    if (isEdit) {
+      onUpdateBooking!({
+        ...editingBooking!,
+        name,
+        location: loc,
+        island: selectedIsland,
+        status,
+        pricePerNight: price,
+        checkIn,
+        checkOut,
+        address,
+        checkInTime,
+        checkOutTime,
+        link,
+      });
+    } else {
+      onAddBooking({
+        name,
+        location: loc,
+        island: selectedIsland,
+        status,
+        pricePerNight: price,
+        checkIn,
+        checkOut,
+        address,
+        checkInTime,
+        checkOutTime,
+        link,
+      });
+    }
 
     setName('');
     setLocation('');
@@ -171,7 +245,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
                 Accommodatie & Boekingen
               </span>
               <h2 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[#001a33]">
-                Accommodatie Beheren & Hotel Suggesties
+                {editingBooking ? 'Boeking Wijzigen' : 'Boeking Toevoegen'}
               </h2>
             </div>
           </div>
@@ -188,26 +262,28 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
               }`}
             >
               <Hotel className="w-4 h-4" />
-              1. Handmatig Boeking Toevoegen
+              1. {editingBooking ? 'Boeking Wijzigen' : 'Handmatig Boeking Toevoegen'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('ai');
-                if (aiHotels.length === 0) {
-                  fetchAIHotels(searchIsland);
-                }
-              }}
-              className={`flex-1 py-2.5 rounded-xl font-['Inter'] font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'ai'
-                  ? 'bg-[#005BAE] text-white shadow-sm'
-                  : 'text-[#717783] hover:text-[#005BAE]'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              2. AI Hotel Suggesties
-            </button>
+            {!editingBooking && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('ai');
+                  if (aiHotels.length === 0) {
+                    fetchAIHotels(searchIsland);
+                  }
+                }}
+                className={`flex-1 py-2.5 rounded-xl font-['Inter'] font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  activeTab === 'ai'
+                    ? 'bg-[#005BAE] text-white shadow-sm'
+                    : 'text-[#717783] hover:text-[#005BAE]'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                2. AI Hotel Suggesties
+              </button>
+            )}
           </div>
         </div>
 
@@ -238,22 +314,14 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
                   onChange={(e) => setSelectedIsland(e.target.value)}
                   className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-3 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
                 >
-                  {tripStays.length > 0 ? (
-                    tripStays.map(s => (
-                      <option key={s.id} value={s.island}>
-                        {s.island} ({s.startDate} - {s.endDate})
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Milos">Milos</option>
-                      <option value="Naxos">Naxos</option>
-                      <option value="Koufonisia">Koufonisia</option>
-                      <option value="Paros">Paros</option>
-                      <option value="Mykonos">Mykonos</option>
-                      <option value="Santorini">Santorini</option>
-                    </>
+                  {!editingBooking && (
+                    <option value="">Kies bestemming</option>
                   )}
+                  {toUniqueIslands(tripStays, editingBooking?.island).map((island) => (
+                    <option key={island} value={island}>
+                      {island}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -328,22 +396,76 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Adres
+                </label>
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="straat + huisnummer, postcode, plaats"
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Check-in tijd
+                </label>
+                <input
+                  type="time"
+                  value={checkInTime}
+                  onChange={(e) => setCheckInTime(e.target.value)}
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Check-out tijd
+                </label>
+                <input
+                  type="time"
+                  value={checkOutTime}
+                  onChange={(e) => setCheckOutTime(e.target.value)}
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Link naar accommodatie
+                </label>
+                <input
+                  type="url"
+                  value={link}
+                  onChange={(e) => setLink(e.target.value)}
+                  placeholder="https://booking.com/..."
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+            </div>
+
             <div className="pt-4 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setActiveTab('ai')}
-                className="text-[#005BAE] font-['Inter'] text-xs font-semibold hover:underline flex items-center gap-1"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                Liever AI Hotel Suggesties bekijken?
-              </button>
+              {!editingBooking && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('ai')}
+                  className="text-[#005BAE] font-['Inter'] text-xs font-semibold hover:underline flex items-center gap-1"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Liever AI Hotel Suggesties bekijken?
+                </button>
+              )}
 
               <button
                 type="submit"
                 className="bg-[#005BAE] text-white px-6 py-3 rounded-xl font-['Inter'] font-semibold text-sm hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer flex items-center gap-2"
               >
                 <Check className="w-4 h-4" />
-                Boeking Opslaan
+                {editingBooking ? 'Wijzigingen Opslaan' : 'Boeking Opslaan'}
               </button>
             </div>
           </form>
