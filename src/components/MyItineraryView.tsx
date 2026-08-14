@@ -699,7 +699,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       </>
                     )}
 
-                    {onAskDayPlanInChat && (
+                    {!isGuestMode && onAskDayPlanInChat && (
                       <button
                         onClick={() => onAskDayPlanInChat(stay)}
                         className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
@@ -710,7 +710,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       </button>
                     )}
 
-                    {onSaveDayPlans && (
+                    {!isGuestMode && onSaveDayPlans && (
                       <button
                         onClick={() => setDayPlanEditorStay(stay)}
                         className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-white border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
