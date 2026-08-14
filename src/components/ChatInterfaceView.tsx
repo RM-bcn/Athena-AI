@@ -326,23 +326,23 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
           {msg.role === 'assistant' && onExportToDayPlan && (
             <button
               onClick={() => setExportMessage(msg)}
-              className="p-1 rounded-full transition-colors cursor-pointer text-[#c0c7d3] hover:text-[#005BAE] hover:bg-[#f0f4f9]"
+              className="p-2 rounded-full transition-colors cursor-pointer text-[#c0c7d3] hover:text-[#005BAE] hover:bg-[#f0f4f9]"
               title="Toevoegen aan dagplanning"
             >
-              <CalendarPlus className="w-3.5 h-3.5" />
+              <CalendarPlus className="w-4 h-4" />
             </button>
           )}
           {msg.role === 'assistant' && (
             <button
               onClick={() => onToggleFavorite(msg)}
-              className={`p-1 rounded-full transition-colors cursor-pointer ${
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
                 favoriteIds.has(msg.id)
                   ? 'text-amber-400 hover:text-amber-500'
                   : 'text-[#c0c7d3] hover:text-amber-400'
               }`}
               title={favoriteIds.has(msg.id) ? 'Verwijder uit favorieten' : 'Opslaan als favoriet'}
             >
-              <Star className={`w-3.5 h-3.5 ${favoriteIds.has(msg.id) ? 'fill-amber-400' : ''}`} />
+              <Star className={`w-4 h-4 ${favoriteIds.has(msg.id) ? 'fill-amber-400' : ''}`} />
             </button>
           )}
         </div>
@@ -433,7 +433,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
               <div className="flex gap-2 mb-3 md:mb-4 overflow-x-auto pb-1 no-scrollbar">
                 <button
                   onClick={onStartNewSession}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
                   title="Start een nieuw gesprek"
                 >
                   <MessageSquarePlus className="w-4 h-4" />
@@ -442,7 +442,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
                 <button
                   onClick={() => onTriggerQuickAction('/plan')}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#005BAE] text-white rounded-full font-['Inter'] text-xs font-medium hover:brightness-110 transition-colors whitespace-nowrap shadow-sm cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-[#005BAE] text-white rounded-full font-['Inter'] text-xs font-medium hover:brightness-110 transition-colors whitespace-nowrap shadow-sm cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4" />
                   /plan
@@ -450,7 +450,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
                 <button
                   onClick={() => onTriggerQuickAction('Ferry Status')}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
                 >
                   <Ship className="w-4 h-4" />
                   Veerbootstatus
@@ -458,7 +458,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
                 <button
                   onClick={() => onTriggerQuickAction('Translate Menu')}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
                 >
                   <Languages className="w-4 h-4" />
                   Vertaal menu
@@ -466,7 +466,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
 
                 <button
                   onClick={() => onTriggerQuickAction('/travel')}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#005BAE] border border-[#005BAE]/20 rounded-full font-['Inter'] text-xs font-medium hover:bg-[#f0f4f9] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
                 >
                   <MapIcon className="w-4 h-4" />
                   /travel
@@ -483,7 +483,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setAttachedFile(null)}
-                    className="p-1 hover:bg-[#005BAE]/20 rounded-full transition-colors text-[#005BAE]"
+                    className="p-2 hover:bg-[#005BAE]/20 rounded-full transition-colors text-[#005BAE]"
                     title="Verwijder bijlage"
                   >
                     <X className="w-4 h-4" />

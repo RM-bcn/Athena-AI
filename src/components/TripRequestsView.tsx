@@ -124,7 +124,7 @@ export const TripRequestsView: React.FC<TripRequestsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setExpandedId(isExpanded ? null : req.id)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#f0f4f9] text-[#005BAE] text-xs font-bold hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-3 py-2.5 rounded-lg bg-[#f0f4f9] text-[#005BAE] text-xs font-bold hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer"
               >
                 {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 Verblijven tonen
@@ -136,7 +136,7 @@ export const TripRequestsView: React.FC<TripRequestsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onApprove(req.id)}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   Goedkeuren
@@ -144,7 +144,7 @@ export const TripRequestsView: React.FC<TripRequestsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => startReject(req.id)}
-                  className="px-4 py-2 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
                   <XCircle className="w-3.5 h-3.5" />
                   Afkeuren
@@ -169,14 +169,14 @@ export const TripRequestsView: React.FC<TripRequestsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setRejectingId(null)}
-                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                  className="px-3 py-2.5 rounded-lg border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
                 >
                   Annuleren
                 </button>
                 <button
                   type="button"
                   onClick={() => confirmReject(req.id)}
-                  className="px-4 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 cursor-pointer"
+                  className="px-4 py-2.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 cursor-pointer"
                 >
                   Bevestig afkeuring
                 </button>

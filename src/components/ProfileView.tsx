@@ -205,7 +205,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUser, onUpdateU
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-[#005BAE] text-white flex items-center justify-center shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                className="absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-[#005BAE] text-white flex items-center justify-center shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                 title="Profielfoto wijzigen"
               >
                 <Camera className="w-4 h-4" />

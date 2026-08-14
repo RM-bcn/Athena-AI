@@ -521,7 +521,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                       setShowRegister(false);
                       setErrorMsg('');
                     }}
-                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold cursor-pointer"
+                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold py-2 cursor-pointer"
                   >
                     Terug naar inloggen
                   </button>
@@ -564,7 +564,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsForgotPasswordOpen(true)}
-                      className="text-[#E2725B] hover:underline font-semibold cursor-pointer text-xs"
+                      className="text-[#E2725B] hover:underline font-semibold py-2 cursor-pointer text-xs"
                     >
                       Wachtwoord vergeten?
                     </button>
@@ -585,7 +585,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                       setShowRegister(true);
                       setErrorMsg('');
                     }}
-                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold cursor-pointer"
+                    className="w-full text-center text-[#d2e4fb] hover:text-white text-xs font-semibold py-2 cursor-pointer"
                   >
                     Nog geen account? <span className="text-[#E2725B] font-bold">Word lid</span>
                   </button>
@@ -626,7 +626,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 setResetSuccessMsg('');
                 setResetErrorMsg('');
               }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

@@ -82,7 +82,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser, onOpenP
                   <p className="font-['Inter'] text-xs text-[#717783]">Binnenkort · Pushmeldingen voor Cycladen-veerboten</p>
                 </div>
               </div>
-              <input type="checkbox" disabled className="w-5 h-5 accent-[#005BAE] rounded cursor-not-allowed opacity-50" />
+              <input type="checkbox" disabled className="w-6 h-6 accent-[#005BAE] rounded cursor-not-allowed opacity-50" />
             </div>
 
             <div className="flex items-center justify-between p-4 rounded-xl hover:bg-[#f0f4f9] transition-colors">
