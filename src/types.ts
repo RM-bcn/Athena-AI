@@ -46,12 +46,29 @@ export interface ActivityChip {
   label: string;
 }
 
+export type DayPlanItemType = 'activity' | 'dining' | 'tip' | 'transport' | 'checkin' | 'checkout';
+
+export interface DayPlanItem {
+  id: string;
+  type: DayPlanItemType;
+  text: string;
+  /** Optionele tijd (HH:mm) voor deze activiteit / dit record. */
+  time?: string;
+  /** Beschermde records (ferry, hotel-inchecken/uitchecken) worden automatisch
+   *  uit de verblijfs-/transportdata gezet en mogen niet per ongeluk worden
+   *  verwijderd of overschreven wanneer je de dagplanning bewerkt. */
+  protected?: boolean;
+}
+
 export interface DayPlan {
   day: number;            // lokale dag-index in de stop (0 = aankomstdag)
   title: string;
-  activities: string[];   // 3-5 punten, concreet per eiland
-  dining: string;
-  tips: string[];         // praktische tips (tijdig boeken, cash, etc.)
+  items: DayPlanItem[];
+  // Legacy/compat: de server kan deze ook teruggeven; de client normaliseert
+  // deze velden bij het laden naar items.
+  activities?: string[];
+  dining?: string;
+  tips?: string[];
 }
 
 export interface DailyItinerary {

@@ -1418,13 +1418,24 @@ app.post("/api/dayplan", async (req, res) => {
     const normalizePlans = (raw: any): any[] | null => {
       if (!Array.isArray(raw) || raw.length === 0) return null;
       const sorted = [...raw].sort((a: any, b: any) => (Number(a.day) || 0) - (Number(b.day) || 0));
-      return sorted.map((p: any, i: number) => ({
-        day: i,
-        title: typeof p?.title === "string" ? p.title : `Dag ${i + 1} op ${curIsland}`,
-        activities: Array.isArray(p?.activities) ? p.activities.map(String) : [],
-        dining: typeof p?.dining === "string" ? p.dining : "",
-        tips: Array.isArray(p?.tips) ? p.tips.map(String) : [],
-      }));
+      return sorted.map((p: any, i: number) => {
+        const activities = Array.isArray(p?.activities) ? p.activities.map(String) : [];
+        const dining = typeof p?.dining === "string" ? p.dining : "";
+        const tips = Array.isArray(p?.tips) ? p.tips.map(String) : [];
+        const items = [
+          ...activities.map((text: string, j: number) => ({ id: `activity-${i}-${j}`, type: "activity", text })),
+          ...(dining ? [{ id: `dining-${i}`, type: "dining", text: dining }] : []),
+          ...tips.map((text: string, j: number) => ({ id: `tip-${i}-${j}`, type: "tip", text })),
+        ];
+        return {
+          day: i,
+          title: typeof p?.title === "string" ? p.title : `Dag ${i + 1} op ${curIsland}`,
+          activities,
+          dining,
+          tips,
+          items,
+        };
+      });
     };
 
     const groqRes = await callGroqAI(systemPrompt, userPrompt);

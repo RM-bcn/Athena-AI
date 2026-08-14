@@ -5,7 +5,8 @@ import {
   TripData,
   IslandStay,
   UserAccount,
-  DayPlan
+  DayPlan,
+  DayPlanItemType
 } from '../types';
 import { getStayLinkInfo, StayLinkInfo } from '../utils/accommodationMatcher';
 import {
@@ -36,6 +37,7 @@ import {
   Lock
 } from 'lucide-react';
 import { EditStayModal } from './Modals/EditStayModal';
+import { DayPlanEditorModal } from './Modals/DayPlanEditorModal';
 import { WeatherCard } from './WeatherCard';
 import { TransportSidebarCard } from '../transport/TransportSidebarCard';
 import { TransportRouteConnector } from '../transport/TransportRouteConnector';
@@ -50,7 +52,6 @@ interface MyItineraryViewProps {
   currentUser: UserAccount | null;
   isGuestMode: boolean;
   tripCode: string;
-  onOpenChat: () => void;
   onOpenNewBooking: (mode?: 'manual' | 'ai', island?: string) => void;
   onShare: () => void;
   onExportPDF: () => void;
@@ -71,9 +72,10 @@ interface MyItineraryViewProps {
   isSheetsConnected?: boolean;
   onSyncSheets?: () => void;
   dayPlans?: Record<string, DayPlan[]>;
-  dayPlanGenerating?: Record<string, boolean>;
-  dayPlanErrors?: Record<string, string>;
-  onGenerateDayPlan?: (stay: IslandStay) => Promise<{ success: boolean; error?: string }>;
+  onSaveDayPlans?: (stayId: string, plans: DayPlan[]) => void;
+  onAskDayPlanInChat?: (stay: IslandStay) => void;
+  dayPlanAutoSync?: Record<string, Partial<Record<DayPlanItemType, boolean>>>;
+  onSetAutoSync?: (stayId: string, type: DayPlanItemType, enabled: boolean) => void;
 }
 
 export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
@@ -81,7 +83,6 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   currentUser,
   isGuestMode,
   tripCode,
-  onOpenChat,
   onOpenNewBooking,
   onShare,
   onExportPDF,
@@ -102,9 +103,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   isSheetsConnected = false,
   onSyncSheets,
   dayPlans = {},
-  dayPlanGenerating = {},
-  dayPlanErrors = {},
-  onGenerateDayPlan,
+  onSaveDayPlans,
+  onAskDayPlanInChat,
+  dayPlanAutoSync = {},
+  onSetAutoSync,
 }) => {
 
   const [accommodationsOpen, setAccommodationsOpen] = useState(true);
@@ -122,6 +124,9 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   // Edit Stay Modal state
   const [isEditStayOpen, setIsEditStayOpen] = useState(false);
   const [editingStay, setEditingStay] = useState<IslandStay | null>(null);
+
+  // Day Plan Editor Modal state
+  const [dayPlanEditorStay, setDayPlanEditorStay] = useState<IslandStay | null>(null);
 
   const [tipsChecklist, setTipsChecklist] = useState([
     { id: '1', text: 'Boek veerboottickets minimaal 48 uur van tevoren in het hoogseizoen.', checked: true },
@@ -630,36 +635,29 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       </>
                     )}
 
-                    {!isGuestMode && (
+                    {onAskDayPlanInChat && (
                       <button
-                        onClick={onOpenChat}
-                        className="text-xs font-['Inter'] font-semibold text-white bg-[#005BAE] px-3 py-1.5 rounded-lg hover:brightness-110 transition-colors cursor-pointer flex items-center gap-1"
+                        onClick={() => onAskDayPlanInChat(stay)}
+                        className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                        title="Vraag Athena in de chat om een dagplanning voor dit verblijf te maken"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        Vraag Concierge
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        Vraag Athena (dagplanning)
                       </button>
                     )}
 
-                    {onGenerateDayPlan && (
+                    {onSaveDayPlans && (
                       <button
-                        onClick={() => onGenerateDayPlan(stay)}
-                        disabled={!!dayPlanGenerating[`${tripCode}:${stay.id}`]}
-                        className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-60 disabled:cursor-wait"
-                        title="Genereer een AI-dagplanning voor dit verblijf"
+                        onClick={() => setDayPlanEditorStay(stay)}
+                        className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-white border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                        title="Bewerk de dagplanning voor dit verblijf"
                       >
-                        <RefreshCw className={`w-3.5 h-3.5 ${dayPlanGenerating[`${tripCode}:${stay.id}`] ? 'animate-spin' : ''}`} />
-                        {dayPlanGenerating[`${tripCode}:${stay.id}`] ? 'Bezig met genereren...' : 'Regenereer dagplanning'}
+                        <Calendar className="w-3.5 h-3.5" />
+                        Dagplanning bewerken
                       </button>
                     )}
                   </div>
                 </div>
-
-                {dayPlanErrors[`${tripCode}:${stay.id}`] && (
-                  <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-['Inter']">
-                    <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <span>{dayPlanErrors[`${tripCode}:${stay.id}`]}</span>
-                  </div>
-                )}
 
                 {/* Day Cards for this Stay */}
                 <div className="space-y-4">
@@ -688,34 +686,29 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                           </div>
                         </div>
 
-                        {plan ? (
+                        {plan && plan.items && plan.items.length > 0 ? (
                           <div className="space-y-2.5 text-xs font-['Inter'] text-[#404752]">
-                            {plan.activities.length > 0 && (
-                              <ul className="space-y-1.5">
-                                {plan.activities.map((activity, i) => (
-                                  <li key={i} className="flex items-start gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
-                                    <span>{activity}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                            {plan.dining && (
-                              <div className="flex items-start gap-2">
-                                <Utensils className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
-                                <span>{plan.dining}</span>
+                            {plan.items.map((item) => (
+                              <div key={item.id} className="flex items-start gap-2">
+                                {item.type === 'dining' ? (
+                                  <Utensils className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
+                                ) : item.type === 'tip' ? (
+                                  <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                ) : item.type === 'transport' ? (
+                                  <Ship className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
+                                ) : item.type === 'checkin' || item.type === 'checkout' ? (
+                                  <Hotel className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                                ) : (
+                                  <CheckCircle2 className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
+                                )}
+                                <span className="whitespace-pre-line">
+                                  {item.time ? (
+                                    <span className="font-bold text-[#005BAE] mr-1.5">{item.time}</span>
+                                  ) : null}
+                                  {item.text}
+                                </span>
                               </div>
-                            )}
-                            {plan.tips.length > 0 && (
-                              <div className="pt-2 mt-1 border-t border-[#c0c7d3]/20 space-y-1.5">
-                                {plan.tips.map((tip, i) => (
-                                  <div key={i} className="flex items-start gap-2">
-                                    <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                                    <span>{tip}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            ))}
                           </div>
                         ) : dayIdx === 0 ? (
                           <div className="space-y-2 text-xs font-['Inter'] text-[#404752]">
@@ -967,6 +960,27 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         leg={transportLegToAdd}
         onClose={() => setTransportLegToAdd(null)}
         onAdd={(entry) => onAddTransportEntry?.(entry)}
+      />
+
+      <DayPlanEditorModal
+        isOpen={dayPlanEditorStay !== null}
+        onClose={() => setDayPlanEditorStay(null)}
+        stay={dayPlanEditorStay || currentTrip.stays[0]}
+        plans={dayPlanEditorStay ? dayPlans[`${tripCode}:${dayPlanEditorStay.id}`] || [] : []}
+        onSave={(plans) => {
+          if (dayPlanEditorStay) onSaveDayPlans?.(dayPlanEditorStay.id, plans);
+        }}
+        onAskChat={(stay) => onAskDayPlanInChat?.(stay)}
+        autoSync={dayPlanEditorStay ? dayPlanAutoSync[`${tripCode}:${dayPlanEditorStay.id}`] || {} : {}}
+        onToggleAutoSync={
+          dayPlanEditorStay && onSetAutoSync
+            ? (type) => onSetAutoSync(
+                dayPlanEditorStay.id,
+                type,
+                (dayPlanAutoSync[`${tripCode}:${dayPlanEditorStay.id}`] || {})[type] === false
+              )
+            : undefined
+        }
       />
     </main>
   );
