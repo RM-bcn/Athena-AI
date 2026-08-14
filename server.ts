@@ -419,6 +419,113 @@ app.post("/api/dayphotos/caption", requireAuth, async (req, res) => {
   }
 });
 
+// API: AI-dagoverzicht voor gasten (non-chat, één-klik-samenvatting).
+app.post("/api/dayoverview", async (req, res) => {
+  try {
+    const { island, date, dayPlan, accommodation, area } = req.body || {};
+    const safeIsland = typeof island === "string" && island.trim() ? island.trim() : "de Cycladen";
+    const safeDate = typeof date === "string" && date.trim() ? date.trim() : "";
+    const stayArea = typeof area === "string" && area.trim() ? area.trim() : "";
+    const accommodationName = typeof accommodation === "string" && accommodation.trim() ? accommodation.trim() : "";
+
+    // Weer ophalen via de specifiekere verblijfslocatie (bijv. Glyfada), anders
+    // het eiland; bij fout statische fallback.
+    let weatherText = "Warm en zonnig, typisch voor de Cycladen in augustus";
+    try {
+      const weatherQuery = stayArea || (safeIsland === "de Cycladen" ? "Naxos" : safeIsland);
+      const weather = await getWeather(weatherQuery);
+      if (weather && weather.text && !weather.text.startsWith("Geen") && !weather.text.startsWith("Weer niet") && !weather.text.includes("niet gevonden")) {
+        weatherText = weather.text;
+      }
+    } catch {
+      // statische fallback behouden
+    }
+
+    const DAY_PLAN_LABELS: Record<string, string> = {
+      activity: "Activiteit",
+      dining: "Eten/diner",
+      tip: "Tip",
+      transport: "Transfer",
+      checkin: "Inchecken",
+      checkout: "Uitchecken",
+    };
+
+    const dayPlanText = Array.isArray(dayPlan) && dayPlan.length > 0
+      ? dayPlan
+          .map((item: any, i: number) => {
+            const type = typeof item?.type === "string" && item.type ? `[${DAY_PLAN_LABELS[item.type] || item.type}]` : "";
+            const time = typeof item?.time === "string" && item.time.trim() ? ` ${item.time}` : "";
+            const text = typeof item?.text === "string" ? item.text : "";
+            return `${i + 1}. ${type}${time} ${text}`.trim();
+          })
+          .join("\n")
+      : "Geen specifieke dagplanning; de dag is vrij in te vullen.";
+
+    const systemPrompt = [
+      "Je bent Athena AI, een persoonlijke reisconcierge voor de Cycladen.",
+      "Geef een kort, warm overzicht van de dag voor een gast die de reis van Dennis & Joyce volgt.",
+      "De reizigers zijn Dennis & Joyce; de gast leest mee. Beschrijf de dag dus als hun dag, niet als de dag van de lezer. Gebruik 'zij', 'ze' of 'Dennis & Joyce' in plaats van 'je' of 'jij'.",
+      "Verwerk de geplande elementen uit de dagplanning expliciet in je verhaal: noem de veerboot/transfer (met tijd als die er is), het hotel waar wordt ingecheckt/uitgecheckt, en het geplande restaurant/diner. Gebruik alleen wat er daadwerkelijk gepland staat; verzin geen extra boekingen.",
+      "Inclusief:",
+      "- Weerbericht (kort, als het beschikbaar is)",
+      "- Geplande activiteiten en transfers (uit de dagplanning)",
+      "- Highlights van de verblijfslocatie/regio (gebruik de buurt/wijk als die bekend is, bijvoorbeeld Glyfada)",
+      "- Aanbevolen restaurants of lokale specialiteiten (zo dicht mogelijk bij de verblijfslocatie, tenzij er al een diner gepland staat)",
+      "",
+      "Antwoord in het Nederlands. Max 150 woorden. Geen markdown, geen opsommingstekens.",
+      "Gebruik een vriendelijke, persoonlijke toon.",
+    ].join("\n");
+
+    const stayLine = [
+      accommodationName ? `Accommodatie: ${accommodationName}.` : "",
+      stayArea ? `Verblijf in: ${stayArea} (${safeIsland}).` : `Eiland: ${safeIsland}.`,
+    ].filter(Boolean).join(" ");
+
+    const userPrompt = [
+      stayLine,
+      safeDate ? `Datum: ${safeDate}.` : "",
+      `Weer:\n${weatherText}`,
+      `Dagplanning:\n${dayPlanText}`,
+    ].filter(Boolean).join("\n\n");
+
+    let overview = "";
+    const groqResult = await callGroqAI(systemPrompt, userPrompt);
+    if (groqResult && groqResult.content && groqResult.content.trim()) {
+      overview = groqResult.content.trim();
+    } else {
+      const ai = getGeminiClient();
+      if (ai) {
+        try {
+          const response = await ai.models.generateContent({
+            model: getGeminiModel(),
+            contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+          });
+          let rawText = response.text || "";
+          if (!rawText && response.candidates?.[0]?.content?.parts) {
+            rawText = response.candidates[0].content.parts
+              .filter((p: any) => p.text)
+              .map((p: any) => p.text)
+              .join("\n")
+              .trim();
+          }
+          overview = rawText.trim();
+        } catch (gemErr: any) {
+          console.warn("Day overview Gemini error:", gemErr?.message || gemErr);
+        }
+      }
+    }
+
+    if (!overview) {
+      overview = `Dennis & Joyce zijn vandaag${safeDate ? ` (${safeDate})` : ""} in ${stayArea ? `${stayArea}, ` : ""}${safeIsland}. Het belooft een warme, zonnige dag te worden, typisch voor de Cycladen in augustus. Geniet mee van de geplande activiteiten, de charmante straatjes en een diner bij een authentieke vissers-taverne. Kalimera!`;
+    }
+
+    res.json({ success: true, overview });
+  } catch (err: any) {
+    console.error("Day overview error:", err?.message || err);
+    res.status(500).json({ success: false, error: "Fout bij het ophalen van het dagoverzicht." });
+  }
+});
+
 app.delete("/api/dayphotos/:id", requireAuth, async (req, res) => {
   try {
     const id = req.params.id;

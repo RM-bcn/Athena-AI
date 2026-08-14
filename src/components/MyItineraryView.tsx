@@ -151,6 +151,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   // Day Plan Editor Modal state
   const [dayPlanEditorStay, setDayPlanEditorStay] = useState<IslandStay | null>(null);
 
+  // AI-dagoverzicht (gasten): gecachte overzichten per `${stay.id}-${dayIdx}`.
+  const [dayOverviews, setDayOverviews] = useState<Record<string, string>>({});
+  const [loadingOverview, setLoadingOverview] = useState<string | null>(null);
+
   // Reisdagboek modal states
   const [isReisdagboekUploadOpen, setIsReisdagboekUploadOpen] = useState(false);
   const [storiesPhotos, setStoriesPhotos] = useState<DayPhoto[] | null>(null);
@@ -219,6 +223,50 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
     setTipsChecklist(prev =>
       prev.map(item => (item.id === id ? { ...item, checked: !item.checked } : item))
     );
+  };
+
+  const handleAskDayOverview = async (stay: IslandStay, dayIdx: number) => {
+    const key = `${stay.id}-${dayIdx}`;
+    if (dayOverviews[key] || loadingOverview === key) return;
+    setLoadingOverview(key);
+    try {
+      const plan = dayPlans[`${tripCode}:${stay.id}`]?.[dayIdx];
+      let date = '';
+      if (stay.startDate) {
+        try {
+          const [y, m, d] = stay.startDate.split('-').map(Number);
+          const dt = new Date(y, m - 1, d + dayIdx);
+          date = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        } catch {
+          date = '';
+        }
+      }
+      const linkInfo = getLinkInfo(stay);
+      const matchedBooking = linkInfo.matchedBooking || linkInfo.suggestedBooking;
+      const res = await fetch('/api/dayoverview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          island: stay.island,
+          date,
+          accommodation: matchedBooking?.name || stay.accommodationName || '',
+          area: matchedBooking?.location || '',
+          dayPlan: (plan?.items || []).map(item => ({
+            type: item.type,
+            text: item.text,
+            time: item.time,
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success && data.overview) {
+        setDayOverviews(prev => ({ ...prev, [key]: data.overview }));
+      }
+    } catch (err: any) {
+      console.warn('Day overview error:', err);
+    } finally {
+      setLoadingOverview(null);
+    }
   };
 
   const handleOpenEditStay = (stay?: IslandStay) => {
@@ -748,6 +796,16 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                                 : `Stranden, Cultuur & Gastronomie in ${stay.island}`}
                             </h4>
                           </div>
+                          {isGuestMode && (
+                            <button
+                              onClick={() => handleAskDayOverview(stay, dayIdx)}
+                              className="text-xs font-['Inter'] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1"
+                              title="Laat Athena een samenvatting maken van deze dag"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                              Vraag Athena
+                            </button>
+                          )}
                         </div>
 
                         {plan && plan.items && plan.items.length > 0 ? (
@@ -803,6 +861,22 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                           selectedId={selectedTransportId}
                           onSelect={setSelectedTransportId}
                         />
+
+                        {loadingOverview === `${stay.id}-${dayIdx}` && (
+                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                            <p className="text-xs font-['Inter'] text-amber-600 animate-pulse">
+                              Athena denkt na...
+                            </p>
+                          </div>
+                        )}
+
+                        {dayOverviews[`${stay.id}-${dayIdx}`] && (
+                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                            <p className="text-xs font-['Inter'] text-amber-900 leading-relaxed">
+                              {dayOverviews[`${stay.id}-${dayIdx}`]}
+                            </p>
+                          </div>
+                        )}
                       </article>
                     );
                   })}
