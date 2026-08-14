@@ -31,7 +31,7 @@ execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
 5. Push en open een PR naar `main` met in de beschrijving: wat/waarom, verwijzing
    naar het plan-bestand (`docs/plans/step-XX-*.md`) en de afgevinkte acceptatiecriteria.
 6. Merge NIET zelf; laat de gebruiker reviewen. Na merge wordt de branch verwijderd.
-7. Werk sequentieel: de stappen bouwen op elkaar (01 → 14). Niet parallel werken.
+7. Werk sequentieel: de stappen bouwen op elkaar (01 → 16). Niet parallel werken.
 
 ## Veiligheid
 
@@ -47,9 +47,11 @@ execution policy. Gebruik dan `npm.cmd` (bijv. `npm.cmd run lint`). Als
 
 ## Status & openstaande zaken (bijgewerkt 14 aug 2026)
 
-- **Alle geplande stappen 01–14 zijn afgerond en live.** Nieuwe wensen worden als
-  stap 15+ opgeschreven in een nieuw plan-bestand (`docs/plans/step-15-*.md`).
-  Gearchiveerde plannen staan in `docs/plans/done/`.
+- **Alle geplande stappen 01–14 zijn afgerond en live.** Openstaand: 15 + 16
+  (mobiele responsiveness — eerst kritieke fixes, dan polijsting). Plannen
+  staan in `docs/plans/step-15-*.md` en `docs/plans/step-16-*.md`; volgorde
+  15 → 16 (beide raken dezelfde client-bestanden). Gearchiveerde plannen
+  staan in `docs/plans/done/`.
 - **Step 07 (wachtwoordreset via e-mail) is live** maar verstuurt nog géén e-mail:
   er is nog géén `RESEND_API_KEY` (geen domein geverifieerd). Zonder key logt de
   server de reset-link naar de serverconsole (`[Reset] Reset link: ...`) en verstuurt

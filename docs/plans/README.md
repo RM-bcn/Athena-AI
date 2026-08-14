@@ -25,8 +25,13 @@ dat door een agent uitgevoerd kan worden.
 
 ## Vervolgstappen (openstaand)
 
-Geen openstaande geplande stappen meer. Nieuwe wensen kunnen als stap 15+ worden
-opgeschreven in een nieuw plan-bestand (patroon: `docs/plans/step-15-*.md`).
+| Step | Plan-bestand | Kort doel |
+|------|--------------|-----------|
+| 15 | [step-15-mobiel-responsive-kritiek.md](step-15-mobiel-responsive-kritiek.md) | Mobiel: kritieke fixes (modals scrollbaar, timeline, overflows header/knoppen) |
+| 16 | [step-16-mobiel-responsive-polijsting.md](step-16-mobiel-responsive-polijsting.md) | Mobiel: touch-targets, tablet-gat (md→lg), paddings, kleine grid/footer-fixes |
+
+Voer ze uit in volgorde 15 → 16: beide raken `MyItineraryView.tsx`,
+`ChatInterfaceView.tsx` en de modals — niet parallel werken.
 
 Waarom sequentieel: de stappen raken deels dezelfde bestanden (`server.ts`, `App.tsx`,
 `MyItineraryView.tsx`, `LoginView.tsx`). Parallel werken geeft merge-conflicten.
