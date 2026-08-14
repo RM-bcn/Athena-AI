@@ -790,14 +790,94 @@ function getGeminiClient() {
   return new GoogleGenAI({ apiKey });
 }
 
+// Bekende Groq-modellen als fallback wanneer de dynamische lijst niet ophaalbaar is.
+const DEFAULT_GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+
+// Cache van beschikbare actieve Groq-modellen, met TTL zodat de lijst periodiek
+// ververst wordt zonder redeploy (self-healing tegen Groq-modelrotatie).
+let groqModelCache: { models: string[]; fetchedAt: number } | null = null;
+const GROQ_MODEL_TTL_MS = 6 * 60 * 60 * 1000; // 6 uur
+
+async function fetchGroqModels(): Promise<string[]> {
+  const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
+  if (!apiKey) return [];
+
+  const res = await fetch("https://api.groq.com/openai/v1/models", {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) throw new Error(`Groq models status ${res.status}`);
+  const data = await res.json();
+  // data.data = [{ id, active, owned_by, ... }]
+  return (data.data || [])
+    .filter((m: any) => m && typeof m.id === "string" && m.active !== false)
+    .map((m: any) => m.id);
+}
+
+async function getGroqModelList(): Promise<string[]> {
+  if (groqModelCache && Date.now() - groqModelCache.fetchedAt < GROQ_MODEL_TTL_MS) {
+    return groqModelCache.models;
+  }
+  const models = await fetchGroqModels().catch((err) => {
+    console.warn(`[Groq] models fetch failed, falling back to known list:`, err?.message || err);
+    return [];
+  });
+  const merged = models.length ? models : [...DEFAULT_GROQ_MODELS]; // fallback naar bekende lijst
+  groqModelCache = { models: merged, fetchedAt: Date.now() };
+  return merged;
+}
+
+function rankGroqModels(models: string[]): string[] {
+  const score = (id: string) => {
+    const l = id.toLowerCase();
+    let s = 0;
+    if (/versatile|70b/.test(l)) s += 100;      // beste kwaliteit/context
+    if (/llama-3\.3/.test(l)) s += 50;
+    if (/llama-3\.1/.test(l)) s += 40;
+    if (/8b/.test(l)) s -= 20;                  // kleiner, minder capabel
+    if (/instant/.test(l)) s -= 10;
+    if (/flash/.test(l)) s -= 5;
+    return s;
+  };
+  return [...models].sort((a, b) => score(b) - score(a));
+}
+
+// Voorkeurs-ladder: expliciete env-lijst eerst, daarna dynamisch gerankte
+// beschikbare modellen (expliciet niet herhaald).
+async function resolveGroqModels(): Promise<string[]> {
+  const pref = getEnvVal("GROQ_MODEL_PREFERENCE", "GROQ_MODELS");
+  const explicit = pref ? pref.split(",").map((m) => m.trim()).filter(Boolean) : [];
+  const dynamic = rankGroqModels(await getGroqModelList());
+  return [...explicit, ...dynamic.filter((m) => !explicit.includes(m))];
+}
+
+// Herken model-not-found (400/404) zodat de cache geïnvalideerd en herladen kan worden.
+function isGroqModelNotFound(status: number, errText: string): boolean {
+  if (status === 404) return true;
+  if (status === 400) {
+    return /model\b|does not exist|not found|not_found|unknown model/i.test(errText || "");
+  }
+  return false;
+}
+
+// Gemini-model configureerbaar via env, zodat ook Gemini-rotatie zonder code-wijziging
+// op te vangen is.
+function getGeminiModel(): string {
+  return getEnvVal("GEMINI_MODEL") || "gemini-3.6-flash";
+}
+
 // Helper to call Groq API safely (Primary AI Engine with multi-model fallback)
-async function callGroqAI(systemPrompt: string, userPrompt: string, retriesLeft = 2): Promise<{ content: string; model: string } | null> {
+async function callGroqAI(
+  systemPrompt: string,
+  userPrompt: string,
+  retriesLeft = 2,
+  refreshAttempted = false
+): Promise<{ content: string; model: string } | null> {
   const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
   if (!apiKey) {
     return null;
   }
 
-  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+  const models = await resolveGroqModels();
 
   for (const model of models) {
     try {
@@ -832,7 +912,19 @@ async function callGroqAI(systemPrompt: string, userPrompt: string, retriesLeft 
           const waitMs = parseRetryAfterMs(errText, res.headers.get("retry-after")) || 4000;
           if (waitMs > 5000) break; // sustained limit (e.g. daily budget) — hand over to Gemini quickly
           await sleep(waitMs);
-          return callGroqAI(systemPrompt, userPrompt, retriesLeft - 1);
+          return callGroqAI(systemPrompt, userPrompt, retriesLeft - 1, refreshAttempted);
+        }
+        if (isGroqModelNotFound(res.status, errText)) {
+          if (refreshAttempted) {
+            console.warn(`[Groq] model ${model} niet meer beschikbaar; refresh al geprobeerd — fallback naar Gemini`);
+            break;
+          }
+          groqModelCache = null; // cache invalideren
+          const refreshed = await getGroqModelList();
+          if (refreshed.length) {
+            console.warn(`[Groq] model ${model} niet meer beschikbaar; herladen en retry met verse lijst`);
+            return callGroqAI(systemPrompt, userPrompt, retriesLeft, true);
+          }
         }
       }
     } catch (err) {
@@ -875,13 +967,14 @@ function parseFailedGeneration(errText: string): { name: string; arguments: any 
 }
 
 // API: AI Engine Status
-app.get("/api/ai/status", (req, res) => {
+app.get("/api/ai/status", async (req, res) => {
   const groqKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
   const geminiKey = process.env.GEMINI_API_KEY;
 
   const hasGroq = !!(groqKey && groqKey !== "MY_GROQ_API_KEY");
   const hasGemini = !!(geminiKey && geminiKey !== "MY_GEMINI_API_KEY");
   const duckduckgoEnabled = getEnvVal("DUCKDUCKGO_ENABLED", "duckduckgo_enabled") !== "false";
+  const groqModels = await getGroqModelList().catch(() => [...DEFAULT_GROQ_MODELS]);
 
   res.json({
     activeEngine: hasGroq
@@ -891,6 +984,8 @@ app.get("/api/ai/status", (req, res) => {
       : "Athena Greek Concierge Engine",
     hasGroqKey: hasGroq,
     hasGeminiKey: hasGemini,
+    groqModels: rankGroqModels(groqModels),
+    geminiModel: getGeminiModel(),
     liveSearch: duckduckgoEnabled
       ? "DuckDuckGo (gratis, geen API-sleutel nodig)"
       : "Uitgeschakeld",
@@ -1035,12 +1130,13 @@ async function executeTool(name: string, args: any): Promise<ToolResult> {
 
 async function callGroqAgent(
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  refreshAttempted = false
 ): Promise<{ content: string; model: string; sources: Source[]; rateLimited: boolean } | null> {
   const apiKey = getEnvVal("GROQ_API_KEY", "GROQ_KEY", "GROQ_API_TOKEN", "GROQ_SECRET", "groq_api_key");
   if (!apiKey) return null;
 
-  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+  const models = await resolveGroqModels();
   let hardRateLimited = false;
 
   for (const model of models) {
@@ -1084,6 +1180,18 @@ async function callGroqAgent(
             await sleep(Math.min(waitMs, 4000));
             rounds--; // retry this round after a short backoff
             continue;
+          }
+          if (isGroqModelNotFound(res.status, errText)) {
+            if (refreshAttempted) {
+              console.warn(`[Groq] agent model ${model} niet meer beschikbaar; refresh al geprobeerd — fallback naar Gemini`);
+              break;
+            }
+            groqModelCache = null; // cache invalideren
+            const refreshed = await getGroqModelList();
+            if (refreshed.length) {
+              console.warn(`[Groq] agent model ${model} niet meer beschikbaar; herladen en retry met verse lijst`);
+              return callGroqAgent(systemPrompt, userPrompt, true);
+            }
           }
           if (res.status === 400 && errText.includes("tool_use_failed")) {
             const parsed = parseFailedGeneration(errText);
@@ -1523,7 +1631,7 @@ RULES WHEN LIVE DATA IS PRESENT:
         }
 
         const response = await ai.models.generateContent({
-          model: "gemini-3.6-flash",
+          model: getGeminiModel(),
           contents: [{ role: "user", parts }],
         });
 
@@ -1651,7 +1759,7 @@ app.post("/api/dayplan", async (req, res) => {
     const ai = getGeminiClient();
     if (ai) {
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: getGeminiModel(),
         contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
       });
       let rawText = response.text || "";
@@ -1714,7 +1822,7 @@ app.post("/api/translate-menu", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: getGeminiModel(),
       contents: [{ role: "user", parts }]
     });
 
@@ -1865,7 +1973,7 @@ Generate 3 realistic, highly-rated boutique hotels or resorts on ${curIsland}.
 Return valid JSON array of objects with keys: id, name, location, island, rating (number like 9.4), ratingLabel (e.g. "Buitengewoon" or "Uitstekend"), reviewsCount (number), pricePerNight (number in EUR), tag (e.g. "AI Suggestie • Zeezicht"), amenities (array of string in Dutch), distanceToBeach (string in Dutch).`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: getGeminiModel(),
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
@@ -1943,7 +2051,7 @@ app.post("/api/resolve-ferry", async (req, res) => {
 Generate emergency assistance options including next available hydrofoils/ferries, estimated times, ticket office guidance, and temporary port hotel recommendation. Format response as JSON with fields: status, options (array of {type, operator, departure, arrival, price, notes}), recommendedHotel, advice.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: getGeminiModel(),
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
@@ -2008,6 +2116,9 @@ async function startServer() {
   if (!process.env.VERCEL) {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
+      getGroqModelList().then((models) => {
+        console.info(`[Groq] actieve modellen: ${rankGroqModels(models).join(", ")}`);
+      });
     });
   }
 }
