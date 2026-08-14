@@ -58,6 +58,26 @@ export async function uploadToCloudinary(fileInput: string, folder = "athena_ava
   return result.secure_url;
 }
 
+// Reisfoto-upload voor het Reisdagboek: breed formaat, GEEN face-crop
+// (anders dan de avatar-upload die gravity: face forceert).
+export async function uploadTravelPhoto(fileInput: string): Promise<string> {
+  const isConfigured = configureCloudinary();
+  if (!isConfigured) {
+    throw new Error("Cloudinary environment variabelen ontbreken (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET).");
+  }
+
+  const result = await cloudinary.uploader.upload(fileInput, {
+    folder: "athena_reisdagboek",
+    resource_type: "image",
+    transformation: [
+      { width: 1200, height: 900, crop: "fill" },
+      { quality: "auto", fetch_format: "auto" }
+    ]
+  });
+
+  return result.secure_url;
+}
+
 function getGoogleAuth() {
   const serviceAccountEmail = getEnvVal("GOOGLE_SERVICE_ACCOUNT_EMAIL", "SERVICE_ACCOUNT_EMAIL");
   let privateKey = getEnvVal("GOOGLE_PRIVATE_KEY", "PRIVATE_KEY");
@@ -127,7 +147,7 @@ async function ensureTabsExist(sheets: any, spreadsheetId: string) {
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const existingSheetTitles = (meta.data.sheets || []).map((s: any) => s.properties.title);
     
-    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks", "Transports", "ChatHistory", "Favorites", "TripRequests"];
+    const requiredTabs = ["TripInfo", "Stays", "Users", "CustomBookings", "BookingLinks", "Transports", "ChatHistory", "Favorites", "TripRequests", "DayPhotos"];
     const missingTabs = requiredTabs.filter((title) => !existingSheetTitles.includes(title));
 
     if (missingTabs.length > 0) {
@@ -247,6 +267,7 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
           { properties: { title: "ChatHistory" } },
           { properties: { title: "Favorites" } },
           { properties: { title: "TripRequests" } },
+          { properties: { title: "DayPhotos" } },
         ],
       },
     });
@@ -310,6 +331,12 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
             range: "TripRequests!A1:N1",
             values: [
               ["ID", "Title", "StartDate", "EndDate", "DurationDays", "Style", "TripCode", "StaysJSON", "RequestedBy", "RequestedAt", "Status", "DecidedBy", "DecidedAt", "Notes"]
+            ],
+          },
+          {
+            range: "DayPhotos!A1:G1",
+            values: [
+              ["ID", "Date", "Island", "Caption", "ImageUrl", "Author", "CreatedAt"]
             ],
           },
         ],
@@ -1174,6 +1201,153 @@ export async function createUserInSheet(input: { username: string; email: string
   });
 
   return getUserFromSheet(input.email, input.username);
+}
+
+const DAY_PHOTO_HEADERS = ["ID", "Date", "Island", "Caption", "ImageUrl", "Author", "CreatedAt"];
+
+// Ensure the DayPhotos sheet has the required columns.
+async function ensureDayPhotosHeaders(sheets: any, spreadsheetId: string) {
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "DayPhotos!A1:G1",
+    });
+
+    const existingHeaders = (res.data.values && res.data.values[0]) || [];
+    const needsFix = DAY_PHOTO_HEADERS.some(
+      (header, index) => (existingHeaders[index] || "").trim().toLowerCase() !== header.toLowerCase()
+    );
+
+    if (needsFix) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: "DayPhotos!A1",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [DAY_PHOTO_HEADERS] },
+      });
+      console.log("[Google Sheets] DayPhotos sheet headers updated.");
+    }
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not ensure DayPhotos headers:", err?.message || err);
+  }
+}
+
+function parseDayPhotoRow(row: any[]): any {
+  return {
+    id: row[0],
+    date: row[1] || "",
+    island: row[2] || "",
+    caption: row[3] || "",
+    imageUrl: row[4] || "",
+    author: row[5] || "",
+    createdAt: row[6] || "",
+  };
+}
+
+export interface DayPhotoInput {
+  date: string;
+  island: string;
+  caption: string;
+  imageUrl: string;
+  author?: string;
+}
+
+// Store a new day photo in the DayPhotos tab (used by the Reisdagboek).
+export async function addDayPhoto(input: DayPhotoInput): Promise<any> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google Sheets is niet geconfigureerd.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+  await ensureDayPhotosHeaders(sheets, spreadsheetId);
+
+  const id = `photo-${Date.now()}`;
+  const now = new Date().toISOString();
+  const row = [
+    id,
+    input.date || "",
+    input.island || "",
+    input.caption || "",
+    input.imageUrl || "",
+    input.author || "",
+    now,
+  ];
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: "DayPhotos!A:G",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [row] },
+  });
+
+  return {
+    id,
+    date: input.date || "",
+    island: input.island || "",
+    caption: input.caption || "",
+    imageUrl: input.imageUrl || "",
+    author: input.author || "",
+    createdAt: now,
+  };
+}
+
+// Load all day photos from the DayPhotos tab, newest first (on CreatedAt).
+export async function getDayPhotos(): Promise<any[]> {
+  const auth = getOAuthClient();
+  if (!auth) return [];
+
+  try {
+    const { spreadsheetId } = await getOrCreateSpreadsheet();
+    const sheets = google.sheets({ version: "v4", auth });
+    await ensureTabsExist(sheets, spreadsheetId);
+    await ensureDayPhotosHeaders(sheets, spreadsheetId);
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "DayPhotos!A2:G500",
+    });
+
+    const rows = res.data.values || [];
+    const photos = rows
+      .filter((row: any) => row && row[0] && row[4])
+      .map((row: any) => parseDayPhotoRow(row));
+    return photos.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  } catch (err: any) {
+    console.warn("[Google Sheets] Could not load day photos:", err?.message || err);
+    return [];
+  }
+}
+
+// Remove a day photo row by ID (leaves the row empty so sheet indexes stay stable).
+export async function deleteDayPhoto(id: string): Promise<boolean> {
+  const auth = getOAuthClient();
+  if (!auth) throw new Error("Google Sheets is niet geconfigureerd.");
+
+  const { spreadsheetId } = await getOrCreateSpreadsheet();
+  const sheets = google.sheets({ version: "v4", auth });
+  await ensureTabsExist(sheets, spreadsheetId);
+  await ensureDayPhotosHeaders(sheets, spreadsheetId);
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "DayPhotos!A2:G500",
+  });
+
+  const rows = res.data.values || [];
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === id) {
+      const rowNumber = i + 2; // 1-based sheet row, skipping the header
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `DayPhotos!A${rowNumber}:G${rowNumber}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [["", "", "", "", "", "", ""]] },
+      });
+      return true;
+    }
+  }
+  return false;
 }
 
 
