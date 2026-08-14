@@ -195,3 +195,13 @@ export interface ResetPasswordResponse {
   success: boolean;
   error?: string;
 }
+
+export interface DayPhoto {
+  id: string;
+  date: string;        // YYYY-MM-DD
+  island: string;      // bv. Milos / Naxos / Koufonisia
+  caption: string;     // tekst of AI-bijschrift
+  imageUrl: string;    // Cloudinary secure_url
+  author?: string;     // nickname
+  createdAt?: string;  // ISO
+}
