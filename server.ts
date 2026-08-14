@@ -23,6 +23,10 @@ import {
   getTripRequestById,
   updateTripRequestStatus,
   createUserInSheet,
+  addDayPhoto,
+  getDayPhotos,
+  deleteDayPhoto,
+  uploadTravelPhoto,
 } from "./server/sheets-service.js";
 import { validateTrip } from "./server/trip-validation.js";
 import { handleProfileUpdate } from "./server/profile-service.js";
@@ -332,6 +336,100 @@ app.post("/api/chat/favorites", requireAuth, async (req, res) => {
   } catch (err: any) {
     console.warn("Favorites save error:", err?.message || err);
     res.json({ success: false, error: err?.message || "Failed to save favorites" });
+  }
+});
+
+// API: Reisdagboek — foto's per reisdag (owner/member uploadt, gasten lezen).
+app.post("/api/dayphotos", requireAuth, async (req, res) => {
+  try {
+    const { imageBase64, date, island, caption, author } = req.body || {};
+
+    if (!imageBase64 || typeof imageBase64 !== "string") {
+      return res.status(400).json({ success: false, error: "Foto ontbreekt." });
+    }
+    if (!imageBase64.startsWith("data:image/")) {
+      return res.status(400).json({ success: false, error: "Ongeldige afbeelding. Upload een JPG, PNG of WebP." });
+    }
+    // Max ~5MB net als de avatar-upload.
+    const base64Body = imageBase64.split(",")[1] || "";
+    const approxBytes = Math.floor((base64Body.length * 3) / 4);
+    if (approxBytes > 5 * 1024 * 1024) {
+      return res.status(400).json({ success: false, error: "Foto is te groot (max ~5MB). Kies een kleinere afbeelding." });
+    }
+    if (!date) {
+      return res.status(400).json({ success: false, error: "Datum is verplicht (YYYY-MM-DD)." });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ success: false, error: "Ongeldige datum. Gebruik het formaat YYYY-MM-DD." });
+    }
+
+    const imageUrl = await uploadTravelPhoto(imageBase64);
+    const photo = await addDayPhoto({
+      date,
+      island: typeof island === "string" ? island : "",
+      caption: typeof caption === "string" ? caption : "",
+      imageUrl,
+      author: typeof author === "string" ? author : "",
+    });
+    res.json({ success: true, photo });
+  } catch (err: any) {
+    console.error("Day photo upload error:", err?.message || err);
+    res.status(500).json({ success: false, error: err?.message || "Fout bij het uploaden van de foto." });
+  }
+});
+
+// Gasten mogen het Reisdagboek lezen zonder in te loggen.
+app.get("/api/dayphotos", async (req, res) => {
+  try {
+    if (!isGoogleAuthConfigured()) {
+      return res.json({ success: true, photos: [] });
+    }
+    const photos = await getDayPhotos();
+    res.json({ success: true, photos });
+  } catch (err: any) {
+    console.error("Day photos load error:", err?.message || err);
+    res.status(500).json({ success: false, error: "Fout bij het laden van het reisdagboek." });
+  }
+});
+
+// API: AI-bijschrift genereren (Groq/Gemini, met vriendelijke standaardtekst als fallback).
+app.post("/api/dayphotos/caption", requireAuth, async (req, res) => {
+  try {
+    const { photoContext } = req.body || {};
+    const island = typeof photoContext?.island === "string" ? photoContext.island : "";
+    const date = typeof photoContext?.date === "string" ? photoContext.date : "";
+    const extra = typeof photoContext?.text === "string" && photoContext.text.trim() ? photoContext.text.trim() : "";
+
+    const islandLine = island ? `Eiland: ${island}.` : "";
+    const dateLine = date ? `Datum: ${date}.` : "";
+    const extraLine = extra ? `Aanvulling van de reiziger: "${extra}".` : "";
+
+    let caption = `Een onvergetelijke dag op ${island || "de Cycladen"}!`;
+    const result = await callGroqAI(
+      "Je schrijft korte, warme Nederlandse bijschriften (max 1 zin) voor foto's van een Griekse eilandenreis van Dennis & Joyce. Spreek als de reiziger zelf, gebruik geen emojis en geen aanhalingstekens. Noem het eiland of het moment.",
+      `${islandLine} ${dateLine} ${extraLine}`.trim()
+    );
+    if (result && result.content && result.content.trim()) {
+      caption = result.content.trim().replace(/["']/g, "");
+    }
+    res.json({ success: true, caption });
+  } catch (err: any) {
+    console.error("Day photo caption error:", err?.message || err);
+    res.json({ success: true, caption: "Een bijzonder moment onderweg — het eiland op zijn mooist!" });
+  }
+});
+
+app.delete("/api/dayphotos/:id", requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const removed = await deleteDayPhoto(id);
+    if (!removed) {
+      return res.status(404).json({ success: false, error: "Foto niet gevonden." });
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Day photo delete error:", err?.message || err);
+    res.status(500).json({ success: false, error: "Fout bij het verwijderen van de foto." });
   }
 });
 
