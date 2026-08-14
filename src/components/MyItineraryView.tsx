@@ -697,7 +697,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {canEdit && (
                       <>
                         <button
@@ -714,10 +714,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                             return (
                               <button
                                 onClick={() => handleChangeLink(stay.id)}
-                                className="text-xs font-['Inter'] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1"
+                                className="text-xs font-['Inter'] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1 max-w-full"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                {linkInfo.matchedBooking.name}
+                                <span className="truncate max-w-[160px]">{linkInfo.matchedBooking.name}</span>
                               </button>
                             );
                           }
