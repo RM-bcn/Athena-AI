@@ -46,12 +46,16 @@ export interface ActivityChip {
   label: string;
 }
 
-export type DayPlanItemType = 'activity' | 'dining' | 'tip';
+export type DayPlanItemType = 'activity' | 'dining' | 'tip' | 'transport' | 'checkin' | 'checkout';
 
 export interface DayPlanItem {
   id: string;
   type: DayPlanItemType;
   text: string;
+  /** Beschermde records (ferry, hotel-inchecken/uitchecken) worden automatisch
+   *  uit de verblijfs-/transportdata gezet en mogen niet per ongeluk worden
+   *  verwijderd of overschreven wanneer je de dagplanning bewerkt. */
+  protected?: boolean;
 }
 
 export interface DayPlan {
