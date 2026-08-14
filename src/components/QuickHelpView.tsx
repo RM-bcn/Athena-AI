@@ -79,9 +79,9 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
         {/* Urgent: Missed Ferry (Large High-Priority Card) */}
         <div
           onClick={onOpenMissedFerry}
-          className="col-span-12 md:col-span-8 group cursor-pointer"
+          className="col-span-12 lg:col-span-8 group cursor-pointer"
         >
-          <div className="h-full bg-white rounded-[24px] p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,91,174,0.12)] transition-all duration-300 border border-[#c0c7d3]/30 flex flex-col md:flex-row gap-8 relative overflow-hidden">
+          <div className="h-full bg-white rounded-[24px] p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,91,174,0.12)] transition-all duration-300 border border-[#c0c7d3]/30 flex flex-col lg:flex-row gap-8 relative overflow-hidden">
             <div className="flex-1 relative z-10">
               <div className="w-12 h-12 bg-red-100 text-[#ba1a1a] rounded-full flex items-center justify-center mb-6 shadow-sm">
                 <Ship className="w-6 h-6" />
@@ -97,14 +97,14 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
                   e.stopPropagation();
                   onOpenMissedFerry();
                 }}
-                className="bg-[#ba1a1a] text-white px-6 py-3 rounded-full font-['Inter'] font-semibold text-sm flex items-center gap-2 active:scale-95 transition-transform hover:brightness-110 shadow-md cursor-pointer"
+                className="bg-[#ba1a1a] text-white px-4 py-3 text-xs rounded-full font-['Inter'] font-semibold lg:px-6 lg:text-sm flex items-center gap-2 active:scale-95 transition-transform hover:brightness-110 shadow-md cursor-pointer"
               >
                 Vertrek oplossen
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="w-full md:w-1/3 h-48 md:h-auto rounded-2xl overflow-hidden relative grayscale-[20%] group-hover:grayscale-0 transition-all duration-500 shadow-sm">
+            <div className="w-full lg:w-1/3 h-48 lg:h-auto rounded-2xl overflow-hidden relative grayscale-[20%] group-hover:grayscale-0 transition-all duration-500 shadow-sm">
               <img
                 src={MISSED_FERRY_IMAGE}
                 alt="Veerboot bij Griekse haven"
@@ -117,7 +117,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
         {/* Translate Menu (Medium Interactive Card) */}
         <div
           onClick={onOpenTranslateMenu}
-          className="col-span-12 md:col-span-4 group cursor-pointer"
+          className="col-span-12 lg:col-span-4 group cursor-pointer"
         >
           <div className="h-full bg-[#005BAE] text-white rounded-[24px] p-8 shadow-[0_16px_24px_rgba(0,91,174,0.15)] hover:shadow-[0_24px_48px_rgba(0,91,174,0.25)] transition-all duration-300 flex flex-col justify-between">
             <div>
@@ -142,7 +142,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
         {/* Recommend Taverna (Standard Card) */}
         <div
           onClick={onOpenTavernas}
-          className="col-span-12 md:col-span-6 group cursor-pointer"
+          className="col-span-12 lg:col-span-6 group cursor-pointer"
         >
           <div className="h-full bg-white rounded-[24px] p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,91,174,0.12)] transition-all duration-300 flex items-start gap-6 border border-[#c0c7d3]/30">
             <div className="shrink-0 w-16 h-16 rounded-2xl overflow-hidden shadow-sm">
@@ -174,7 +174,7 @@ export const QuickHelpView: React.FC<QuickHelpViewProps> = ({
         {/* Find Quiet Beach (Standard Card) */}
         <div
           onClick={onOpenBeaches}
-          className="col-span-12 md:col-span-6 group cursor-pointer"
+          className="col-span-12 lg:col-span-6 group cursor-pointer"
         >
           <div className="h-full bg-white rounded-[24px] p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,91,174,0.12)] transition-all duration-300 flex items-start gap-6 border border-[#c0c7d3]/30">
             <div className="shrink-0 w-16 h-16 rounded-2xl overflow-hidden shadow-sm">

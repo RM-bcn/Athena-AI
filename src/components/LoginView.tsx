@@ -364,7 +364,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </button>
           </section>
         ) : (
-        <div className="grid md:grid-cols-2 gap-8 items-stretch">
+        <div className="grid lg:grid-cols-2 gap-8 items-stretch">
           {/* Section 1: Travel Code Access (Follow a Journey) */}
           <section className="bg-white/90 backdrop-blur-md rounded-2xl p-8 md:p-10 shadow-sm hover:shadow-md transition-all border border-[#f0f4f9] flex flex-col justify-between group">
             <div className="space-y-6">
