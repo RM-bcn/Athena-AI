@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, CalendarPlus, Check, Utensils, Lightbulb, CheckCircle2, Ship, Hotel, LogOut } from 'lucide-react';
+import { X, CalendarPlus, Check, Utensils, Lightbulb, CheckCircle2, Ship, Hotel, LogOut, Clock } from 'lucide-react';
 import type { ChatMessage, TripData, DayPlanItemType } from '../../types';
 
 interface ChatExportModalProps {
@@ -7,7 +7,7 @@ interface ChatExportModalProps {
   onClose: () => void;
   message: ChatMessage | null;
   trip: TripData;
-  onExport: (stayId: string, dayIdx: number, type: DayPlanItemType, text: string) => void;
+  onExport: (stayId: string, dayIdx: number, type: DayPlanItemType, text: string, time?: string) => void;
 }
 
 const TYPE_LABELS: Record<DayPlanItemType, string> = {
@@ -29,6 +29,7 @@ export const ChatExportModal: React.FC<ChatExportModalProps> = ({
   const [stayId, setStayId] = useState<string>(() => trip.stays[0]?.id || '');
   const [dayIdx, setDayIdx] = useState(0);
   const [type, setType] = useState<DayPlanItemType>('activity');
+  const [time, setTime] = useState('');
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export const ChatExportModal: React.FC<ChatExportModalProps> = ({
       setStayId(trip.stays[0]?.id || '');
       setDayIdx(0);
       setType('activity');
+      setTime('');
       setDone(false);
     }
   }, [isOpen, trip.stays]);
@@ -53,7 +55,7 @@ export const ChatExportModal: React.FC<ChatExportModalProps> = ({
   const handleExport = () => {
     const text = message.content;
     if (!text.trim()) return;
-    onExport(selectedStay?.id || '', safeDayIdx, type, text);
+    onExport(selectedStay?.id || '', safeDayIdx, type, text, time && time.trim() ? time.trim() : undefined);
     setDone(true);
   };
 
@@ -148,6 +150,20 @@ export const ChatExportModal: React.FC<ChatExportModalProps> = ({
                   <option value="checkin">Inchecken hotel</option>
                   <option value="checkout">Uitchecken hotel</option>
                 </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Tijd (optioneel)
+                </label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#717783] pointer-events-none" />
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-sm text-[#0b1d2d] focus:outline-none focus:ring-2 focus:ring-[#005BAE]/30"
+                  />
+                </div>
               </div>
             </div>
 

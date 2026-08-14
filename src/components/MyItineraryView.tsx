@@ -72,10 +72,10 @@ interface MyItineraryViewProps {
   isSheetsConnected?: boolean;
   onSyncSheets?: () => void;
   dayPlans?: Record<string, DayPlan[]>;
-  dayPlanGenerating?: Record<string, boolean>;
-  dayPlanErrors?: Record<string, string>;
-  onGenerateDayPlan?: (stay: IslandStay) => Promise<{ success: boolean; error?: string }>;
   onSaveDayPlans?: (stayId: string, plans: DayPlan[]) => void;
+  onAskDayPlanInChat?: (stay: IslandStay) => void;
+  dayPlanAutoSync?: Record<string, boolean>;
+  onSetAutoSync?: (stayId: string, enabled: boolean) => void;
 }
 
 export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
@@ -104,10 +104,10 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   isSheetsConnected = false,
   onSyncSheets,
   dayPlans = {},
-  dayPlanGenerating = {},
-  dayPlanErrors = {},
-  onGenerateDayPlan,
   onSaveDayPlans,
+  onAskDayPlanInChat,
+  dayPlanAutoSync = {},
+  onSetAutoSync,
 }) => {
 
   const [accommodationsOpen, setAccommodationsOpen] = useState(true);
@@ -646,15 +646,14 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                       </button>
                     )}
 
-                    {onGenerateDayPlan && (
+                    {onAskDayPlanInChat && (
                       <button
-                        onClick={() => onGenerateDayPlan(stay)}
-                        disabled={!!dayPlanGenerating[`${tripCode}:${stay.id}`]}
-                        className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-60 disabled:cursor-wait"
-                        title="Genereer een AI-dagplanning voor dit verblijf"
+                        onClick={() => onAskDayPlanInChat(stay)}
+                        className="text-xs font-['Inter'] font-semibold text-[#005BAE] bg-[#f0f4f9] border border-[#005BAE]/30 px-3 py-1.5 rounded-lg hover:bg-[#005BAE] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                        title="Vraag Athena in de chat om een dagplanning voor dit verblijf te maken"
                       >
-                        <RefreshCw className={`w-3.5 h-3.5 ${dayPlanGenerating[`${tripCode}:${stay.id}`] ? 'animate-spin' : ''}`} />
-                        {dayPlanGenerating[`${tripCode}:${stay.id}`] ? 'Bezig met genereren...' : 'Regenereer dagplanning'}
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        Vraag Athena (dagplanning)
                       </button>
                     )}
 
@@ -670,13 +669,6 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                     )}
                   </div>
                 </div>
-
-                {dayPlanErrors[`${tripCode}:${stay.id}`] && (
-                  <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-['Inter']">
-                    <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <span>{dayPlanErrors[`${tripCode}:${stay.id}`]}</span>
-                  </div>
-                )}
 
                 {/* Day Cards for this Stay */}
                 <div className="space-y-4">
@@ -720,7 +712,12 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
                                 ) : (
                                   <CheckCircle2 className="w-4 h-4 text-[#005BAE] flex-shrink-0 mt-0.5" />
                                 )}
-                                <span className="whitespace-pre-line">{item.text}</span>
+                                <span className="whitespace-pre-line">
+                                  {item.time ? (
+                                    <span className="font-bold text-[#005BAE] mr-1.5">{item.time}</span>
+                                  ) : null}
+                                  {item.text}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -984,9 +981,16 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
         onSave={(plans) => {
           if (dayPlanEditorStay) onSaveDayPlans?.(dayPlanEditorStay.id, plans);
         }}
-        onGenerate={onGenerateDayPlan || (() => Promise.resolve({ success: false }))}
-        generating={dayPlanEditorStay ? !!dayPlanGenerating[`${tripCode}:${dayPlanEditorStay.id}`] : false}
-        error={dayPlanEditorStay ? dayPlanErrors[`${tripCode}:${dayPlanEditorStay.id}`] : ''}
+        onAskChat={(stay) => onAskDayPlanInChat?.(stay)}
+        autoSync={dayPlanEditorStay ? dayPlanAutoSync[`${tripCode}:${dayPlanEditorStay.id}`] !== false : true}
+        onToggleAutoSync={
+          dayPlanEditorStay && onSetAutoSync
+            ? () => onSetAutoSync(
+                dayPlanEditorStay.id,
+                dayPlanAutoSync[`${tripCode}:${dayPlanEditorStay.id}`] === false
+              )
+            : undefined
+        }
       />
     </main>
   );

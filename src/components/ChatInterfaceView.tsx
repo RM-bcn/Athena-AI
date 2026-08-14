@@ -38,7 +38,7 @@ interface ChatInterfaceViewProps {
   onDeleteSession: (sessionId: string) => void;
   onStartNewSession: () => void;
   currentTrip: TripData;
-  onExportToDayPlan?: (stayId: string, dayIdx: number, type: DayPlanItemType, text: string) => void;
+  onExportToDayPlan?: (stayId: string, dayIdx: number, type: DayPlanItemType, text: string, time?: string) => void;
 }
 
 export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
@@ -702,7 +702,7 @@ export const ChatInterfaceView: React.FC<ChatInterfaceViewProps> = ({
         onClose={() => setExportMessage(null)}
         message={exportMessage}
         trip={currentTrip}
-        onExport={(stayId, dayIdx, type, text) => onExportToDayPlan?.(stayId, dayIdx, type, text)}
+        onExport={(stayId, dayIdx, type, text, time) => onExportToDayPlan?.(stayId, dayIdx, type, text, time)}
       />
     </div>
   );

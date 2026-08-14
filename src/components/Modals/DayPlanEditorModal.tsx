@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Sparkles, Plus, Trash2, ArrowUp, ArrowDown, RefreshCw, Utensils, Lightbulb, CheckCircle2, Calendar, Ship, Hotel, Lock, LogOut } from 'lucide-react';
+import { X, Sparkles, Plus, Trash2, ArrowUp, ArrowDown, Utensils, Lightbulb, CheckCircle2, Calendar, Ship, Hotel, Lock, LogOut, Clock, MessageCircle } from 'lucide-react';
 import type { IslandStay, DayPlan, DayPlanItem, DayPlanItemType } from '../../types';
 import { normalizeDayPlans, dayPlanItemId, ensureDayPlanCount, emptyDayPlan, isProtectedItem } from '../../utils/dayPlans';
 
@@ -9,9 +9,9 @@ interface DayPlanEditorModalProps {
   stay: IslandStay;
   plans: DayPlan[];
   onSave: (plans: DayPlan[]) => void;
-  onGenerate: (stay: IslandStay) => Promise<{ success: boolean; error?: string }>;
-  generating?: boolean;
-  error?: string;
+  onAskChat: (stay: IslandStay) => void;
+  autoSync?: boolean;
+  onToggleAutoSync?: () => void;
 }
 
 const TYPE_LABELS: Record<DayPlanItemType, string> = {
@@ -38,15 +38,15 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
   stay,
   plans,
   onSave,
-  onGenerate,
-  generating = false,
-  error,
+  onAskChat,
+  autoSync = true,
+  onToggleAutoSync,
 }) => {
   const [draft, setDraft] = useState<DayPlan[]>(() => normalizeDayPlans(plans));
   const [activeDay, setActiveDay] = useState(0);
   const [newItemType, setNewItemType] = useState<DayPlanItemType>('activity');
   const [newItemText, setNewItemText] = useState('');
-  const prevGenerating = useRef<boolean>(generating);
+  const [newItemTime, setNewItemTime] = useState('');
 
   // Reset draft wanneer het modal opent.
   useEffect(() => {
@@ -54,17 +54,10 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
       setDraft(normalizeDayPlans(plans));
       setActiveDay(0);
       setNewItemText('');
+      setNewItemTime('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  // Na een AI-generatie (generating: true -> false) de verse plannen laden.
-  useEffect(() => {
-    if (isOpen && prevGenerating.current && !generating) {
-      setDraft(normalizeDayPlans(plans));
-    }
-    prevGenerating.current = generating;
-  }, [generating, plans, isOpen]);
 
   if (!isOpen) return null;
 
@@ -88,11 +81,12 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
       id: dayPlanItemId(newItemType),
       type: newItemType,
       text,
+      time: newItemTime && newItemTime.trim() ? newItemTime.trim() : undefined,
       protected: isRecordType,
     };
-    const target = padded[activeDay] || emptyDayPlan(activeDay);
     updatePlan(padded.map((p) => (p.day === activeDay ? { ...p, items: [...(p.items || []), item] } : p)));
     setNewItemText('');
+    setNewItemTime('');
   };
 
   const removeItem = (itemId: string) => {
@@ -121,6 +115,11 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
   const handleSave = () => {
     onSave(padded);
     onClose();
+  };
+
+  const handleAskChat = () => {
+    onClose();
+    onAskChat(stay);
   };
 
   return (
@@ -162,11 +161,28 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
           ))}
         </div>
 
-        {error && (
-          <div className="mb-4 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-['Inter']">
-            <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
+        {onToggleAutoSync && (
+          <button
+            onClick={onToggleAutoSync}
+            className="mb-4 w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#f7f9ff] border border-[#c0c7d3]/30 font-['Inter'] text-xs cursor-pointer hover:bg-[#f0f4f9] transition-colors"
+            title="Zet de automatische records (ferry, inchecken, uitchecken) voor dit verblijf aan of uit"
+          >
+            <span className="flex items-center gap-2 text-[#0b1d2d] font-semibold">
+              <Lock className="w-3.5 h-3.5 text-[#005BAE]" />
+              Auto-records (ferry, incheck, uitcheck)
+            </span>
+            <span
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                autoSync ? 'bg-[#005BAE]' : 'bg-[#c0c7d3]'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  autoSync ? 'translate-x-[18px]' : 'translate-x-0.5'
+                }`}
+              />
+            </span>
+          </button>
         )}
 
         {/* Title */}
@@ -191,7 +207,7 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
         ) : (
           <ul className="space-y-1.5 mb-4">
             {activePlan.items.map((item, idx) => {
-              const isProtected = isProtectedItem(item);
+              const isProtected = isProtectedItem(item) && autoSync;
               return (
                 <li
                   key={item.id}
@@ -212,7 +228,15 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
                         </span>
                       )}
                     </span>
-                    <span className="font-['Inter'] text-sm text-[#0b1d2d] whitespace-pre-line">{item.text}</span>
+                    <span className="font-['Inter'] text-sm text-[#0b1d2d] whitespace-pre-line">
+                      {item.time ? (
+                        <span className="inline-flex items-center gap-0.5 font-bold text-[#005BAE] mr-1.5">
+                          <Clock className="w-3 h-3" />
+                          {item.time}
+                        </span>
+                      ) : null}
+                      {item.text}
+                    </span>
                   </div>
                   {!isProtected && (
                     <>
@@ -263,6 +287,16 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
             <option value="checkin">Inchecken hotel</option>
             <option value="checkout">Uitchecken hotel</option>
           </select>
+          <div className="relative flex-shrink-0">
+            <Clock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#717783] pointer-events-none" />
+            <input
+              type="time"
+              value={newItemTime}
+              onChange={(e) => setNewItemTime(e.target.value)}
+              className="pl-8 pr-2 py-2.5 bg-[#f7f9ff] border border-[#c0c7d3]/40 rounded-xl font-['Inter'] text-xs text-[#001a33] focus:outline-none focus:ring-2 focus:ring-[#005BAE]/30"
+              title="Optionele tijd (bijv. 09:30)"
+            />
+          </div>
           <input
             value={newItemText}
             onChange={(e) => setNewItemText(e.target.value)}
@@ -284,16 +318,13 @@ export const DayPlanEditorModal: React.FC<DayPlanEditorModalProps> = ({
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-[#f0f4f9]">
           <button
-            onClick={() => onGenerate(stay)}
-            disabled={generating}
-            className="text-xs font-['Inter'] font-semibold text-white bg-gradient-to-r from-[#005BAE] to-[#0074d4] px-4 py-2.5 rounded-xl hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait shadow-sm"
+            onClick={handleAskChat}
+            className="text-xs font-['Inter'] font-semibold text-white bg-gradient-to-r from-[#005BAE] to-[#0074d4] px-4 py-2.5 rounded-xl hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+            title="Ga naar de chat en vraag Athena om een dagplanning voor dit verblijf"
           >
-            {generating ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4 text-amber-300" />
-            )}
-            {generating ? 'Athena plant je dagen...' : 'Genereer met AI'}
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <MessageCircle className="w-4 h-4 text-white" />
+            Genereer met AI in de chat
           </button>
           <button
             onClick={handleSave}

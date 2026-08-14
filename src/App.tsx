@@ -342,8 +342,24 @@ export default function App() {
       return {};
     }
   });
-  const [dayPlanGenerating, setDayPlanGenerating] = useState<Record<string, boolean>>({});
-  const [dayPlanErrors, setDayPlanErrors] = useState<Record<string, string>>({});
+  const [dayPlanAutoSync, setDayPlanAutoSync] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(`athena_dayplans_autosync_${tripCode}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const isAutoSyncEnabled = (stayId: string) => dayPlanAutoSync[`${tripCode}:${stayId}`] !== false;
+  const setAutoSyncEnabled = (stayId: string, enabled: boolean) => {
+    const key = `${tripCode}:${stayId}`;
+    setDayPlanAutoSync((prev) => ({ ...prev, [key]: enabled }));
+    try {
+      localStorage.setItem(`athena_dayplans_autosync_${tripCode}`, JSON.stringify({ ...dayPlanAutoSync, [key]: enabled }));
+    } catch (e) {
+      console.error("Failed to save day plan auto-sync preference", e);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -353,63 +369,30 @@ export default function App() {
     }
   }, [dayPlans, tripCode]);
 
-  const generateDayPlan = async (stay: IslandStay): Promise<{ success: boolean; error?: string }> => {
-    const key = `${tripCode}:${stay.id}`;
-    setDayPlanGenerating((prev) => ({ ...prev, [key]: true }));
-    setDayPlanErrors((prev) => ({ ...prev, [key]: '' }));
-    try {
-      const res = await fetch('/api/dayplan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          island: stay.island,
-          startDate: stay.startDate,
-          endDate: stay.endDate,
-          nights: stay.nights,
-          accommodationName: stay.accommodationName,
-          style: currentTrip.style,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && Array.isArray(data.plans) && data.plans.length > 0) {
-        const base = normalizeDayPlans(data.plans);
-        // Vaste records (ferry + inchecken dag 0, uitchecken + ferry laatste
-        // dag) uit de verblijfs- en transportdata toepassen, zodat ze nooit
-        // verloren gaan bij regenereren of handmatig bewerken.
-        const withRecords = applyStayRecords(base, stay, transportEntriesRef.current);
-        setDayPlans((prev) => ({ ...prev, [key]: withRecords }));
-        return { success: true };
-      }
-      const message =
-        typeof data.error === 'string' && data.error.trim()
-          ? data.error
-          : 'De dagplanning kon niet worden opgehaald. Probeer het later opnieuw.';
-      setDayPlanErrors((prev) => ({ ...prev, [key]: message }));
-      return { success: false, error: message };
-    } catch (err: any) {
-      const message = 'Netwerkfout: de dagplanning kon niet worden gegenereerd.';
-      setDayPlanErrors((prev) => ({ ...prev, [key]: message }));
-      return { success: false, error: message };
-    } finally {
-      setDayPlanGenerating((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
   // Sla een volledige dagplanning voor een verblijf op (editor-opslag).
   const saveDayPlans = (stayId: string, plans: DayPlan[]) => {
     const key = `${tripCode}:${stayId}`;
     const stay = currentTrip.stays.find((s) => s.id === stayId);
     const normalized = plans.map((p) => normalizeDayPlan(p));
     // Records opnieuw toepassen zodat ferry/inchecken/uitchecken ook na een
-    // handmatige bewerkingsronde op de juiste dagen blijven staan.
-    const withRecords = stay ? applyStayRecords(normalized, stay, transportEntriesRef.current) : normalized;
+    // handmatige bewerkingsronde op de juiste dagen blijven staan (tenzij de
+    // auto-sync voor dit verblijf is uitgeschakeld).
+    const withRecords = stay && isAutoSyncEnabled(stayId)
+      ? applyStayRecords(normalized, stay, transportEntriesRef.current)
+      : normalized;
     setDayPlans((prev) => ({ ...prev, [key]: withRecords }));
   };
 
-  // Voeg een item (activiteit / eettip / praktische tip) toe aan een dag van
-  // een verblijf. Gebruikt door de chat-export; maakt de dagplanning aan als
-  // die er nog niet is.
-  const addDayPlanItem = (stayId: string, dayIdx: number, type: DayPlanItemType, text: string) => {
+  // Voeg een item (activiteit / eettip / praktische tip / transport / etc.) toe
+  // aan een dag van een verblijf. Gebruikt door de chat-export; maakt de
+  // dagplanning aan als die er nog niet is.
+  const addDayPlanItem = (
+    stayId: string,
+    dayIdx: number,
+    type: DayPlanItemType,
+    text: string,
+    time?: string
+  ) => {
     const key = `${tripCode}:${stayId}`;
     const stay = currentTrip.stays.find((s) => s.id === stayId);
     setDayPlans((prev) => {
@@ -419,6 +402,7 @@ export default function App() {
         id: dayPlanItemId(type),
         type,
         text: text.trim(),
+        time: time && time.trim() ? time.trim() : undefined,
         protected: type === 'transport' || type === 'checkin' || type === 'checkout',
       };
       let updated: DayPlan[] = padded.map((p) => {
@@ -427,7 +411,7 @@ export default function App() {
       });
       // Zorg dat de vaste records op dag 0 en de laatste dag staan, ook wanneer
       // de planning nog niet eerder was gegenereerd.
-      if (stay) updated = applyStayRecords(updated, stay, transportEntriesRef.current);
+      if (stay && isAutoSyncEnabled(stayId)) updated = applyStayRecords(updated, stay, transportEntriesRef.current);
       return { ...prev, [key]: updated };
     });
   };
@@ -509,6 +493,8 @@ if (loaded.stayBookingLinks) {
         next[key] = plans;
         const stay = currentTrip.stays.find((s) => `${tripCode}:${s.id}` === key);
         if (!stay) continue;
+        // Auto-sync overslaan voor verblijven waar de gebruiker deze uitzette.
+        if (!isAutoSyncEnabled(stay.id)) continue;
         const withRecords = applyStayRecords(plans, stay, transportEntries);
         if (JSON.stringify(withRecords) !== JSON.stringify(plans)) {
           next[key] = withRecords;
@@ -518,7 +504,7 @@ if (loaded.stayBookingLinks) {
       return changed ? next : prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transportEntries, currentTrip.stays, tripCode]);
+  }, [transportEntries, currentTrip.stays, tripCode, dayPlanAutoSync]);
 
   // Single debounced save path to Google Sheets. Trip edits and transport edits
   // both funnel through here, so concurrent changes bundle into one request.
@@ -1133,6 +1119,14 @@ if (loaded.stayBookingLinks) {
     if (message) handleSendMessage(message);
   };
 
+  // "Genereer met AI" linkt door naar de chat: daar stelt de gebruiker zijn
+  // vraag aan Athena en kan hij het antwoord daarna in de dagplanning zetten.
+  const askDayPlanInChat = (stay: IslandStay) => {
+    openChat(
+      `Athena, maak een dagplanning voor ${stay.island} (${stay.startDate} t/m ${stay.endDate}, ${stay.nights} nachten, accommodatie: ${stay.accommodationName || 'nog niet gekozen'}). Geef per dag een titel, activiteiten, eettips en praktische tips in het Nederlands.`
+    );
+  };
+
   const handleFindSecludedBeaches = () => {
     const fallback = () =>
       openChat(
@@ -1303,10 +1297,10 @@ if (loaded.stayBookingLinks) {
             isSheetsConnected={isSheetsConnected}
             onSyncSheets={handleManualSyncSheets}
             dayPlans={dayPlans}
-            dayPlanGenerating={dayPlanGenerating}
-            dayPlanErrors={dayPlanErrors}
-            onGenerateDayPlan={generateDayPlan}
             onSaveDayPlans={saveDayPlans}
+            onAskDayPlanInChat={askDayPlanInChat}
+            dayPlanAutoSync={dayPlanAutoSync}
+            onSetAutoSync={setAutoSyncEnabled}
           />
         )}
 
