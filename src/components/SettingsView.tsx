@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Bell, Moon, Sun, Globe, User, Key, Cpu, Sparkles, CheckCircle2, ChevronRight, ImagePlus } from 'lucide-react';
+import { Settings, Shield, Bell, Moon, Sun, Globe, User, Key, Cpu, Sparkles, CheckCircle2, ChevronRight, ImagePlus, Smartphone, Download } from 'lucide-react';
 import { UserAccount } from '../types';
+import { useInstallPrompt } from '../pwa/useInstallPrompt';
 
 interface SettingsViewProps {
   currentUser: UserAccount | null;
@@ -11,6 +12,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser, onOpenP
   const [aiEngine, setAiEngine] = useState<string>('Groq Llama-3.3-70B (Primair)');
   const [hasGroq, setHasGroq] = useState<boolean>(true);
   const [statusUnknown, setStatusUnknown] = useState(false);
+  const { canInstall, isStandalone, isIOS, promptInstall } = useInstallPrompt();
+  const [installing, setInstalling] = useState(false);
+
+  const handleInstallClick = async () => {
+    setInstalling(true);
+    try {
+      await promptInstall();
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/ai/status')
@@ -94,6 +106,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser, onOpenP
                 </div>
               </div>
               <span className="font-['Inter'] text-xs font-bold text-[#005BAE] bg-[#f0f4f9] px-3 py-1.5 rounded-full">Nederlands</span>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl hover:bg-[#f0f4f9] transition-colors">
+              <div className="flex items-center gap-3">
+                <Smartphone className="w-5 h-5 text-[#005BAE]" />
+                <div>
+                  <p className="font-['Inter'] text-sm font-semibold text-[#0b1d2d]">App</p>
+                  {isStandalone ? (
+                    <p className="font-['Inter'] text-xs text-[#717783]">
+                      Geïnstalleerd — je gebruikt Athena AI als app.
+                    </p>
+                  ) : canInstall ? (
+                    <p className="font-['Inter'] text-xs text-[#717783]">
+                      Installeer Athena AI als app — werkt ook offline.
+                    </p>
+                  ) : isIOS ? (
+                    <p className="font-['Inter'] text-xs text-[#717783]">
+                      Zet Athena AI op je beginscherm via Delen → &lsquo;Zet op beginscherm&rsquo;.
+                    </p>
+                  ) : (
+                    <p className="font-['Inter'] text-xs text-[#717783]">
+                      Open deze site in Chrome of Safari om te installeren.
+                    </p>
+                  )}
+                </div>
+              </div>
+              {isStandalone ? (
+                <span className="font-['Inter'] text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-full border border-emerald-300 flex items-center gap-1 self-start sm:self-auto">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  GEÏNSTALLEERD
+                </span>
+              ) : canInstall ? (
+                <button
+                  onClick={handleInstallClick}
+                  disabled={installing}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer disabled:opacity-60 self-start sm:self-auto"
+                >
+                  <Download className="w-4 h-4" />
+                  {installing ? 'Installeren…' : 'Installeren'}
+                </button>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between p-4 rounded-xl bg-orange-50/50 border border-orange-200/60">
