@@ -5,6 +5,7 @@ import { DayPhoto } from '../../types';
 interface StoriesModalProps {
   isOpen: boolean;
   photos: DayPhoto[];
+  startIndex?: number;
   onClose: () => void;
 }
 
@@ -22,11 +23,12 @@ function formatStoryDate(dateStr: string): string {
   }
 }
 
-export const StoriesModal: React.FC<StoriesModalProps> = ({ isOpen, photos, onClose }) => {
-  const [index, setIndex] = useState(0);
+export const StoriesModal: React.FC<StoriesModalProps> = ({ isOpen, photos, startIndex = 0, onClose }) => {
+  const [index, setIndex] = useState(startIndex);
 
   useEffect(() => {
-    if (isOpen) setIndex(0);
+    if (isOpen) setIndex(Math.min(Math.max(startIndex, 0), Math.max(photos.length - 1, 0)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const goPrev = useCallback(() => {
