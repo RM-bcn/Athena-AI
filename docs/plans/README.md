@@ -4,7 +4,7 @@ Overzicht van de geplande stappen voor Athena AI. Uitgevoerde stappen staan
 gearchiveerd in [done/](done/). Elke openstaande stap heeft een eigen plan-bestand
 dat door een agent uitgevoerd kan worden.
 
-## Afgerond (stap 0 + 01–14)
+## Afgerond (stap 0 + 01–18)
 
 - [x] Stap 0 — main bijwerken + branch-/stash-opruiming
 - [x] Step 01 — server-side login (bcrypt, token) → [done](done/step-01-server-auth-login.md)
@@ -24,11 +24,13 @@ dat door een agent uitgevoerd kan worden.
 - [x] Step 14 — proactief tegen Groq-modelrotatie → [done](done/step-14-groq-model-rotatie.md)
 - [x] Step 15 — mobiele responsiveness: kritieke fixes → [done](done/step-15-mobiel-responsive-kritiek.md)
 - [x] Step 16 — mobiele responsive polijsting → [done](done/step-16-mobiel-responsive-polijsting.md)
+- [x] Step 17 — Vandaag-knop 24u-regel + Tijdlijn-pagina → [step-17-tijdlijn-en-vandaag-fix.md](step-17-tijdlijn-en-vandaag-fix.md)
+- [ ] Step 18 — PWA: installeerbare app met offline-ondersteuning → [step-18-pwa-installeerbaar.md](step-18-pwa-installeerbaar.md)
 
 ## Vervolgstappen (openstaand)
 
-Geen openstaande geplande stappen. Nieuwe wensen kunnen als stap 17+ worden
-opgeschreven in een nieuw plan-bestand (patroon: `docs/plans/step-17-*.md`).
+Geen openstaande geplande stappen. Nieuwe wensen kunnen als stap 19+ worden
+opgeschreven in een nieuw plan-bestand (patroon: `docs/plans/step-19-*.md`).
 
 Waarom sequentieel: de stappen raken deels dezelfde bestanden (`server.ts`, `App.tsx`,
 `MyItineraryView.tsx`, `LoginView.tsx`). Parallel werken geeft merge-conflicten.
