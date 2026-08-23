@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Athena AI — Tijdlijn (mockup)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .font-display { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+</head>
+<body class="bg-[#f5f8fc] min-h-screen text-[#0b1d2d] antialiased pb-24">
+
+  <!-- Slimme topbar (context: dit wordt een eigen pagina/tab naast "Mijn Reis") -->
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-[#e1efff]">
+    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+      <button class="flex items-center gap-2 text-[#404752] hover:text-[#005BAE] text-sm font-semibold transition-colors cursor-pointer">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Mijn Reis
+      </button>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-[#005BAE] flex items-center justify-center text-white shadow-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8c2 0 4-1.5 4-3.5S14 2 12 2 8 2.5 8 4.5 10 8 12 8Z"/><path d="M12 8v13"/><path d="M5 12c1.5-2 4-3 7-3s5.5 1 7 3"/><path d="M4 17c2 1.5 4.5 2.5 8 2.5s6-1 8-2.5"/></svg>
+        </div>
+        <span class="font-display font-bold text-[#005BAE]">Athena AI</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-4">
+
+    <!-- Pagina-header -->
+    <section class="mt-6 bg-white rounded-[24px] border border-[#e1efff] shadow-sm p-6">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#005BAE]">Reisdagboek</span>
+          <h1 class="font-display text-3xl font-extrabold mt-1">Tijdlijn</h1>
+          <p class="text-sm text-[#717783] mt-1">Alle momenten van Dennis &amp; Joyce tijdens de Cycladen Odyssey.</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="px-3 py-1 rounded-full bg-[#005BAE]/10 text-[#005BAE] text-xs font-bold">42 momenten</span>
+          <span class="px-3 py-1 rounded-full bg-[#005BAE]/10 text-[#005BAE] text-xs font-bold">3 eilanden</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEMO-balk: alleen in deze mockup, niet in de app -->
+    <section class="mt-4 p-4 rounded-2xl border-2 border-dashed border-amber-400 bg-amber-50 flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <p class="text-xs font-extrabold uppercase tracking-wider text-amber-600">Alleen in deze mockup</p>
+        <p class="text-xs text-[#404752] mt-0.5 max-w-md">Zet uit om te zien wat er gebeurt als er geen foto's binnen 24 uur zijn: de "Vandaag"-cirkel én de zwevende Vandaag-knop verdwijnen (Deel A van het plan).</p>
+      </div>
+      <label class="flex items-center gap-3 cursor-pointer select-none flex-shrink-0">
+        <span class="text-xs font-bold text-[#404752]">Foto's &lt; 24u aanwezig</span>
+        <input id="recentToggle" type="checkbox" checked class="sr-only peer">
+        <span class="relative w-11 h-6 rounded-full bg-[#c0c7d3] peer-checked:bg-emerald-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-5"></span>
+      </label>
+    </section>
+
+    <!-- Stories-tray: cirkels per dag, tik = fullscreen viewer -->
+    <section class="mt-6 bg-white rounded-[24px] border border-[#e1efff] shadow-sm p-5">
+      <div class="flex items-center justify-between mb-4 px-1">
+        <h2 class="font-display font-bold text-lg">Verhalen</h2>
+        <span class="text-[11px] text-[#717783]">tik op een dag voor fullscreen</span>
+      </div>
+      <div id="tray" class="flex gap-5 overflow-x-auto no-scrollbar px-1 pb-1">
+
+        <!-- Vandaag (binnen 24u -> amber-gradient ring) -->
+        <button data-day="0" class="tray-day group flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer">
+          <span class="p-[3px] rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 transition-transform group-hover:scale-105">
+            <span class="block p-[2.5px] bg-white rounded-full">
+              <img src="https://picsum.photos/seed/sarakiniko/160/160" alt="Vandaag" class="w-14 h-14 rounded-full object-cover">
+            </span>
+          </span>
+          <span class="text-[11px] font-bold text-[#0b1d2d] flex items-center gap-1">Vandaag
+            <span class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+          </span>
+        </button>
+
+        <!-- Oudere dagen (blauwe ring) -->
+        <button data-day="1" class="tray-day group flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer">
+          <span class="p-[3px] rounded-full bg-[#005BAE] transition-transform group-hover:scale-105">
+            <span class="block p-[2.5px] bg-white rounded-full">
+              <img src="https://picsum.photos/seed/portara/160/160" alt="22 aug" class="w-14 h-14 rounded-full object-cover">
+            </span>
+          </span>
+          <span class="text-[11px] font-semibold text-[#404752]">22 aug</span>
+        </button>
+
+        <button data-day="2" class="tray-day group flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer">
+          <span class="p-[3px] rounded-full bg-[#005BAE] transition-transform group-hover:scale-105">
+            <span class="block p-[2.5px] bg-white rounded-full">
+              <img src="https://picsum.photos/seed/koufo-cove/160/160" alt="21 aug" class="w-14 h-14 rounded-full object-cover">
+            </span>
+          </span>
+          <span class="text-[11px] font-semibold text-[#404752]">21 aug</span>
+        </button>
+
+        <button data-day="3" class="tray-day group flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer">
+          <span class="p-[3px] rounded-full bg-[#005BAE] transition-transform group-hover:scale-105">
+            <span class="block p-[2.5px] bg-white rounded-full">
+              <img src="https://picsum.photos/seed/plaka-castle/160/160" alt="20 aug" class="w-14 h-14 rounded-full object-cover">
+            </span>
+          </span>
+          <span class="text-[11px] font-semibold text-[#404752]">20 aug</span>
+        </button>
+
+        <button data-day="4" class="tray-day group flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer">
+          <span class="p-[3px] rounded-full bg-[#005BAE] transition-transform group-hover:scale-105">
+            <span class="block p-[2.5px] bg-white rounded-full">
+              <img src="https://picsum.photos/seed/adamantas-harbor/160/160" alt="19 aug" class="w-14 h-14 rounded-full object-cover">
+            </span>
+          </span>
+          <span class="text-[11px] font-semibold text-[#404752]">19 aug</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Feed: verticale kaarten, nieuwste eerst -->
+    <div id="feed" class="mt-6 space-y-6">
+
+      <!-- Post 1 — Joyce, binnen 24u -->
+      <article class="bg-white rounded-[24px] border border-[#e1efff] shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 p-4">
+          <span class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#005BAE] to-[#3b82c4] text-white flex items-center justify-center font-display font-bold text-sm flex-shrink-0">J</span>
+          <div class="min-w-0">
+            <p class="text-sm font-bold leading-tight">Joyce <span class="font-medium text-[#717783]">&middot; 2 uur geleden</span></p>
+            <p class="text-[11px] text-[#717783] flex items-center gap-1 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-[#005BAE]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              Milos
+            </p>
+          </div>
+          <span class="ml-auto px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-extrabold uppercase tracking-wide">Nieuw</span>
+          <button title="Verwijderen (alleen admins)" class="p-2 rounded-full text-[#717783] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <button data-photo="0" class="feed-photo block w-full cursor-zoom-in">
+          <img src="https://picsum.photos/seed/sarakiniko/900/1125" alt="Sarakiniko maanstrand" loading="lazy" class="w-full aspect-[4/5] object-cover">
+        </button>
+        <div class="p-4">
+          <p class="text-sm leading-snug"><span class="font-bold">Joyce</span> Sarakiniko maanstrand — wat een plaatje! Alsof je op de maan loopt.</p>
+          <p class="text-[11px] text-[#717783] mt-2 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+            Vandaag, zondag 23 augustus
+          </p>
+        </div>
+      </article>
+
+      <!-- Post 2 — Dennis, binnen 24u (gisterenavond) -->
+      <article class="bg-white rounded-[24px] border border-[#e1efff] shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 p-4">
+          <span class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#005BAE] to-[#3b82c4] text-white flex items-center justify-center font-display font-bold text-sm flex-shrink-0">D</span>
+          <div class="min-w-0">
+            <p class="text-sm font-bold leading-tight">Dennis <span class="font-medium text-[#717783]">&middot; 14 uur geleden</span></p>
+            <p class="text-[11px] text-[#717783] flex items-center gap-1 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-[#005BAE]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              Naxos
+            </p>
+          </div>
+          <span class="ml-auto px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-extrabold uppercase tracking-wide">Nieuw</span>
+          <button title="Verwijderen (alleen admins)" class="p-2 rounded-full text-[#717783] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <button data-photo="1" class="feed-photo block w-full cursor-zoom-in">
+          <img src="https://picsum.photos/seed/portara/900/1125" alt="Portara zonsondergang" loading="lazy" class="w-full aspect-[4/5] object-cover">
+        </button>
+        <div class="p-4">
+          <p class="text-sm leading-snug"><span class="font-bold">Dennis</span> Zonsondergang bij de Portara. Dit soort avonden doe je het voor.</p>
+          <p class="text-[11px] text-[#717783] mt-2 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+            Gisteren, zaterdag 22 augustus
+          </p>
+        </div>
+      </article>
+
+      <!-- Post 3 — Joyce, ouder dan 24u -->
+      <article class="bg-white rounded-[24px] border border-[#e1efff] shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 p-4">
+          <span class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#005BAE] to-[#3b82c4] text-white flex items-center justify-center font-display font-bold text-sm flex-shrink-0">J</span>
+          <div class="min-w-0">
+            <p class="text-sm font-bold leading-tight">Joyce <span class="font-medium text-[#717783]">&middot; vrijdag</span></p>
+            <p class="text-[11px] text-[#717783] flex items-center gap-1 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-[#005BAE]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              Koufonisia
+            </p>
+          </div>
+          <button title="Verwijderen (alleen admins)" class="ml-auto p-2 rounded-full text-[#717783] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <button data-photo="2" class="feed-photo block w-full cursor-zoom-in">
+          <img src="https://picsum.photos/seed/koufo-cove/900/1125" alt="Pori-baai Koufonisia" loading="lazy" class="w-full aspect-[4/5] object-cover">
+        </button>
+        <div class="p-4">
+          <p class="text-sm leading-snug"><span class="font-bold">Joyce</span> Pori-baai: turquoise water en niemand anders op het strand.</p>
+          <p class="text-[11px] text-[#717783] mt-2 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+            Vrijdag 21 augustus
+          </p>
+        </div>
+      </article>
+
+      <!-- Post 4 — Dennis, ouder dan 24u -->
+      <article class="bg-white rounded-[24px] border border-[#e1efff] shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 p-4">
+          <span class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#005BAE] to-[#3b82c4] text-white flex items-center justify-center font-display font-bold text-sm flex-shrink-0">D</span>
+          <div class="min-w-0">
+            <p class="text-sm font-bold leading-tight">Dennis <span class="font-medium text-[#717783]">&middot; donderdag</span></p>
+            <p class="text-[11px] text-[#717783] flex items-center gap-1 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-[#005BAE]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              Milos
+            </p>
+          </div>
+          <button title="Verwijderen (alleen admins)" class="ml-auto p-2 rounded-full text-[#717783] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <button data-photo="3" class="feed-photo block w-full cursor-zoom-in">
+          <img src="https://picsum.photos/seed/plaka-castle/900/1125" alt="Plaka kasteel" loading="lazy" class="w-full aspect-[4/5] object-cover">
+        </button>
+        <div class="p-4">
+          <p class="text-sm leading-snug"><span class="font-bold">Dennis</span> Bovenop het kasteel van Plaka, uitzicht over de hele baai.</p>
+          <p class="text-[11px] text-[#717783] mt-2 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+            Donderdag 20 augustus
+          </p>
+        </div>
+      </article>
+
+      <!-- Post 5 — Joyce, ouder dan 24u -->
+      <article class="bg-white rounded-[24px] border border-[#e1efff] shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 p-4">
+          <span class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#005BAE] to-[#3b82c4] text-white flex items-center justify-center font-display font-bold text-sm flex-shrink-0">J</span>
+          <div class="min-w-0">
+            <p class="text-sm font-bold leading-tight">Joyce <span class="font-medium text-[#717783]">&middot; woensdag</span></p>
+            <p class="text-[11px] text-[#717783] flex items-center gap-1 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-[#005BAE]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              Naxos
+            </p>
+          </div>
+          <button title="Verwijderen (alleen admins)" class="ml-auto p-2 rounded-full text-[#717783] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <button data-photo="4" class="feed-photo block w-full cursor-zoom-in">
+          <img src="https://picsum.photos/seed/adamantas-harbor/900/1125" alt="Adamantas haven" loading="lazy" class="w-full aspect-[4/5] object-cover">
+        </button>
+        <div class="p-4">
+          <p class="text-sm leading-snug"><span class="font-bold">Joyce</span> Avondwandeling langs de haven van Adamantas.</p>
+          <p class="text-[11px] text-[#717783] mt-2 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+            Woensdag 19 augustus
+          </p>
+        </div>
+      </article>
+    </div>
+
+    <p class="text-center text-[11px] text-[#717783] mt-8 mb-4">
+      Mockup stap 17 — Tijdlijn. Foto's zijn tijdelijke placeholders; in de app komen deze uit Cloudinary.
+    </p>
+  </main>
+
+  <!-- Gesimuleerde zwevende Vandaag-knop zoals op het Itinerary-scherm (Deel A) -->
+  <button id="floatingVandaag" class="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 px-5 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-extrabold shadow-2xl active:scale-95 transition-all cursor-pointer flex items-center gap-2">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+    Vandaag
+    <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+  </button>
+
+  <!-- Fullscreen story-viewer (hergebruik van StoriesModal) -->
+  <div id="viewer" class="fixed inset-0 z-[70] bg-black/95 hidden items-center justify-center">
+    <button id="viewerClose" class="absolute top-5 right-5 z-10 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer" title="Sluiten (Esc)">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+    <div class="absolute top-5 left-1/2 -translate-x-1/2 flex gap-1.5" id="viewerProgress"></div>
+    <div class="absolute top-5 left-5 flex items-center gap-2">
+      <span id="viewerDayChip" class="px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-white text-xs font-bold"></span>
+    </div>
+    <img id="viewerImg" src="" alt="Story foto" class="max-w-full max-h-full object-contain rounded-2xl shadow-2xl">
+    <div class="absolute bottom-5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-white text-xs font-bold" id="viewerCounter">1/5</div>
+    <button id="viewerPrev" class="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-30 transition-colors cursor-pointer" title="Vorige (links)">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    <button id="viewerNext" class="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-30 transition-colors cursor-pointer" title="Volgende (rechts)">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+  </div>
+
+<script>
+  var PHOTOS = [
+    { url: 'https://picsum.photos/seed/sarakiniko/1200/1500', day: 'Vandaag' },
+    { url: 'https://picsum.photos/seed/portara/1200/1500',    day: 'Gisteren' },
+    { url: 'https://picsum.photos/seed/koufo-cove/1200/1500', day: 'Vrijdag 21 augustus' },
+    { url: 'https://picsum.photos/seed/plaka-castle/1200/1500', day: 'Donderdag 20 augustus' },
+    { url: 'https://picsum.photos/seed/adamantas-harbor/1200/1500', day: 'Woensdag 19 augustus' }
+  ];
+  var DAY_START = [0, 1, 2, 3, 4];
+
+  var viewer = document.getElementById('viewer');
+  var viewerImg = document.getElementById('viewerImg');
+  var viewerCounter = document.getElementById('viewerCounter');
+  var viewerProgress = document.getElementById('viewerProgress');
+  var viewerDayChip = document.getElementById('viewerDayChip');
+  var idx = 0;
+
+  function renderViewer() {
+    var p = PHOTOS[idx];
+    viewerImg.src = p.url;
+    viewerDayChip.textContent = p.day;
+    viewerCounter.textContent = (idx + 1) + '/' + PHOTOS.length;
+    viewerProgress.innerHTML = '';
+    PHOTOS.forEach(function (_, i) {
+      var b = document.createElement('div');
+      b.className = i === idx ? 'h-1 w-8 rounded-full bg-white' : 'h-1 w-3 rounded-full bg-white/30';
+      viewerProgress.appendChild(b);
+    });
+    document.getElementById('viewerPrev').disabled = idx === 0;
+    document.getElementById('viewerNext').disabled = idx === PHOTOS.length - 1;
+  }
+
+  function openViewer(startIdx) {
+    idx = startIdx;
+    renderViewer();
+    viewer.classList.remove('hidden');
+    viewer.classList.add('flex');
+  }
+  function closeViewer() {
+    viewer.classList.add('hidden');
+    viewer.classList.remove('flex');
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.feed-photo'), function (btn) {
+    btn.addEventListener('click', function () { openViewer(Number(btn.getAttribute('data-photo'))); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.tray-day'), function (btn) {
+    btn.addEventListener('click', function () {
+      var day = Number(btn.getAttribute('data-day'));
+      if (day === 0 && !document.getElementById('recentToggle').checked) return;
+      openViewer(DAY_START[day]);
+    });
+  });
+
+  document.getElementById('viewerClose').addEventListener('click', closeViewer);
+  document.getElementById('viewerPrev').addEventListener('click', function () { if (idx > 0) { idx--; renderViewer(); } });
+  document.getElementById('viewerNext').addEventListener('click', function () { if (idx < PHOTOS.length - 1) { idx++; renderViewer(); } });
+  document.addEventListener('keydown', function (e) {
+    if (viewer.classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeViewer();
+    if (e.key === 'ArrowLeft' && idx > 0) { idx--; renderViewer(); }
+    if (e.key === 'ArrowRight' && idx < PHOTOS.length - 1) { idx++; renderViewer(); }
+  });
+  document.getElementById('floatingVandaag').addEventListener('click', function () { openViewer(0); });
+
+  // Deel A demonstratie: geen foto's binnen 24u => Vandaag-cirkel + zwevende knop verdwijnen
+  var toggle = document.getElementById('recentToggle');
+  var vandaagCircle = document.querySelector('[data-day="0"]');
+  var floatingBtn = document.getElementById('floatingVandaag');
+  function applyRecent() {
+    var on = toggle.checked;
+    vandaagCircle.style.display = on ? '' : 'none';
+    floatingBtn.style.display = on ? '' : 'none';
+  }
+  toggle.addEventListener('change', applyRecent);
+  applyRecent();
+</script>
+</body>
+</html>

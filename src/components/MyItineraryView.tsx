@@ -53,6 +53,15 @@ import { TransportBookingModal } from '../transport/TransportBookingModal';
 import type { TransportEntry, TransportLeg } from '../transport/types';
 import { RouteMapBackground } from './RouteMapBackground';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function localDateString(): string {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
 interface MyItineraryViewProps {
   currentTrip: TripData;
   currentUser: UserAccount | null;
@@ -160,24 +169,18 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
   const [storiesPhotos, setStoriesPhotos] = useState<DayPhoto[] | null>(null);
   const [reisdagboekOpen, setReisdagboekOpen] = useState(true);
 
-  // "Vandaag"-stories: foto's van vandaag, anders van de meest recente dag.
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayPhotos = dayPhotos.filter((p) => p.date === todayStr);
-  const storiesDayPhotos = todayPhotos.length > 0
-    ? todayPhotos
-    : (() => {
-        const byDate = new Map<string, DayPhoto[]>();
-        for (const p of dayPhotos) {
-          if (!p.date) continue;
-          const list = byDate.get(p.date) || [];
-          list.push(p);
-          byDate.set(p.date, list);
-        }
-        if (byDate.size === 0) return [];
-        const latestDate = Array.from(byDate.keys()).sort().pop()!;
-        return byDate.get(latestDate) || [];
-      })();
-  const showStoriesButton = dayPhotos.length > 0;
+  // "Vandaag"-stories: alleen foto's die minder dan 24 uur geleden geplaatst zijn.
+  // Zonder recente foto's verdwijnen de Vandaag-knoppen volledig (geen fallback meer
+  // naar de meest recente dag). Fallback op kalenderdatum als CreatedAt ontbreekt.
+  const recentPhotos = dayPhotos.filter((p) => {
+    if (p.createdAt) {
+      const placed = Date.parse(p.createdAt);
+      return !Number.isNaN(placed) && Date.now() - placed < DAY_MS;
+    }
+    return p.date === localDateString();
+  });
+  const storiesDayPhotos = recentPhotos;
+  const showStoriesButton = recentPhotos.length > 0;
 
   // Reisdagboek: groepeer foto's op datum (nieuwste eerst).
   const dayPhotoGroups = Array.from(
@@ -1134,7 +1137,7 @@ export const MyItineraryView: React.FC<MyItineraryViewProps> = ({
               <button
                 onClick={() => setStoriesPhotos(storiesDayPhotos)}
                 className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-['Inter'] text-xs font-bold hover:brightness-110 shadow-md transition-all cursor-pointer flex items-center gap-2"
-                title="Bekijk de foto's van vandaag (of de meest recente dag) fullscreen"
+                title="Bekijk de foto's van de laatste 24 uur fullscreen"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 Vandaag

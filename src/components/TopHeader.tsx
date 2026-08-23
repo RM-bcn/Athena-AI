@@ -49,6 +49,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             ? 'Chat'
             : activeTab === 'itinerary'
             ? 'Mijn Reis'
+            : activeTab === 'tijdlijn'
+            ? 'Tijdlijn'
             : activeTab === 'quick-help'
             ? 'Directe Hulp'
             : activeTab === 'login'
@@ -120,6 +122,14 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     }`}
                   >
                     Mijn Reis
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('tijdlijn')}
+                    className={`font-['Inter'] text-sm transition-colors py-1 cursor-pointer ${
+                      activeTab === 'tijdlijn' ? 'text-[#005BAE] border-b-2 border-[#005BAE] font-medium' : 'text-[#404752] hover:text-[#005BAE]'
+                    }`}
+                  >
+                    Tijdlijn
                   </button>
                   <button
                     onClick={() => setActiveTab('quick-help')}

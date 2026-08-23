@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActiveTab, UserAccount } from '../types';
-import { Sailboat, MessageSquare, Calendar, HelpCircle, Plus, Settings, LifeBuoy, LogOut, LogIn, Key, User, X, Inbox } from 'lucide-react';
+import { Sailboat, MessageSquare, Calendar, HelpCircle, Plus, Settings, LifeBuoy, LogOut, LogIn, Key, User, X, Inbox, Camera } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -125,6 +125,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Calendar className="w-4 h-4" />
             Mijn Itinerary
+          </button>
+        )}
+
+        {/* Tijdlijn - voor ingelogden en gasten (leesrechten) */}
+        {isAuthenticated && (
+          <button
+            onClick={() => handleNavClick('tijdlijn')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-medium text-sm transition-all duration-300 text-left cursor-pointer ${
+              activeTab === 'tijdlijn'
+                ? 'bg-[#005BAE] text-white shadow-sm'
+                : 'text-[#404752] hover:bg-[#f0f4f9]'
+            }`}
+          >
+            <Camera className="w-4 h-4" />
+            Tijdlijn
           </button>
         )}
 

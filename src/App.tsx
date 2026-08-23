@@ -8,6 +8,7 @@ import { getToken, clearToken } from './utils/authToken';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { MyItineraryView } from './components/MyItineraryView';
+import { TijdlijnView } from './components/TijdlijnView';
 import { QuickHelpView } from './components/QuickHelpView';
 import { ChatInterfaceView } from './components/ChatInterfaceView';
 import { SettingsView } from './components/SettingsView';
@@ -1611,6 +1612,16 @@ if (loaded.stayBookingLinks) {
             onAddDayPhoto={handleAddDayPhoto}
             onDeleteDayPhoto={handleDeleteDayPhoto}
             onGenerateCaption={handleGenerateCaption}
+          />
+        )}
+
+        {activeTab === 'tijdlijn' && (
+          <TijdlijnView
+            dayPhotos={dayPhotos}
+            currentUser={currentUser}
+            isGuestMode={isGuestMode}
+            onBack={() => setActiveTab('itinerary')}
+            onDeleteDayPhoto={handleDeleteDayPhoto}
           />
         )}
 
