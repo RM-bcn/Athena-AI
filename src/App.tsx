@@ -17,6 +17,7 @@ import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
 import { LoginView } from './components/LoginView';
 import { NotFoundView } from './components/NotFoundView';
+import { PwaInstallBanner } from './components/PwaInstallBanner';
 
 // Modals
 import { NewTripModal } from './components/Modals/NewTripModal';
@@ -1705,6 +1706,8 @@ if (loaded.stayBookingLinks) {
         onCreateTrip={handleCreateTrip}
         isOwner={isOwner}
       />
+
+      <PwaInstallBanner />
 
       {notice && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl bg-[#0b1d2d] text-white text-sm font-['Inter'] font-semibold shadow-2xl border border-[#005BAE]/40 animate-in fade-in slide-in-from-bottom-2 duration-200 max-w-md text-center">
