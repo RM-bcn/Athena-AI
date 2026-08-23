@@ -18,6 +18,7 @@ import { SupportView } from './components/SupportView';
 import { LoginView } from './components/LoginView';
 import { NotFoundView } from './components/NotFoundView';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
+import { OfflineBanner } from './components/OfflineBanner';
 
 // Modals
 import { NewTripModal } from './components/Modals/NewTripModal';
@@ -711,6 +712,9 @@ if (loaded.stayBookingLinks) {
     if (!currentUser) {
       return { success: false, error: 'Je bent niet ingelogd. Log in om een foto toe te voegen.' };
     }
+    if (!navigator.onLine) {
+      return { success: false, error: 'Je bent offline. Foto opslaan kan zodra je weer verbinding hebt.' };
+    }
     try {
       const res = await authFetch('/api/dayphotos', {
         method: 'POST',
@@ -770,6 +774,12 @@ if (loaded.stayBookingLinks) {
   }): Promise<{ success: boolean; caption?: string; error?: string }> => {
     if (!currentUser) {
       return { success: false, error: 'Je bent niet ingelogd.' };
+    }
+    if (!navigator.onLine) {
+      return { success: false, error: 'Je bent offline — bijschriften genereren vereist een verbinding.' };
+    }
+    if (!navigator.onLine) {
+      return { success: false, error: 'Je bent offline — bijschriften genereren vereist een verbinding.' };
     }
     try {
       const res = await authFetch('/api/dayphotos/caption', {
@@ -1319,6 +1329,11 @@ if (loaded.stayBookingLinks) {
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
         data = await res.json();
+      } else if (!navigator.onLine) {
+        console.warn("Offline: chat-server niet bereikbaar.");
+        data = {
+          reply: `Je bent op dit moment offline, dus ik kan de AI-reiscocierge niet raadplegen. Je vraag staat wel in je geschiedenis — verstuur hem opnieuw zodra je weer verbinding hebt (bijv. op de ferry of bij de hotel-wifi).`
+        };
       } else {
         console.warn("Server returned non-JSON for chat, falling back to local Concierge.");
         data = {
@@ -1382,7 +1397,9 @@ if (loaded.stayBookingLinks) {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         sessionId,
         savedAt: new Date().toISOString(),
-        content: `Kalimera ${sender}! Ik heb je bericht of geüploade reisplan ontvangen en je dagschema bijgewerkt voor ${currentTrip.title}.`,
+        content: !navigator.onLine
+          ? `Je bent op dit moment offline, dus ik kan de AI-reiscocierge niet raadplegen. Je vraag staat wel in je geschiedenis — verstuur hem opnieuw zodra je weer verbinding hebt (bijv. op de ferry of bij de hotel-wifi).`
+          : `Kalimera ${sender}! Ik heb je bericht of geüploade reisplan ontvangen en je dagschema bijgewerkt voor ${currentTrip.title}.`,
         quickButtons: [{ label: ' Bekijk Mijn Reis', action: '/travel' }],
       };
       appendHistory([fallbackAiMsg]);
@@ -1546,6 +1563,8 @@ if (loaded.stayBookingLinks) {
 
   return (
     <div className="min-h-screen bg-white text-[#0b1d2d] flex font-['Inter'] overflow-x-hidden w-full">
+      <OfflineBanner />
+
       {/* Left Sidebar Drawer / Fixed Navigation */}
       <Sidebar
         activeTab={activeTab}
