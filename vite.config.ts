@@ -45,12 +45,22 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,png,svg,jpg,webp,woff,woff2,webmanifest}'],
+          globPatterns: ['**/*.{js,css,png,svg,jpg,webp,woff,woff2,webmanifest}'],
           globIgnores: ['**/server.cjs*'],
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [
+            {
+              urlPattern: ({url}: {url: URL}) => url.pathname.endsWith('.html') || url.pathname === '/',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'html-cache',
+                networkTimeoutSeconds: 3,
+                expiration: {maxEntries: 5, maxAgeSeconds: 60 * 60 * 24},
+                cacheableResponse: {statuses: [200]},
+              },
+            },
             {
               urlPattern: ({url}: {url: URL}) => url.origin === 'https://fonts.googleapis.com',
               handler: 'StaleWhileRevalidate',

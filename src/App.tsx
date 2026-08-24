@@ -83,6 +83,14 @@ export default function App() {
   // Reisdagboek: dagelijkse foto's + bijschriften (gasten mogen lezen).
   const [dayPhotos, setDayPhotos] = useState<DayPhoto[]>([]);
 
+  // PWA: detecteer nieuwe versie en toon update-banner.
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+  useEffect(() => {
+    const onControllerChange = () => setShowUpdateBanner(true);
+    navigator.serviceWorker?.addEventListener('controllerchange', onControllerChange);
+    return () => navigator.serviceWorker?.removeEventListener('controllerchange', onControllerChange);
+  }, []);
+
   useEffect(() => {
     if (!notice) return;
     const t = window.setTimeout(() => setNotice(null), 6000);
@@ -1730,6 +1738,21 @@ if (loaded.stayBookingLinks) {
       />
 
       <PwaInstallBanner />
+
+      {showUpdateBanner && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[56] w-[calc(100%-2rem)] max-w-md bg-[#0b1d2d] text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="flex-1 min-w-0">
+            <p className="font-['Inter'] text-sm font-bold">Nieuwe versie beschikbaar</p>
+            <p className="font-['Inter'] text-xs text-white/70 mt-0.5">Tik om te vernieuwen</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 transition-all cursor-pointer flex-shrink-0"
+          >
+            Vernieuwen
+          </button>
+        </div>
+      )}
 
       {notice && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl bg-[#0b1d2d] text-white text-sm font-['Inter'] font-semibold shadow-2xl border border-[#005BAE]/40 animate-in fade-in slide-in-from-bottom-2 duration-200 max-w-md text-center">
