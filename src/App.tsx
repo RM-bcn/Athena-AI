@@ -1642,6 +1642,9 @@ if (loaded.stayBookingLinks) {
             isGuestMode={isGuestMode}
             onBack={() => setActiveTab('itinerary')}
             onDeleteDayPhoto={handleDeleteDayPhoto}
+            onAddDayPhoto={handleAddDayPhoto}
+            onGenerateCaption={handleGenerateCaption}
+            stays={currentTrip.stays}
           />
         )}
 

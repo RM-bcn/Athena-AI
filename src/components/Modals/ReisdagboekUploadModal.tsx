@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X,
   ImagePlus,
@@ -8,6 +8,8 @@ import {
   Calendar,
   MapPin,
   AlertCircle,
+  Camera,
+  SwitchCamera,
 } from 'lucide-react';
 import { IslandStay } from '../../types';
 
@@ -78,6 +80,9 @@ export const ReisdagboekUploadModal: React.FC<ReisdagboekUploadModalProps> = ({
   onGenerateCaption,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rearCameraRef = useRef<HTMLInputElement>(null);
+  const frontCameraRef = useRef<HTMLInputElement>(null);
+  const isTouchDevice = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches, []);
   const [preview, setPreview] = useState<string | null>(null);
   const [date, setDate] = useState<string>(todayDateString);
   const [island, setIsland] = useState<string>(stays[0]?.island || '');
@@ -240,7 +245,44 @@ export const ReisdagboekUploadModal: React.FC<ReisdagboekUploadModalProps> = ({
               onChange={handleFileSelect}
               className="hidden"
             />
+            <input
+              ref={rearCameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <input
+              ref={frontCameraRef}
+              type="file"
+              accept="image/*"
+              capture="user"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
           </div>
+
+          {isTouchDevice && !preview && !isCompressing && (
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => rearCameraRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-[#c0c7d3] bg-white text-[#005BAE] font-['Inter'] text-xs font-bold hover:border-[#005BAE] hover:bg-[#e1efff] transition-colors cursor-pointer"
+              >
+                <Camera className="w-4 h-4" />
+                Camera achter
+              </button>
+              <button
+                type="button"
+                onClick={() => frontCameraRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-[#c0c7d3] bg-white text-[#005BAE] font-['Inter'] text-xs font-bold hover:border-[#005BAE] hover:bg-[#e1efff] transition-colors cursor-pointer"
+              >
+                <SwitchCamera className="w-4 h-4" />
+                Camera voor
+              </button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Datum */}
