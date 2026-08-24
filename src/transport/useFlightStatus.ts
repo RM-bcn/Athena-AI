@@ -3,8 +3,10 @@ import type { TransportEntry } from './types';
 import { fetchFlightStatus, FlightStatus, normalizeFlightIata } from '../api/flightStatus';
 
 export interface FirstFlight {
-  flight: TransportEntry;
+  /** The moment the clock counts down to. */
   date: Date;
+  /** Present only when the target is an actual flight (enables live status). */
+  flight?: TransportEntry;
 }
 
 const POLL_MS = 3 * 60 * 1000;
@@ -29,11 +31,17 @@ export function useFlightStatus(
       return;
     }
 
-    const flightIata = normalizeFlightIata(firstFlight.flight.flightNumber);
-    const depIata = firstFlight.flight.fromIata
-      ? firstFlight.flight.fromIata.toUpperCase()
-      : undefined;
-    const depDate = firstFlight.flight.date;
+    const flight = firstFlight.flight;
+    if (!flight) {
+      // Target is the trip start, not a flight — no live status lookup.
+      setStatus(null);
+      startedRef.current = '';
+      return;
+    }
+
+    const flightIata = normalizeFlightIata(flight.flightNumber);
+    const depIata = flight.fromIata ? flight.fromIata.toUpperCase() : undefined;
+    const depDate = flight.date;
     const id = `${flightIata || ''}|${depIata || ''}|${depDate}`;
 
     if (!inWindow) {

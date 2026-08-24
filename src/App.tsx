@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType, TripRequest, DayPhoto } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
-import { getFirstFlightDeparture } from './transport/transportLogic';
+import { getFirstFlightDeparture, combineDateTime } from './transport/transportLogic';
 import { initialTransportEntries } from './data/initialData';
 import type { TransportEntry } from './transport/types';
 import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId, applyStayRecords, DAY_PLAN_RECORD_TYPES } from './utils/dayPlans';
@@ -484,18 +484,23 @@ export default function App() {
   } = useTransportEntries();
 
   // Earliest flight departure — powers the header countdown clock. Recomputed
-  // only when the transport list changes (not on every tick). When no real
-  // flight has been added yet, fall back to the demo flight so the clock is
-  // visible for logged-in users. The demo is used purely as a display target
-  // and is NEVER stored in localStorage or synced to the Google Sheet.
+  // only when the transport list changes (not on every tick). Priority:
+  // 1) eerste vlucht (zodra tickets zijn toegevoegd), 2) startdatum van de
+  // reis (geen vlucht maar wel een toekomstige reis), 3) demovlucht als
+  // toon-doel zodat de klok zichtbaar blijft. De demo wordt nooit opgeslagen.
   const firstFlight = useMemo(() => {
     const real = getFirstFlightDeparture(transportEntries);
     if (real) return real;
-    if (currentUser || isGuestMode) {
-      return getFirstFlightDeparture(initialTransportEntries);
+    if (!(currentUser || isGuestMode)) return null;
+
+    const tripStart = combineDateTime(currentTrip.startDate);
+    if (tripStart && tripStart.getTime() > Date.now()) {
+      return { date: tripStart };
     }
-    return null;
-  }, [transportEntries, currentUser, isGuestMode]);
+
+    const demo = getFirstFlightDeparture(initialTransportEntries);
+    return demo ? { date: demo.date } : null;
+  }, [transportEntries, currentUser, isGuestMode, currentTrip.startDate]);
 
   // Google Sheets Integration State
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
