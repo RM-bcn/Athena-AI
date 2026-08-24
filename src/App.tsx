@@ -88,7 +88,18 @@ export default function App() {
   useEffect(() => {
     const onControllerChange = () => setShowUpdateBanner(true);
     navigator.serviceWorker?.addEventListener('controllerchange', onControllerChange);
-    return () => navigator.serviceWorker?.removeEventListener('controllerchange', onControllerChange);
+
+    // Check direct bij laden en daarna elke 5 minuten op een nieuwe service worker.
+    const checkUpdate = () => {
+      navigator.serviceWorker?.getRegistration?.().then((reg) => reg?.update().catch(() => {}));
+    };
+    checkUpdate();
+    const interval = setInterval(checkUpdate, 5 * 60 * 1000);
+
+    return () => {
+      navigator.serviceWorker?.removeEventListener('controllerchange', onControllerChange);
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
