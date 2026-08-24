@@ -189,38 +189,36 @@ export const TijdlijnView: React.FC<TijdlijnViewProps> = ({
 
       <main className="max-w-2xl mx-auto px-4 pb-24 pt-6">
         {/* Pagina-header */}
-        <section className="mt-6 bg-white rounded-[24px] border border-[#e1efff] shadow-sm p-6">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <span className="font-['Inter'] text-xs font-semibold uppercase tracking-wider text-[#005BAE]">
-                Reisdagboek
-              </span>
-              <h1 className="font-['Plus_Jakarta_Sans'] text-3xl font-extrabold text-[#0b1d2d] mt-1">
-                Tijdlijn
-              </h1>
-              <p className="font-['Inter'] text-sm text-[#717783] mt-1">
-                Alle momenten van Dennis &amp; Joyce tijdens de Cycladen Odyssey.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
+        <section className="mt-6 bg-white rounded-[24px] border border-[#e1efff] shadow-sm p-5 sm:p-6">
+          <div>
+            <span className="font-['Inter'] text-xs font-semibold uppercase tracking-wider text-[#005BAE]">
+              Reisdagboek
+            </span>
+            <h1 className="font-['Plus_Jakarta_Sans'] text-2xl sm:text-3xl font-extrabold text-[#0b1d2d] mt-1">
+              Tijdlijn
+            </h1>
+            <p className="font-['Inter'] text-xs sm:text-sm text-[#717783] mt-1">
+              Alle momenten van Dennis &amp; Joyce tijdens de Cycladen Odyssey.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap mt-4">
+            <span className="px-3 py-1 rounded-full bg-[#005BAE]/10 text-[#005BAE] font-['Inter'] text-xs font-bold">
+              {dayPhotos.length} {dayPhotos.length === 1 ? 'moment' : 'momenten'}
+            </span>
+            {islandCount > 0 && (
               <span className="px-3 py-1 rounded-full bg-[#005BAE]/10 text-[#005BAE] font-['Inter'] text-xs font-bold">
-                {dayPhotos.length} {dayPhotos.length === 1 ? 'moment' : 'momenten'}
+                {islandCount} {islandCount === 1 ? 'eiland' : 'eilanden'}
               </span>
-              {islandCount > 0 && (
-                <span className="px-3 py-1 rounded-full bg-[#005BAE]/10 text-[#005BAE] font-['Inter'] text-xs font-bold">
-                  {islandCount} {islandCount === 1 ? 'eiland' : 'eilanden'}
-                </span>
-              )}
-              {canEdit && (
-                <button
-                  onClick={() => setIsUploadOpen(true)}
-                  className="px-3.5 py-2 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  Foto toevoegen
-                </button>
-              )}
-            </div>
+            )}
+            {canEdit && (
+              <button
+                onClick={() => setIsUploadOpen(true)}
+                className="ml-auto px-3.5 py-2 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                Foto toevoegen
+              </button>
+            )}
           </div>
         </section>
 
