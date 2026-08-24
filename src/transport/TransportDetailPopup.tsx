@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Anchor, ExternalLink, Info, RefreshCw, Ship, X } from 'lucide-react';
+import { Anchor, ExternalLink, Info, RefreshCw, X } from 'lucide-react';
 import type { TransportEntry } from './types';
 import { TransportIcon } from './TransportIcon';
 import { transportTypeLabel } from './transportLogic';
@@ -107,7 +107,7 @@ export const TransportDetailPopup: React.FC<TransportDetailPopupProps> = ({
         <div className="mb-5 pr-10">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-[#005BAE] text-white flex items-center justify-center shadow-md">
-              <Ship className="w-6 h-6" />
+              <TransportIcon type={entry.type} className="w-6 h-6" />
             </div>
             <div>
               <span className="font-['Inter'] text-xs font-semibold text-[#005BAE] uppercase tracking-wider block">
@@ -141,23 +141,43 @@ export const TransportDetailPopup: React.FC<TransportDetailPopupProps> = ({
           <DetailRow label="Vertrek" value={entry.departureTime ? `${entry.departureTime} (Griekse tijd)` : '—'} />
           <DetailRow label="Aankomst" value={entry.arrivalTime ? `${entry.arrivalTime} (Griekse tijd)` : '—'} />
           <DetailRow label="Vervoerder" value={entry.operator || '—'} />
-          <DetailRow
-            label="Schip"
-            value={
-              vessel ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          {entry.type === 'flight' ? (
+            <>
+              {entry.flightNumber && (
+                <DetailRow
+                  label="Vluchtnummer"
+                  value={
+                    <span className="font-semibold text-[#005BAE]">{entry.flightNumber}</span>
+                  }
+                />
+              )}
+              {(entry.fromIata || entry.toIata) && (
+                <DetailRow
+                  label="Route"
+                  value={`${entry.fromIata || entry.from} → ${entry.toIata || entry.to}`}
+                />
+              )}
+              {entry.seat && <DetailRow label="Stoel" value={entry.seat} />}
+            </>
+          ) : (
+            <DetailRow
+              label="Schip"
+              value={
+                vessel ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    {vessel.name}
+                    <span className="text-[10px] text-[#717783] font-medium">(IMO {vessel.imo})</span>
                   </span>
-                  {vessel.name}
-                  <span className="text-[10px] text-[#717783] font-medium">(IMO {vessel.imo})</span>
-                </span>
-              ) : (
-                entry.vesselName || '—'
-              )
-            }
-          />
+                ) : (
+                  entry.vesselName || '—'
+                )
+              }
+            />
+          )}
           {entry.bookingRef && <DetailRow label="Referentie" value={entry.bookingRef} />}
         </div>
 

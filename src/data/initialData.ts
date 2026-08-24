@@ -1,4 +1,33 @@
 ﻿import { DailyItinerary, Accommodation, LocalTip, WeatherInfo, TimelineStop, ChatMessage } from '../types';
+import type { TransportEntry } from '../transport/types';
+
+// Demo flight so the countdown clock has a future target in dev / when no
+// Google Sheet is connected. Overridden by real data once a Sheet is loaded.
+// Date is computed relative to "today" so the clock is always visible.
+function futureDate(daysAhead: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  return d.toISOString().slice(0, 10);
+}
+
+export const initialTransportEntries: TransportEntry[] = [
+  {
+    id: 'transport-seed-ams-ath',
+    type: 'flight',
+    from: 'Amsterdam Schiphol',
+    to: 'Athens (ATH)',
+    date: futureDate(12),
+    departureTime: '08:25',
+    arrivalTime: '12:50',
+    operator: 'KLM',
+    flightNumber: 'KL1571',
+    fromIata: 'AMS',
+    toIata: 'ATH',
+    bookingRef: 'ABC123',
+    seat: '14A',
+    notes: 'Demovlucht — vervangen door je eigen ticket.',
+  },
+];
 
 export const USER_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuD2iljiBhAsAiyvXWmhlOpuzfMWXAD_6mWv-5fDLMBf3sg2vJy9asYoS5YaZPVDoEBA7qxAHSKb0pO59uwDBRdIA_MVVffoC1E2MXONsSBGM8LCr-gO5WJJASZ-WrLNH10HW_Sx--2HrxnPQP4dD2jQTrjH4xKSGo4Ci5xKFozY74ntm8n5I9KU2ERvxpUF_IkyJfnGf4_o7bXakzsJXyoTwLBCEBjRf7_rgQZC0Zq6srzRTiUqCXVyKA";
 

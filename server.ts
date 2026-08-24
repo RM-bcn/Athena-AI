@@ -36,6 +36,7 @@ import type { ToolResult, Source } from "./server/live-providers.js";
 import { transliterateGreek } from "./server/transliterate.js";
 import { translateWithMyMemory } from "./server/translate-fallback.js";
 import { handleFerryDisruptions } from "./server/ferry-disruptions.js";
+import { getFlightStatus } from "./server/flight-status.js";
 
 // Laad omgevingsvariabelen uit .env en .env.local (voor lokale dev). Op Vercel
 // worden de variabelen door het platform geïnjecteerd en bestaan de bestanden niet.
@@ -985,6 +986,21 @@ app.post("/api/auth/reset-password", async (req, res) => {
 
 // API: Blue Star Ferries "Itineraries Modifications" (scraped, no API key)
 app.get("/api/ferry/disruptions", handleFerryDisruptions);
+
+// API: live flight status for the header countdown (AviationStack).
+app.get("/api/flights/status", requireAuth, async (req, res) => {
+  try {
+    const raw = (v: unknown): string | undefined =>
+      typeof v === "string" && v.trim() ? v.trim().toUpperCase() : undefined;
+    const flightIata = raw(req.query.flightIata);
+    const depIata = raw(req.query.depIata);
+    const depDate = typeof req.query.depDate === "string" ? req.query.depDate : undefined;
+    const status = await getFlightStatus({ flightIata, depIata, depDate });
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ found: false, reason: "error", detail: String(err?.message || err) });
+  }
+});
 
 // Helper to get Gemini AI instance safely
 function getGeminiClient() {

@@ -47,6 +47,21 @@ export function parseDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
+/**
+ * Tolerant date parser. Google Sheets often returns date cells as a
+ * locale-formatted string (e.g. "17-9-2026" or "9/17/2026") rather than
+ * YYYY-MM-DD, which would otherwise break the strict parseDate above.
+ */
+export function parseFlexibleDate(dateStr: string): Date | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(dateStr.trim());
+  if (dmy) return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+  const t = Date.parse(dateStr);
+  return Number.isNaN(t) ? null : new Date(t);
+}
+
 export function formatCalendarDate(dateStr: string): string {
   if (!dateStr) return '';
   try {
@@ -210,4 +225,45 @@ export function transportTypeLabel(type: TransportEntry['type']): string {
     case 'transfer': return 'Transfer';
     default: return 'Transport';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Countdown helpers (header aftelklok)
+// ---------------------------------------------------------------------------
+
+/** Combine a YYYY-MM-DD date and optional HH:mm time into a local Date. */
+export function combineDateTime(dateStr: string, timeStr?: string): Date | null {
+  const base = parseFlexibleDate(dateStr);
+  if (!base || Number.isNaN(base.getTime())) return null;
+  if (timeStr && /^\d{1,2}:\d{2}$/.test(timeStr)) {
+    const [h, m] = timeStr.split(':').map(Number);
+    if (h > 23 || m > 59) return base;
+    base.setHours(h, m, 0, 0);
+  }
+  return base;
+}
+
+/**
+ * Find the earliest upcoming flight across the transport entries. This is the
+ * target the header countdown ticks down to. Returns null when there are no
+ * flight entries at all (so the clock stays hidden until tickets are added).
+ */
+export function getFirstFlightDeparture(
+  entries: TransportEntry[]
+): { flight: TransportEntry; date: Date } | null {
+  const flights = entries.filter((e) => e.type === 'flight' && e.date);
+  if (!flights.length) return null;
+
+  let best: TransportEntry | null = null;
+  let bestDate: Date | null = null;
+  for (const f of flights) {
+    const d = combineDateTime(f.date, f.departureTime);
+    if (!d) continue;
+    if (!bestDate || d.getTime() < bestDate.getTime()) {
+      best = f;
+      bestDate = d;
+    }
+  }
+  if (!best || !bestDate) return null;
+  return { flight: best, date: bestDate };
 }
