@@ -1,17 +1,46 @@
+import fs from 'fs';
+import {execSync} from 'child_process';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import type {Plugin} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
+
+function resolveVersion(): string {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (sha) return sha.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD', {cwd: __dirname}).toString().trim();
+  } catch {
+    return 'dev';
+  }
+}
+
+function versionFilePlugin(version: string): Plugin {
+  return {
+    name: 'athena-version-file',
+    apply: 'build',
+    closeBundle() {
+      fs.writeFileSync(
+        path.resolve(__dirname, 'dist/version.json'),
+        JSON.stringify({version}),
+      );
+    },
+  };
+}
+
+const APP_VERSION = resolveVersion();
 
 export default defineConfig(() => {
   return {
     plugins: [
+      versionFilePlugin(APP_VERSION),
       react(),
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        injectRegister: 'script-defer',
+        injectRegister: null,
         includeAssets: ['favicon.png', 'icons/apple-touch-icon.png'],
         manifest: {
           name: 'Athena AI — Mediterranean Concierge',
@@ -76,17 +105,6 @@ export default defineConfig(() => {
                 cacheName: 'google-fonts-files',
                 expiration: {maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365},
                 cacheableResponse: {statuses: [0, 200]},
-              },
-            },
-            {
-              urlPattern: ({url}: {url: URL}) => url.pathname.startsWith('/api/'),
-              method: 'GET',
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'api-get-cache',
-                networkTimeoutSeconds: 8,
-                expiration: {maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7},
-                cacheableResponse: {statuses: [200]},
               },
             },
             {

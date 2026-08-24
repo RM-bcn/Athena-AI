@@ -2,6 +2,34 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        if (!params.has('pwa-reset')) return;
+        var finish = function () {
+          params.delete('pwa-reset');
+          var qs = params.toString();
+          window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+          window.location.reload();
+        };
+        var jobs = [];
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+          jobs.push(
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+            })
+          );
+        }
+        if (window.caches && window.caches.keys) {
+          jobs.push(
+            window.caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (key) { return window.caches.delete(key); }));
+            })
+          );
+        }
+        Promise.all(jobs).then(finish, finish);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Jouw persoonlijke reisconcierge voor de Griekse Cycladen." />
     <meta name="theme-color" content="#005BAE" />

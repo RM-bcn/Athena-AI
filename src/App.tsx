@@ -88,20 +88,14 @@ export default function App() {
   // PWA: detecteer nieuwe versie en toon update-banner.
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   useEffect(() => {
-    const onControllerChange = () => setShowUpdateBanner(true);
-    navigator.serviceWorker?.addEventListener('controllerchange', onControllerChange);
-
-    // Check direct bij laden en daarna elke 5 minuten op een nieuwe service worker.
-    const checkUpdate = () => {
-      navigator.serviceWorker?.getRegistration?.().then((reg) => reg?.update().catch(() => {}));
+    if (!('serviceWorker' in navigator)) return;
+    let hadController = Boolean(navigator.serviceWorker.controller);
+    const onControllerChange = () => {
+      if (hadController) setShowUpdateBanner(true);
+      hadController = true;
     };
-    checkUpdate();
-    const interval = setInterval(checkUpdate, 5 * 60 * 1000);
-
-    return () => {
-      navigator.serviceWorker?.removeEventListener('controllerchange', onControllerChange);
-      clearInterval(interval);
-    };
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
   }, []);
 
   useEffect(() => {
