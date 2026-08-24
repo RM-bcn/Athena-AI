@@ -161,18 +161,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </nav>
       </div>
 
-      {countdownFlight && (
-        <div className="flex flex-1 justify-center min-w-0 px-2">
-          <TripCountdown firstFlight={countdownFlight} />
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-        {activeTab === 'chat' && (
-          <button className="p-2 rounded-full hover:bg-[#f0f4f9] text-[#404752] transition-colors cursor-pointer" title="Berichten zoeken">
-            <Search className="w-5 h-5" />
-          </button>
-        )}
+      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-2 md:gap-4">
+          {activeTab === 'chat' && (
+            <button className="p-2 rounded-full hover:bg-[#f0f4f9] text-[#404752] transition-colors cursor-pointer" title="Berichten zoeken">
+              <Search className="w-5 h-5" />
+            </button>
+          )}
 
         {/* User Account / Guest Status Badge */}
         {currentUser ? (
@@ -223,6 +218,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             <LogIn className="w-4 h-4" />
             Inloggen / Code Invoeren
           </button>
+        )}
+        </div>
+        {countdownFlight && (
+          <TripCountdown firstFlight={countdownFlight} />
         )}
       </div>
     </header>
