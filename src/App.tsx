@@ -484,23 +484,22 @@ export default function App() {
   } = useTransportEntries();
 
   // Earliest flight departure — powers the header countdown clock. Recomputed
-  // only when the transport list changes (not on every tick).
-  const firstFlight = useMemo(
-    () => getFirstFlightDeparture(transportEntries),
-    [transportEntries]
-  );
+  // only when the transport list changes (not on every tick). When no real
+  // flight has been added yet, fall back to the demo flight so the clock is
+  // visible for logged-in users. The demo is used purely as a display target
+  // and is NEVER stored in localStorage or synced to the Google Sheet.
+  const firstFlight = useMemo(() => {
+    const real = getFirstFlightDeparture(transportEntries);
+    if (real) return real;
+    if (currentUser || isGuestMode) {
+      return getFirstFlightDeparture(initialTransportEntries);
+    }
+    return null;
+  }, [transportEntries, currentUser, isGuestMode]);
 
   // Google Sheets Integration State
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const [isSheetsConnected, setIsSheetsConnected] = useState<boolean>(false);
-
-  // Demo seed: when no Google Sheet is connected (dev) and there are no
-  // transports yet, show a sample flight so the countdown is visible.
-  useEffect(() => {
-    if (!isSheetsConnected && transportEntries.length === 0) {
-      setTransportEntries(initialTransportEntries);
-    }
-  }, [isSheetsConnected, transportEntries.length, setTransportEntries]);
 
   // Sync Google Sheets on startup
   useEffect(() => {
@@ -1630,7 +1629,7 @@ if (loaded.stayBookingLinks) {
         onLoginClick={() => setActiveTab('login')}
         onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         isOwner={isOwner}
-        countdownFlight={firstFlight}
+        countdownFlight={currentUser || isGuestMode ? firstFlight : null}
       />
 
       {/* View Content based on Active Tab */}
