@@ -19,6 +19,15 @@ export interface TransportEntry {
   /** Vessel name as printed on the ticket, e.g. "Blue Star Delos". Used to
    *  resolve the public IMO number for live vessel tracking. */
   vesselName?: string;
+  /** Flight number as printed on the ticket, e.g. "KL1571". Used for live
+   *  flight-status lookups via AviationStack. */
+  flightNumber?: string;
+  /** IATA code of the departure airport, e.g. "AMS". */
+  fromIata?: string;
+  /** IATA code of the arrival airport, e.g. "ATH". */
+  toIata?: string;
+  /** Seat assignment as printed on the boarding pass, e.g. "14A". */
+  seat?: string;
   bookingRef?: string;
   notes?: string;
   /** Optional explicit link to a derived leg id (override of auto-link). */

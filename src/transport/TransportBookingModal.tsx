@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Ship, X } from 'lucide-react';
+import { Check, Ship, Plane, X } from 'lucide-react';
 import type { TransportEntry, TransportLeg, TransportType } from './types';
 import { transportTypeLabel } from './transportLogic';
 import { TransportIcon } from './TransportIcon';
@@ -20,6 +20,10 @@ interface FormState {
   arrivalTime: string;
   operator: string;
   vessel: string;
+  flightNumber: string;
+  fromIata: string;
+  toIata: string;
+  seat: string;
   bookingRef: string;
   notes: string;
 }
@@ -33,6 +37,10 @@ const EMPTY_FORM: FormState = {
   arrivalTime: '',
   operator: '',
   vessel: '',
+  flightNumber: '',
+  fromIata: '',
+  toIata: '',
+  seat: '',
   bookingRef: '',
   notes: '',
 };
@@ -77,6 +85,10 @@ export const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
       arrivalTime: form.arrivalTime || undefined,
       operator: form.operator.trim() || undefined,
       vesselName: form.vessel.trim() || undefined,
+      flightNumber: form.flightNumber.trim() || undefined,
+      fromIata: form.fromIata.trim().toUpperCase() || undefined,
+      toIata: form.toIata.trim().toUpperCase() || undefined,
+      seat: form.seat.trim() || undefined,
       bookingRef: form.bookingRef.trim() || undefined,
       notes: form.notes.trim() || undefined,
     });
@@ -98,14 +110,14 @@ export const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
         <div className="mb-6 pr-10">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-[#005BAE] text-white flex items-center justify-center shadow-md">
-              <Ship className="w-6 h-6" />
+              {form.type === 'flight' ? <Plane className="w-6 h-6" /> : <Ship className="w-6 h-6" />}
             </div>
             <div>
               <span className="font-['Inter'] text-xs font-semibold text-[#005BAE] uppercase tracking-wider block">
-                Ferry & Transfer Boekingen
+                {form.type === 'flight' ? 'Vliegticket' : 'Ferry & Transfer Boekingen'}
               </span>
               <h2 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[#001a33]">
-                Vervoer toevoegen
+                {form.type === 'flight' ? 'Vlucht toevoegen' : 'Vervoer toevoegen'}
               </h2>
             </div>
           </div>
@@ -210,22 +222,73 @@ export const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
               <input
                 value={form.operator}
                 onChange={(event) => updateForm('operator', event.target.value)}
-                placeholder="bv. Blue Star Ferries"
+                placeholder={form.type === 'flight' ? 'bv. KLM' : 'bv. Blue Star Ferries'}
                 className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
               />
             </div>
-            <div>
-              <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
-                Schip
-              </label>
-              <input
-                value={form.vessel}
-                onChange={(event) => updateForm('vessel', event.target.value)}
-                placeholder="bv. Blue Star Delos (staat op je ticket)"
-                className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
-              />
-            </div>
+            {form.type !== 'flight' && (
+              <div>
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Schip
+                </label>
+                <input
+                  value={form.vessel}
+                  onChange={(event) => updateForm('vessel', event.target.value)}
+                  placeholder="bv. Blue Star Delos (staat op je ticket)"
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+            )}
           </div>
+
+          {form.type === 'flight' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Vluchtnummer
+                </label>
+                <input
+                  value={form.flightNumber}
+                  onChange={(event) => updateForm('flightNumber', event.target.value)}
+                  placeholder="bv. KL1571"
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+              <div>
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Stoel
+                </label>
+                <input
+                  value={form.seat}
+                  onChange={(event) => updateForm('seat', event.target.value)}
+                  placeholder="bv. 14A"
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+              <div>
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Vertrek IATA
+                </label>
+                <input
+                  value={form.fromIata}
+                  onChange={(event) => updateForm('fromIata', event.target.value)}
+                  placeholder="bv. AMS"
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] uppercase focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+              <div>
+                <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">
+                  Aankomst IATA
+                </label>
+                <input
+                  value={form.toIata}
+                  onChange={(event) => updateForm('toIata', event.target.value)}
+                  placeholder="bv. ATH"
+                  className="w-full bg-[#f0f4f9] border border-[#c0c7d3]/30 rounded-xl px-4 py-2.5 font-['Inter'] text-sm text-[#001a33] uppercase focus:outline-none focus:border-[#005BAE]"
+                />
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block font-['Inter'] text-xs font-semibold text-[#001a33] uppercase tracking-wider mb-1.5">

@@ -211,3 +211,44 @@ export function transportTypeLabel(type: TransportEntry['type']): string {
     default: return 'Transport';
   }
 }
+
+// ---------------------------------------------------------------------------
+// Countdown helpers (header aftelklok)
+// ---------------------------------------------------------------------------
+
+/** Combine a YYYY-MM-DD date and optional HH:mm time into a local Date. */
+export function combineDateTime(dateStr: string, timeStr?: string): Date | null {
+  const base = parseDate(dateStr);
+  if (!base) return null;
+  if (timeStr && /^\d{1,2}:\d{2}$/.test(timeStr)) {
+    const [h, m] = timeStr.split(':').map(Number);
+    if (h > 23 || m > 59) return base;
+    base.setHours(h, m, 0, 0);
+  }
+  return base;
+}
+
+/**
+ * Find the earliest upcoming flight across the transport entries. This is the
+ * target the header countdown ticks down to. Returns null when there are no
+ * flight entries at all (so the clock stays hidden until tickets are added).
+ */
+export function getFirstFlightDeparture(
+  entries: TransportEntry[]
+): { flight: TransportEntry; date: Date } | null {
+  const flights = entries.filter((e) => e.type === 'flight' && e.date);
+  if (!flights.length) return null;
+
+  let best: TransportEntry | null = null;
+  let bestDate: Date | null = null;
+  for (const f of flights) {
+    const d = combineDateTime(f.date, f.departureTime);
+    if (!d) continue;
+    if (!bestDate || d.getTime() < bestDate.getTime()) {
+      best = f;
+      bestDate = d;
+    }
+  }
+  if (!best || !bestDate) return null;
+  return { flight: best, date: bestDate };
+}

@@ -322,9 +322,9 @@ export async function getOrCreateSpreadsheet(): Promise<{ spreadsheetId: string;
             ],
           },
           {
-            range: "Transports!A1:L1",
+            range: "Transports!A1:P1",
             values: [
-              ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId"]
+              ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId", "FlightNumber", "FromIata", "ToIata", "Seat"]
             ],
           },
           {
@@ -511,7 +511,7 @@ export async function saveTripToSheet(
     });
 
     // Format Transports rows
-    const transportHeaders = ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId"];
+    const transportHeaders = ["ID", "Type", "From", "To", "Date", "DepartureTime", "ArrivalTime", "Operator", "VesselName", "BookingRef", "Notes", "LinkedLegId", "FlightNumber", "FromIata", "ToIata", "Seat"];
     const transportRows = validTransports.map((t: any) => [
       t.id,
       t.type || "ferry",
@@ -524,7 +524,11 @@ export async function saveTripToSheet(
       t.vesselName || "",
       t.bookingRef || "",
       t.notes || "",
-      t.linkedLegId || ""
+      t.linkedLegId || "",
+      t.flightNumber || "",
+      t.fromIata || "",
+      t.toIata || "",
+      t.seat || ""
     ]);
     const transportValues = [transportHeaders, ...transportRows];
 
@@ -662,6 +666,10 @@ const stayBookingLinks = linkRows
         bookingRef: row[9] || undefined,
         notes: row[10] || undefined,
         linkedLegId: row[11] || undefined,
+        flightNumber: row[12] || undefined,
+        fromIata: row[13] || undefined,
+        toIata: row[14] || undefined,
+        seat: row[15] || undefined,
       }));
 
     return { trip, customBookings, stayBookingLinks, transportEntries, sheetUrl: spreadsheetUrl };

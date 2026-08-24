@@ -2,6 +2,8 @@ import React from 'react';
 import { ActiveTab, ChatSubTab, UserAccount } from '../types';
 import { USER_AVATAR } from '../data/initialData';
 import { Search, LogOut, LogIn, Key, UserCheck, Eye, Menu } from 'lucide-react';
+import type { FirstFlight } from '../transport/useFlightStatus';
+import { TripCountdown } from './TripCountdown';
 
 interface TopHeaderProps {
   activeTab: ActiveTab;
@@ -16,6 +18,8 @@ interface TopHeaderProps {
   onLoginClick: () => void;
   onToggleMobileMenu?: () => void;
   isOwner?: boolean;
+  /** Earliest flight departure, used to power the header countdown clock. */
+  countdownFlight?: FirstFlight | null;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -31,10 +35,11 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onLoginClick,
   onToggleMobileMenu,
   isOwner = false,
+  countdownFlight = null,
 }) => {
   return (
-    <header className="fixed top-0 left-0 md:left-64 right-0 flex justify-between items-center gap-2 px-4 md:px-8 py-3 md:py-4 bg-white/90 backdrop-blur-xl z-40 border-b border-[#f0f4f9]">
-      <div className="flex items-center gap-2 md:gap-8 min-w-0 flex-1">
+    <header className="fixed top-0 left-0 md:left-64 right-0 flex items-center gap-2 px-4 md:px-8 py-3 md:py-4 bg-white/90 backdrop-blur-xl z-40 border-b border-[#f0f4f9]">
+      <div className="flex items-center gap-2 md:gap-8 min-w-0 flex-1 md:flex-none">
         {/* Hamburger Menu on Mobile */}
         <button
           onClick={onToggleMobileMenu}
@@ -155,6 +160,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           )}
         </nav>
       </div>
+
+      {countdownFlight && (
+        <div className="hidden sm:flex flex-1 justify-center min-w-0 px-2">
+          <TripCountdown firstFlight={countdownFlight} />
+        </div>
+      )}
 
       <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
         {activeTab === 'chat' && (

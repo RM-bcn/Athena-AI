@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ActiveTab, ChatSubTab, ChatMessage, ChatFavorite, TripData, Accommodation, UserAccount, IslandStay, DayPlan, DayPlanItemType, TripRequest, DayPhoto } from './types';
 import { useTransportEntries } from './transport/useTransportEntries';
+import { getFirstFlightDeparture } from './transport/transportLogic';
+import { initialTransportEntries } from './data/initialData';
 import type { TransportEntry } from './transport/types';
 import { normalizeDayPlans, normalizeDayPlan, ensureDayPlanCount, dayPlanItemId, applyStayRecords, DAY_PLAN_RECORD_TYPES } from './utils/dayPlans';
 import { getActiveUser, isGuestMode as readGuestMode, saveLogin, updateActiveUser, clearSession, ACTIVE_USER_KEY, GUEST_MODE_KEY } from './utils/authStorage';
@@ -481,9 +483,24 @@ export default function App() {
     setTransportEntries,
   } = useTransportEntries();
 
+  // Earliest flight departure — powers the header countdown clock. Recomputed
+  // only when the transport list changes (not on every tick).
+  const firstFlight = useMemo(
+    () => getFirstFlightDeparture(transportEntries),
+    [transportEntries]
+  );
+
   // Google Sheets Integration State
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const [isSheetsConnected, setIsSheetsConnected] = useState<boolean>(false);
+
+  // Demo seed: when no Google Sheet is connected (dev) and there are no
+  // transports yet, show a sample flight so the countdown is visible.
+  useEffect(() => {
+    if (!isSheetsConnected && transportEntries.length === 0) {
+      setTransportEntries(initialTransportEntries);
+    }
+  }, [isSheetsConnected, transportEntries.length, setTransportEntries]);
 
   // Sync Google Sheets on startup
   useEffect(() => {
@@ -1613,6 +1630,7 @@ if (loaded.stayBookingLinks) {
         onLoginClick={() => setActiveTab('login')}
         onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         isOwner={isOwner}
+        countdownFlight={firstFlight}
       />
 
       {/* View Content based on Active Tab */}
