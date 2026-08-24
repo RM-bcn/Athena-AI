@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, MapPin, Calendar, Trash2, Images } from 'lucide-react';
-import { DayPhoto, UserAccount } from '../types';
+import { ChevronLeft, MapPin, Calendar, Trash2, Images, Plus } from 'lucide-react';
+import { DayPhoto, UserAccount, IslandStay } from '../types';
 import { StoriesModal } from './Modals/StoriesModal';
+import { ReisdagboekUploadModal } from './Modals/ReisdagboekUploadModal';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -89,6 +90,18 @@ interface TijdlijnViewProps {
   isGuestMode: boolean;
   onBack: () => void;
   onDeleteDayPhoto?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onAddDayPhoto?: (input: {
+    imageBase64: string;
+    date: string;
+    island: string;
+    caption: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  onGenerateCaption?: (photoContext: {
+    island: string;
+    date: string;
+    text?: string;
+  }) => Promise<{ success: boolean; caption?: string; error?: string }>;
+  stays?: IslandStay[];
 }
 
 interface DayGroup {
@@ -104,8 +117,12 @@ export const TijdlijnView: React.FC<TijdlijnViewProps> = ({
   isGuestMode,
   onBack,
   onDeleteDayPhoto,
+  onAddDayPhoto,
+  onGenerateCaption,
+  stays = [],
 }) => {
   const [storiesOpen, setStoriesOpen] = useState<{ photos: DayPhoto[]; startIndex: number } | null>(null);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const canEdit = !!currentUser && !isGuestMode;
 
   const dayGroups: DayGroup[] = useMemo(() => {
@@ -160,7 +177,7 @@ export const TijdlijnView: React.FC<TijdlijnViewProps> = ({
   return (
     <div className="min-h-screen bg-[#f5f8fc]">
       {/* Mobiele terug-knop (desktop heeft de sidebar) */}
-      <div className="md:hidden sticky top-[64px] z-20 bg-white/90 backdrop-blur border-b border-[#e1efff]">
+      <div className="md:hidden bg-white/90 backdrop-blur border-b border-[#e1efff]">
         <button
           onClick={onBack}
           className="flex items-center gap-2 px-4 py-2.5 text-[#404752] hover:text-[#005BAE] text-sm font-semibold transition-colors cursor-pointer"
@@ -170,7 +187,7 @@ export const TijdlijnView: React.FC<TijdlijnViewProps> = ({
         </button>
       </div>
 
-      <main className="max-w-2xl mx-auto px-4 pb-24">
+      <main className="max-w-2xl mx-auto px-4 pb-24 pt-6">
         {/* Pagina-header */}
         <section className="mt-6 bg-white rounded-[24px] border border-[#e1efff] shadow-sm p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -194,6 +211,15 @@ export const TijdlijnView: React.FC<TijdlijnViewProps> = ({
                   {islandCount} {islandCount === 1 ? 'eiland' : 'eilanden'}
                 </span>
               )}
+              {canEdit && (
+                <button
+                  onClick={() => setIsUploadOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  Foto toevoegen
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -203,9 +229,18 @@ export const TijdlijnView: React.FC<TijdlijnViewProps> = ({
             <Images className="w-10 h-10 text-[#c0c7d3]" />
             <p className="font-['Inter'] text-sm font-semibold text-[#404752]">
               {canEdit
-                ? 'Nog geen foto\'s — voeg je eerste moment toe via Mijn Reis!'
+                ? 'Nog geen foto\'s — voeg je eerste moment toe!'
                 : 'Nog geen foto\'s — check straks onze dagelijkse hoogtepunten!'}
             </p>
+            {canEdit && (
+              <button
+                onClick={() => setIsUploadOpen(true)}
+                className="mt-1 px-4 py-2 rounded-xl bg-[#005BAE] text-white font-['Inter'] text-xs font-bold hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Foto toevoegen
+              </button>
+            )}
           </section>
         ) : (
           <>
@@ -333,6 +368,16 @@ export const TijdlijnView: React.FC<TijdlijnViewProps> = ({
         photos={storiesOpen?.photos || []}
         startIndex={storiesOpen?.startIndex || 0}
         onClose={() => setStoriesOpen(null)}
+      />
+
+      <ReisdagboekUploadModal
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        stays={stays}
+        onSave={onAddDayPhoto || (async () => ({ success: false, error: 'Upload niet beschikbaar.' }))}
+        onGenerateCaption={
+          onGenerateCaption || (async () => ({ success: false, error: 'AI niet beschikbaar.' }))
+        }
       />
     </div>
   );
