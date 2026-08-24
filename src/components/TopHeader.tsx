@@ -162,7 +162,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       </div>
 
       {countdownFlight && (
-        <div className="hidden sm:flex flex-1 justify-center min-w-0 px-2">
+        <div className="flex flex-1 justify-center min-w-0 px-2">
           <TripCountdown firstFlight={countdownFlight} />
         </div>
       )}
